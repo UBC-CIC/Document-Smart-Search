@@ -1,7 +1,6 @@
 import localFont from "next/font/local";
 import "./globals.css";
 
-
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
   variable: "--font-geist-sans",
@@ -14,16 +13,17 @@ const geistMono = localFont({
 });
 
 export const metadata = {
-  title: "Digital Strategy Assistant Administration",
-  description: "Administration tool for the Digital Strategy Assistant",
+  title: "DFO Administration",
+  description: "Administration tool for the DFO Smart Search Assistant",
+  icons: {
+    icon: "/logo.png", 
+  },
 };
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         {children}
       </body>
     </html>

@@ -18,24 +18,26 @@ const Footer = () => {
           <DialogContent className="max-w-[425px]">
             <DialogHeader>
               <DialogTitle className="text-xl font-bold mb-4">
-                About the Digital Strategy Assistant
+                About DFO Smart Search
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <p className="text-gray-700">
-                The Digital Strategy Assistant (DSA) is an AI-powered
-                tool designed to help educators and institutions enhance their
-                digital learning capabilities.
+                DFO Smart Search is an AI-powered tool designed to help people quickly find and explore Fisheries and
+                Oceans Canada (DFO) documents, science advice, and research.
               </p>
               <p className="text-gray-700">
-                Our platform provides guidance on implementing effective digital
-                learning strategies, improving course design, and making
-                data-driven decisions for better educational outcomes.
+                Our platform provides user-friendly search functionality,
+                enabling everyone from policymakers to the general public to
+                access clear and relevant information—without needing advanced
+                technical knowledge.
               </p>
               <p className="text-gray-700">
-                Created with the goal of making digital education more
-                accessible and effective, the Digital Strategy Assistant serves as your
-                personal consultant for all aspects of digital learning.
+                Created with the goal of making science advice more accessible
+                and transparent, DFO Smart Search serves as your guide to
+                fisheries, marine ecosystems, and oceans research. We continually
+                refine and improve our search capabilities to keep you informed
+                about the latest developments in fisheries and oceans science.
               </p>
             </div>
           </DialogContent>
@@ -48,35 +50,36 @@ const Footer = () => {
           <DialogContent className="max-w-[425px]">
             <DialogHeader>
               <DialogTitle className="text-xl font-bold mb-4">
-                Terms & Conditions
+                Terms &amp; Conditions
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <p className="text-gray-700">
-                By using the Digital Strategy Assistant, you agree to the following terms and
+                By using DFO Smart Search, you agree to the following terms and
                 conditions:
               </p>
               <ul className="list-disc pl-6 space-y-2 text-gray-700">
                 <li>
-                  This tool is provided for educational and informational
-                  purposes only.
+                  This tool is provided for informational and research purposes
+                  only.
                 </li>
                 <li>
-                  All recommendations should be reviewed and adapted to your
-                  specific context.
+                  Any science advice or recommendations should be reviewed and
+                  adapted to your specific context.
                 </li>
                 <li>
-                  User data is handled in accordance with our privacy policy.
+                  User data is handled in accordance with applicable privacy
+                  policies.
                 </li>
                 <li>The service is provided "as is" without any warranties.</li>
                 <li>
                   We reserve the right to modify or discontinue the service at
-                  any time.
+                  any time without notice.
                 </li>
               </ul>
               <p className="text-gray-700">
-                For full terms and conditions, please contact your
-                administrator.
+                For the full terms and conditions, or any questions, please
+                contact the Fisheries and Oceans Canada support team.
               </p>
             </div>
           </DialogContent>

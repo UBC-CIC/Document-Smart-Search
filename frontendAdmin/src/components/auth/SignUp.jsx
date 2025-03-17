@@ -1,6 +1,5 @@
-"use client";
 import React, { useState } from "react";
-import Header from "../Header";
+import Header from "../components/Header";
 import Image from "next/image";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -136,7 +135,7 @@ const SignUp = ({
         />
         <Button
           type="submit"
-          className="w-full bg-blue-900 hover:bg-blue-800 text-md"
+          className="w-full bg-red-500 hover:bg-red-600 text-md"
         >
           SIGN UP
         </Button>

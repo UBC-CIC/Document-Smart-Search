@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import Header from "../Header";
+import Header from "../components/Header";
 import Image from "next/image";
 import SignIn from "./SignIn";
 import SignUp from "./SignUp";
@@ -18,18 +18,18 @@ const Auth = () => {
     <div className="w-full h-screen flex flex-col">
       <Header />
       <div className="flex flex-grow">
-        <div className="flex flex-col items-center justify-center bg-adminHome w-full md:w-1/2 h-full">
-          <div className="relative w-[350px] md:h-[350px]">
-            <div className="top-14 left-14 absolute inset-0 bg-white rounded-full w-[240px] md:h-[240px]" />
-            <Image
-              src="/logo.png"
-              alt="logo"
-              layout="fill"
-              objectFit="contain"
-              className="relative z-10"
-            />
+      <div className="bg-gray-100 w-full md:w-1/2 h-full flex flex-col items-center justify-center">
+          <div className="relative w-[240px] h-[240px] bg-white rounded-full flex items-center justify-center">
+            <div className="relative w-[180px] h-[180px]">
+              <Image
+                src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-WxA3QbDhsMTlR8fSf3OIicudyp8eif.png"
+                alt="Canadian Flag"
+                layout="fill"
+                objectFit="contain"
+              />
+            </div>
           </div>
-          <div className="text-3xl font-bold mt-4">DSA Administrator</div>
+          <h2 className="text-3xl font-bold mt-8 mb-4">DFO SmartSearch</h2>
         </div>
         <div className="bg-white w-full md:w-1/2 p-8 flex items-center justify-center">
           {authState === "signin" && (

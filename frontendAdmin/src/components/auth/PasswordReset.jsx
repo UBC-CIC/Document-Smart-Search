@@ -141,7 +141,7 @@ const PasswordReset = ({ email, loading, setLoading, setAuthState }) => {
           Remember your password?{" "}
           <a
             onClick={() => setAuthState("signin")}
-            className="text-blue-600 hover:underline cursor-pointer"
+            className="text-blue-400 hover:underline cursor-pointer"
           >
             Sign in
           </a>

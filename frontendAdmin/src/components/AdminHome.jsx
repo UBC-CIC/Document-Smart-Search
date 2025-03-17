@@ -7,7 +7,7 @@ import Categories from "./categories/Categories.jsx";
 import Prompt from "./prompt/Prompt.jsx";
 import Files from "./files/Files.jsx";
 import Sidebar from "./Sidebar.jsx";
-import Header from "./Header.jsx";
+import Header from "./components/Header.jsx";
 import PostAuthHeader from "./PostAuthHeader.jsx";
 import History from "./history/History.jsx";
 import Category_creation from "./categories/Category_creation.jsx";
