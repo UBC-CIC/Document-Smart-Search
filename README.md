@@ -1,4 +1,4 @@
-# Digital Strategy Assistant
+# DFO
 
 This prototype explores how Large Language Models (LLMs) can enhance digital learning by providing an accessible and interactive way for the general public, educators, and administrators to engage with the Digital Strategy Assistant (DSA). Acting as a conversational guide, the chatbot allows users to ask questions and receive tailored responses aligned with DSA principles and recommendations. This approach fosters a broader understanding of technology-enhanced learning, making digital literacy concepts and strategies more approachable and relevant across educational and public contexts.
 
