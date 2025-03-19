@@ -257,7 +257,7 @@ export default function DocumentSearch() {
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900 transition-all duration-300">
       {/* Main Content */}
-      <main className="max-w-3xl mx-auto px-4 py-6 md:py-8">
+      <main className="max-w-5xl mx-auto px-4 py-6 md:py-8">
         <h2 className="text-2xl md:text-3xl font-bold text-center mb-6 md:mb-8 dark:text-white">
           Document & Metadata Search
         </h2>

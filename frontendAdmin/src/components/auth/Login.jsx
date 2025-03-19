@@ -7,6 +7,7 @@ import SignUp from "./SignUp";
 import SignupConfirmation from "./SignupConfirmation";
 import ForgotPassword from "./ForgotPassword";
 import PasswordReset from "./PasswordReset";
+
 const Auth = () => {
   const [authState, setAuthState] = useState("signin");
   const [email, setEmail] = useState("");
@@ -15,12 +16,12 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
 
   return (
-    <div className="w-full h-screen flex flex-col">
+    <div className="w-full h-screen flex flex-col bg-gray-100">
       <Header />
-      <div className="flex flex-grow">
-      <div className="bg-gray-100 w-full md:w-1/2 h-full flex flex-col items-center justify-center">
-          <div className="relative w-[240px] h-[240px] bg-white rounded-full flex items-center justify-center">
-            <div className="relative w-[180px] h-[180px]">
+      <div className="flex-grow flex flex-col items-center justify-center px-4">
+        <div className="bg-white shadow-lg rounded-xl px-8 py-10 max-w-md w-full">
+          <div className="flex flex-col items-center mb-6">
+            <div className="relative w-[100px] h-[100px]">
               <Image
                 src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-WxA3QbDhsMTlR8fSf3OIicudyp8eif.png"
                 alt="Canadian Flag"
@@ -28,10 +29,9 @@ const Auth = () => {
                 objectFit="contain"
               />
             </div>
+            <h2 className="text-2xl font-bold mt-4">DFO SmartSearch</h2>
           </div>
-          <h2 className="text-3xl font-bold mt-8 mb-4">DFO SmartSearch</h2>
-        </div>
-        <div className="bg-white w-full md:w-1/2 p-8 flex items-center justify-center">
+
           {authState === "signin" && (
             <SignIn
               email={email}
@@ -74,7 +74,12 @@ const Auth = () => {
             />
           )}
           {authState === "passwordReset" && (
-            <PasswordReset email={email} loading={loading} setLoading={setLoading} setAuthState={setAuthState} />
+            <PasswordReset
+              email={email}
+              loading={loading}
+              setLoading={setLoading}
+              setAuthState={setAuthState}
+            />
           )}
         </div>
       </div>

@@ -467,7 +467,7 @@ export default function SmartSearchAssistant() {
       <CitationsSidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
       {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-4 py-6 md:py-8 flex-grow flex flex-col">
+      <main className="max-w-6xl mx-auto px-4 py-6 md:py-8 flex-grow flex flex-col">
         <h2 className="text-2xl md:text-3xl font-bold text-center mb-6 md:mb-8">SmartSearch Assistant</h2>
 
         {/* Conversation */}
@@ -591,7 +591,7 @@ export default function SmartSearchAssistant() {
         </div>
 
         {/* Input Area */}
-        <div className="w-full max-w-4xl mx-auto px-4 py-4 space-y-4">
+        <div className="w-full max-w-6xl mx-auto px-4 py-4 space-y-4">
           <div className="relative flex items-center w-full bg-gray-100 rounded-full px-4 py-2">
             <div className="flex items-center space-x-2">
               <button onClick={handleSessionReset} className="p-1.5 hover:bg-gray-200 rounded-full">
