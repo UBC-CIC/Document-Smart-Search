@@ -27,7 +27,7 @@ const FeedbackComponent = ({ feedback, setFeedback, onSubmit, isSubmitting, onCl
       </Button>
       <Image className="mb-2" src="/logo.png" alt="logo" width={40} height={40} />
       <h2 className="text-base font-normal text-gray-900 mb-4">
-        How was your experience with the Digital Strategy Assistant?
+        How was your experience with the DFO Smart Search?
       </h2>
       <div className="flex gap-1 mb-6">
         {[...Array(5)].map((_, index) => (

@@ -16,7 +16,7 @@ export const metadata = {
   title: "DFO Administration",
   description: "Administration tool for the DFO Smart Search Assistant",
   icons: {
-    icon: "/logo.png", 
+    icon: "/gov_leaf.png", 
   },
 };
 

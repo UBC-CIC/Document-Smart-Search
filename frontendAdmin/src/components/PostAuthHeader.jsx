@@ -1,49 +1,47 @@
-import React from "react";
-import { signOut } from "aws-amplify/auth";
-import { Button } from "./ui/button";
-const PostAuthHeader = ({ page }) => {
-  const headerMapping = (page) => {
-    switch (page) {
-      case "analytics":
-        return "Administrator Dashboard";
-      case "categories":
-        return "Edit Categories";
-      case "history":
-        return "View History";
-      case "prompt":
-        return "Edit Prompt";
-      case "files":
-        return "Files";
-      case "category_creation":
-        return "Create Category";
-        case "edit_category":
-          return "Edit Category";
-      default:
-        return "Administrator Dashboard";
-    }
-  };
+"use client"
+import Image from "next/image"
+import { signOut } from "aws-amplify/auth"
+import { Button } from "./ui/button"
+import mapleLeaf from "../app/flag_of_canada.png"
 
+const PostAuthHeader = () => {
   const handleSignOut = async () => {
     try {
-      await signOut();
-      window.location.reload();
+      await signOut()
+      window.location.reload()
     } catch (error) {
-      console.log("error signing out: ", error);
+      console.log("error signing out: ", error)
     }
-  };
+  }
+
   return (
-    <div className="pb-4 border-b border-gray-200">
-      <div className="bg-adminMain py-6 mb-4"></div>
-      <div className="flex flex-row justify-between px-6">
-        <h1 className="text-center text-3xl font-bold">
-          {headerMapping(page)}
-        </h1>
-        <Button className="bg-adminMain hover:bg-adminHover text-white text-md py-4" onClick={handleSignOut}>
+    <header className="bg-white border-b border-gray-300">
+      <div className="max-w-[98%] mx-auto px-4 py-2 flex items-center justify-between">
+        {/* Left side: Flag and Government branding */}
+        <div className="flex items-center space-x-3">
+          {/* Canada Flag */}
+          <Image
+            src={mapleLeaf || "/placeholder.svg"}
+            alt="Canadian Flag"
+            width={70}
+            height={30}
+            className="object-contain"
+          />
+          {/* Government of Canada Wordmark */}
+          <div className="leading-tight">
+            <p className="text-black font-bold">Government of Canada</p>
+            <p className="text-black font-bold">Gouvernement du Canada</p>
+          </div>
+        </div>
+
+        {/* Right side: Sign Out button */}
+        <Button variant="outline" className="border-gray-300 hover:bg-gray-100 text-black" onClick={handleSignOut}>
           Sign Out
         </Button>
       </div>
-    </div>
-  );
-};
+    </header>
+  )
+}
 
-export default PostAuthHeader;
+export default PostAuthHeader
+

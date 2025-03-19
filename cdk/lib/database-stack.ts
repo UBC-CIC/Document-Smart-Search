@@ -1,25 +1,31 @@
-import { Stack, StackProps, RemovalPolicy, SecretValue } from 'aws-cdk-lib';
-import { Construct } from 'constructs';
-import { Duration } from 'aws-cdk-lib';
+import { Stack, StackProps, RemovalPolicy, SecretValue } from "aws-cdk-lib";
+import { Construct } from "constructs";
+import { Duration } from "aws-cdk-lib";
 
-import * as iam from 'aws-cdk-lib/aws-iam';
-import * as rds from 'aws-cdk-lib/aws-rds';
+import * as iam from "aws-cdk-lib/aws-iam";
+import * as rds from "aws-cdk-lib/aws-rds";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
-import * as secretmanager from 'aws-cdk-lib/aws-secretsmanager';
+import * as secretmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as logs from "aws-cdk-lib/aws-logs";
-import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
+import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 
-import { VpcStack } from './vpc-stack';
+import { VpcStack } from "./vpc-stack";
 
 export class DatabaseStack extends Stack {
   public readonly dbInstance: rds.DatabaseInstance;
+  public readonly comparisonDbInstance: rds.DatabaseInstance;
   public readonly secretPathAdminName: string;
   public readonly rdsProxyEndpointAdmin: string;
+  public readonly comparisonSecretPathAdminName: string;
+  public readonly comparisonRdsProxyEndpointAdmin: string;
   public readonly secretPathUser: secretsmanager.Secret;
+  public readonly comparisonSecretPathUser: secretsmanager.Secret;
   public readonly secretPathTableCreator: secretsmanager.Secret;
   public readonly rdsProxyEndpoint: string;
+  public readonly comparisonRDSProxyEndpoint: string;
   public readonly rdsProxyEndpointTableCreator: string;
   public readonly databaseID: string;
+  public readonly comparisonDatabaseID: string;
 
   constructor(
     scope: Construct,
@@ -46,6 +52,7 @@ export class DatabaseStack extends Stack {
      * Secrets will be populate at initalization of data
      */
     this.secretPathAdminName = `${id}-DSA/credentials/DbCredential`; // Name in the Secret Manager to store DB credentials
+    this.comparisonSecretPathAdminName = `${id}-DSA/credentials/DbComparison`; // Name in the Secret Manager to store DB credentials
     const secretPathUserName = `${id}-DSA/userCredentials/DbCredential`;
     this.secretPathUser = new secretsmanager.Secret(this, secretPathUserName, {
       secretName: secretPathUserName,
@@ -56,6 +63,21 @@ export class DatabaseStack extends Stack {
         password: SecretValue.unsafePlainText("applicationPassword"), // in the initializer
       },
     });
+
+    const comparisonSecretPathUserName = `${id}-DSA/userCredentials/DbComparison`;
+    this.comparisonSecretPathUser = new secretsmanager.Secret(
+      this,
+      comparisonSecretPathUserName,
+      {
+        secretName: comparisonSecretPathUserName,
+        description: "Secrets for clients to connect to RDS",
+        removalPolicy: RemovalPolicy.DESTROY,
+        secretObjectValue: {
+          username: SecretValue.unsafePlainText("applicationUsername"), // this will change later at runtime
+          password: SecretValue.unsafePlainText("applicationPassword"), // in the initializer
+        },
+      }
+    );
 
     const secretPathTableCreator = `${id}-DSA/userCredentials/rdsTableCreator`;
     this.secretPathTableCreator = new secretsmanager.Secret(
@@ -71,8 +93,6 @@ export class DatabaseStack extends Stack {
         },
       }
     );
-
-    
     const parameterGroup = new rds.ParameterGroup(this, `rdsParameterGroup`, {
       engine: rds.DatabaseInstanceEngine.postgres({
         version: rds.PostgresEngineVersion.VER_16_3,
@@ -112,17 +132,67 @@ export class DatabaseStack extends Stack {
       autoMinorVersionUpgrade: true,
       backupRetention: Duration.days(7),
       deleteAutomatedBackups: true,
-      deletionProtection: true, /// To be changed
+      deletionProtection: true,
       databaseName: "DSA",
       publiclyAccessible: false,
       cloudwatchLogsRetention: logs.RetentionDays.INFINITE,
       cloudwatchLogsExports: ["postgresql", "upgrade"],
-      storageEncrypted: true, // storage encryption at rest
-      monitoringInterval: Duration.seconds(60), // enhanced monitoring interval
+      storageEncrypted: true,
+      monitoringInterval: Duration.seconds(60),
       parameterGroup: parameterGroup,
     });
 
+    this.comparisonDbInstance = new rds.DatabaseInstance(
+      this,
+      `comparison-database`,
+      {
+        vpc: vpcStack.vpc,
+        vpcSubnets: {
+          subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+        },
+        engine: rds.DatabaseInstanceEngine.postgres({
+          version: rds.PostgresEngineVersion.VER_16_3,
+        }),
+        instanceType: ec2.InstanceType.of(
+          ec2.InstanceClass.BURSTABLE4_GRAVITON,
+          ec2.InstanceSize.MEDIUM
+        ),
+        credentials: rds.Credentials.fromUsername(
+          secret.secretValueFromJson("DB_Username").unsafeUnwrap(),
+          {
+            secretName: this.comparisonSecretPathAdminName,
+          }
+        ),
+        multiAz: true,
+        allocatedStorage: 100,
+        maxAllocatedStorage: 115,
+        allowMajorVersionUpgrade: false,
+        autoMinorVersionUpgrade: true,
+        backupRetention: Duration.days(7),
+        deleteAutomatedBackups: true,
+        deletionProtection: true,
+        databaseName: "DSA",
+        publiclyAccessible: false,
+        cloudwatchLogsRetention: logs.RetentionDays.INFINITE,
+        cloudwatchLogsExports: ["postgresql", "upgrade"],
+        storageEncrypted: true,
+        monitoringInterval: Duration.seconds(60),
+        parameterGroup: parameterGroup,
+      }
+    );
+
     this.dbInstance.connections.securityGroups.forEach(function (
+      securityGroup
+    ) {
+      // 10.0.0.0/16 match the cidr range in vpc stack
+      securityGroup.addIngressRule(
+        ec2.Peer.ipv4("10.0.0.0/16"),
+        ec2.Port.tcp(5432),
+        "Postgres Ingress"
+      );
+    });
+
+    this.comparisonDbInstance.connections.securityGroups.forEach(function (
       securityGroup
     ) {
       // 10.0.0.0/16 match the cidr range in vpc stack
@@ -169,11 +239,25 @@ export class DatabaseStack extends Stack {
       this.secretPathAdminName
     );
 
+    const comaprisonSecretPathAdmin = secretmanager.Secret.fromSecretNameV2(
+      this,
+      "AdminComparisonSecret",
+      this.comparisonSecretPathAdminName
+    );
+
     const rdsProxyAdmin = this.dbInstance.addProxy(id + "-proxy-admin", {
       secrets: [secretPathAdmin],
       vpc: vpcStack.vpc,
       role: rdsProxyRole,
       securityGroups: this.dbInstance.connections.securityGroups,
+      requireTLS: false,
+    });
+
+    const comparisonRdsProxyAdmin = this.comparisonDbInstance.addProxy(id + "-proxy-admin", {
+      secrets: [comaprisonSecretPathAdmin],
+      vpc: vpcStack.vpc,
+      role: rdsProxyRole,
+      securityGroups: this.comparisonDbInstance.connections.securityGroups,
       requireTLS: false,
     });
 
@@ -195,7 +279,53 @@ export class DatabaseStack extends Stack {
 
     this.dbInstance.grantConnect(rdsProxyRole);
     this.rdsProxyEndpoint = rdsProxy.endpoint;
-    this.rdsProxyEndpointAdmin = rdsProxyAdmin.endpoint;
     this.rdsProxyEndpointTableCreator = rdsProxyTableCreator.endpoint;
+
+    const comparisonRdsProxy = this.comparisonDbInstance.addProxy(
+      id + "-proxy",
+      {
+        secrets: [this.comparisonSecretPathUser!],
+        vpc: vpcStack.vpc,
+        role: rdsProxyRole,
+        securityGroups: this.comparisonDbInstance.connections.securityGroups,
+        requireTLS: false,
+      }
+    );
+    const comparisonRdsProxyTableCreator = this.comparisonDbInstance.addProxy(
+      id + "+proxy",
+      {
+        secrets: [this.secretPathTableCreator!],
+        vpc: vpcStack.vpc,
+        role: rdsProxyRole,
+        securityGroups: this.comparisonDbInstance.connections.securityGroups,
+        requireTLS: false,
+      }
+    );
+
+    // Workaround for bug where TargetGroupName is not set but required
+    let comparisonTargetGroup = comparisonRdsProxy.node.children.find(
+      (child: any) => {
+        return child instanceof rds.CfnDBProxyTargetGroup;
+      }
+    ) as rds.CfnDBProxyTargetGroup;
+
+    targetGroup.addPropertyOverride("TargetGroupName", "default");
+
+    let comaprisonTargetGroupTableCreator =
+      comparisonRdsProxyTableCreator.node.children.find((child: any) => {
+        return child instanceof rds.CfnDBProxyTargetGroup;
+      }) as rds.CfnDBProxyTargetGroup;
+
+    comparisonTargetGroup.addPropertyOverride("TargetGroupName", "default");
+    comaprisonTargetGroupTableCreator.addPropertyOverride(
+      "TargetGroupName",
+      "default"
+    );
+
+    this.comparisonDbInstance.grantConnect(rdsProxyRole);
+    this.comparisonRDSProxyEndpoint = comparisonRdsProxy.endpoint;
+
+    this.rdsProxyEndpointAdmin = rdsProxyAdmin.endpoint;
+    this.comparisonRdsProxyEndpointAdmin = comparisonRdsProxyAdmin.endpoint;
   }
 }

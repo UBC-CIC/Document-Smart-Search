@@ -15,10 +15,10 @@ const geistMono = localFont({
 })
 
 export const metadata = {
-  title: "DFO Smart Search",
+  title: "DFO SmartSearch",
   description: "Your intelligent assistant for Fisheries and Oceans Canada",
   icons: {
-    icon: "/logo.png", // Ensure this file exists in your public folder
+    icon: "/gov_leaf.png", // Ensure this file exists in your public folder
   },
 }
 
