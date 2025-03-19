@@ -15,7 +15,7 @@ export default function DocumentSearch() {
 
   // Filter states
   const [yearFilters, setYearFilters] = useState({
-    2021: true,
+    2021: false,
     2020: false,
     2019: false,
   })

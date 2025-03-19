@@ -1,38 +1,34 @@
 "use client"
 
+import mapleLeaf from "../../app/maple_leaf.png"
+
 import { useState, useRef, useEffect, useCallback } from "react"
-import Link from "next/link"
-import { Search, Send, ThumbsUp, ThumbsDown, User, Mic, MicOff, RefreshCw } from "lucide-react"
+import { Search, Send, User, Mic, MicOff, RefreshCw } from "lucide-react"
 import { CitationsSidebar } from "../components/citations-sidebar"
-import { FeedbackDialog } from "../components/feedback-dialog"
+import FeedbackComponent from "./feedback-component"
 import { getFingerprint } from "@thumbmarkjs/thumbmarkjs"
 import { toast, ToastContainer } from "react-toastify"
 import "react-toastify/dist/ReactToastify.css"
 import Image from "next/image"
-
-import flag from "../../app/flag_of_canada.png"
-
-import mapleLeaf from "../../app/maple_leaf.png"
-
 import { useRouter } from "next/navigation"
 
-// Import filled icons
-import { ThumbsUp as ThumbsUpFilled } from "../components/filled-icons"
-import { ThumbsDown as ThumbsDownFilled } from "../components/filled-icons"
-
-const INITIAL_MESSAGE = {
-  id: "initial",
-  role: "assistant",
-  content:
-    "Hello! Please select the best role below that fits you. We can better answer your questions about Fisheries and Oceans Canada. Don't include personal details such as your name and private content.",
-  options: ["Student/general public", "Researcher/scientist", "Industry professional", "Government employee"],
-  user_role: "",
-}
-
 export default function SmartSearchAssistant() {
+  // Add these state variables to the component
+  const [showFeedback, setShowFeedback] = useState(false)
+  const [feedback, setFeedback] = useState({ rating: 0, description: [] })
+  const [isSendingFeedback, setIsSendingFeedback] = useState(false)
 
   // State for the conversation history
-  const [messages, setMessages] = useState([INITIAL_MESSAGE])
+  const [messages, setMessages] = useState([
+    {
+      id: "initial",
+      role: "assistant",
+      content:
+        "Hello! Please select the best role below that fits you. We can better answer your questions about Fisheries and Oceans Canada. Don't include personal details such as your name and private content.",
+      options: ["Student/general public", "Researcher/scientist", "Industry professional", "Government employee"],
+      user_role: "",
+    },
+  ])
 
   // State for fingerprint and session
   const [fingerprint, setFingerprint] = useState("")
@@ -57,13 +53,6 @@ export default function SmartSearchAssistant() {
 
   const router = useRouter()
 
-  // State for feedback dialog
-  const [feedbackDialog, setFeedbackDialog] = useState({
-    isOpen: false,
-    messageId: null,
-    feedbackType: null,
-  })
-
   // State for voice input
   const [isListening, setIsListening] = useState(false)
   const recognitionRef = useRef(null)
@@ -76,7 +65,7 @@ export default function SmartSearchAssistant() {
   // Scroll to bottom when messages change
   useEffect(() => {
     scrollToBottom()
-  }, [scrollToBottom, messages, feedbackDialog.isOpen])
+  }, [scrollToBottom, messages, showFeedback])
 
   // Close sidebar when screen resizes to mobile
   useEffect(() => {
@@ -159,7 +148,16 @@ export default function SmartSearchAssistant() {
       localStorage.setItem("dfoSession", JSON.stringify(sessionData))
 
       // Initialize with first message
-      setMessages([INITIAL_MESSAGE])
+      setMessages([
+        {
+          id: "initial",
+          role: "assistant",
+          content:
+            "Hello! Please select the best role below that fits you. We can better answer your questions about Fisheries and Oceans Canada. Don't include personal details such as your name and private content.",
+          options: ["Student/general public", "Researcher/scientist", "Industry professional", "Government employee"],
+          user_role: "",
+        },
+      ])
 
       return sessionData
     } catch (error) {
@@ -186,7 +184,16 @@ export default function SmartSearchAssistant() {
       )
 
       if (!response.ok) {
-        setMessages([INITIAL_MESSAGE])
+        setMessages([
+          {
+            id: "initial",
+            role: "assistant",
+            content:
+              "Hello! Please select the best role below that fits you. We can better answer your questions about Fisheries and Oceans Canada. Don't include personal details such as your name and private content.",
+            options: ["Student/general public", "Researcher/scientist", "Industry professional", "Government employee"],
+            user_role: "",
+          },
+        ])
         return
       }
 
@@ -214,13 +221,29 @@ export default function SmartSearchAssistant() {
         convertedMessages[0].content.includes("Please select the best role below")
 
       if (!hasInitialMessage) {
-        convertedMessages.unshift(INITIAL_MESSAGE)
+        convertedMessages.unshift({
+          id: "initial",
+          role: "assistant",
+          content:
+            "Hello! Please select the best role below that fits you. We can better answer your questions about Fisheries and Oceans Canada. Don't include personal details such as your name and private content.",
+          options: ["Student/general public", "Researcher/scientist", "Industry professional", "Government employee"],
+          user_role: "",
+        })
       }
 
       setMessages(convertedMessages)
     } catch (error) {
       console.error("Error fetching messages:", error)
-      setMessages([INITIAL_MESSAGE])
+      setMessages([
+        {
+          id: "initial",
+          role: "assistant",
+          content:
+            "Hello! Please select the best role below that fits you. We can better answer your questions about Fisheries and Oceans Canada. Don't include personal details such as your name and private content.",
+          options: ["Student/general public", "Researcher/scientist", "Industry professional", "Government employee"],
+          user_role: "",
+        },
+      ])
     }
   }
 
@@ -310,33 +333,22 @@ export default function SmartSearchAssistant() {
     }
   }
 
-  // Handle feedback button clicks
-  const handleFeedback = (messageId, feedbackType) => {
-    // Update the message's feedback status but don't mark as submitted yet
-    setMessages((prev) =>
-      prev.map((message) =>
-        message.id === messageId ? { ...message, feedback: feedbackType, submittedFeedback: false } : message,
-      ),
-    )
-
-    // Open the feedback dialog
-    setFeedbackDialog({
-      isOpen: true,
-      messageId,
-      feedbackType,
-    })
+  // Replace the handleFeedback function with a simpler version that just shows the feedback component
+  const handleFeedback = () => {
+    setShowFeedback(true)
   }
 
-  // Add a new function to handle feedback submission
-  const handleFeedbackSubmitted = async (messageId, feedbackText) => {
-    if (!session || !fingerprint) return
+  // Add the handleFeedbackSubmit function
+  const handleFeedbackSubmit = async () => {
+    if (!feedback.rating || isSendingFeedback) return
 
-    const message = messages.find((msg) => msg.id === messageId)
-    if (!message) return
+    setIsSendingFeedback(true)
 
     try {
-      const feedbackRating = message.feedback === "positive" ? "positive" : "negative"
-      
+      // Check for feedback fields and set them to null if they don't exist
+      const feedbackRating = feedback.rating ? (feedback.rating === 5 ? "positive" : "negative") : null
+      const feedbackDescription = feedback.description?.join(", ") || null
+
       await fetch(
         `${process.env.NEXT_PUBLIC_API_ENDPOINT}user/create_feedback?user_info=${encodeURIComponent(
           fingerprint,
@@ -344,13 +356,8 @@ export default function SmartSearchAssistant() {
           messages,
         )}&feedback_rating=${encodeURIComponent(
           feedbackRating,
-        )}&feedback_description=${encodeURIComponent(feedbackText)}`,
+        )}&feedback_description=${encodeURIComponent(feedbackDescription)}`,
         { method: "POST" },
-      )
-
-      // Mark the feedback as submitted
-      setMessages((prev) =>
-        prev.map((message) => (message.id === messageId ? { ...message, submittedFeedback: true } : message)),
       )
 
       // Add thank you message
@@ -363,39 +370,34 @@ export default function SmartSearchAssistant() {
             "Thank you! Your feedback will help improve the DFO SmartSearch Assistant. You may continue asking questions or start a new session.",
           feedback: null,
           submittedFeedback: false,
+          Type: "ai",
+          Content:
+            "Thank you! Your feedback will help improve the DFO SmartSearch Assistant. You may continue asking questions or start a new session.",
         },
       ])
+      setShowFeedback(false)
     } catch (error) {
       console.error("Error sending feedback:", error)
       toast.error("Failed to send feedback. Please try again.")
+    } finally {
+      setIsSendingFeedback(false)
     }
   }
 
-  // Close feedback dialog
-  const closeFeedbackDialog = (wasSubmitted = false, feedbackText = "") => {
-    if (wasSubmitted && feedbackDialog.messageId) {
-      handleFeedbackSubmitted(feedbackDialog.messageId, feedbackText)
-    } else if (!wasSubmitted && feedbackDialog.messageId) {
-      // Reset the feedback if dialog was closed without submission
-      setMessages((prev) =>
-        prev.map((message) =>
-          message.id === feedbackDialog.messageId && !message.submittedFeedback
-            ? { ...message, feedback: null }
-            : message,
-        ),
-      )
-    }
-
-    setFeedbackDialog({
-      isOpen: false,
-      messageId: null,
-      feedbackType: null,
-    })
-  }
-
+  // Update the handleSessionReset function to also reset feedback
   const handleSessionReset = () => {
+    setShowFeedback(false)
     setSession(null)
-    setMessages([INITIAL_MESSAGE])
+    setMessages([
+      {
+        id: "initial",
+        role: "assistant",
+        content:
+          "Hello! Please select the best role below that fits you. We can better answer your questions about Fisheries and Oceans Canada. Don't include personal details such as your name and private content.",
+        options: ["Student/general public", "Researcher/scientist", "Industry professional", "Government employee"],
+        user_role: "",
+      },
+    ])
     localStorage.removeItem("dfoSession")
     createNewSession(fingerprint)
   }
@@ -464,15 +466,6 @@ export default function SmartSearchAssistant() {
     <div className="min-h-screen bg-white transition-all duration-300 flex flex-col">
       <CitationsSidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
-      <FeedbackDialog
-        isOpen={feedbackDialog.isOpen}
-        onClose={closeFeedbackDialog}
-        feedbackType={feedbackDialog.feedbackType}
-        messageId={feedbackDialog.messageId}
-      />
-
-
-
       {/* Main Content */}
       <main className="max-w-4xl mx-auto px-4 py-6 md:py-8 flex-grow flex flex-col">
         <h2 className="text-2xl md:text-3xl font-bold text-center mb-6 md:mb-8">SmartSearch Assistant</h2>
@@ -499,7 +492,7 @@ export default function SmartSearchAssistant() {
                   <div className="mr-2 md:mr-3 mt-1">
                     <div className="maple-leaf-container border rounded p-1 w-8 h-8 md:w-10 md:h-10 flex items-center justify-center cursor-pointer">
                       <Image
-                        src={mapleLeaf || "/placeholder.svg"}
+                        src={mapleLeaf}
                         alt="Maple Leaf"
                         width={30}
                         height={30}
@@ -527,60 +520,17 @@ export default function SmartSearchAssistant() {
                       </div>
                     )}
 
-                    {/* Add "My task is done" for AI messages starting from the 5th */}
                     {index >= 4 && !message.content.includes("Thank you! Your feedback will help improve") && (
                       <button
-                        onClick={() =>
-                          setFeedbackDialog({
-                            isOpen: true,
-                            messageId: message.id,
-                            feedbackType: "positive",
-                          })
-                        }
+                        onClick={() => setShowFeedback(true)}
                         className="mt-2 inline-block bg-blue-100 hover:bg-blue-200 rounded-xl py-1.5 px-3 text-blue-800 text-sm"
                       >
                         My task is done
                       </button>
                     )}
 
-                    {/* Feedback buttons */}
                     {message.role === "assistant" && (
-                      <div className="flex flex-col sm:flex-row sm:justify-between mt-2 gap-2">
-                        <div className="flex space-x-2">
-                          {!message.submittedFeedback && (
-                            <>
-                              <button
-                                className={`hover:bg-gray-100 p-1.5 md:p-2 rounded-full ${message.feedback === "positive" ? "text-blue-600" : ""}`}
-                                onClick={() => handleFeedback(message.id, "positive")}
-                                aria-label="Thumbs up"
-                              >
-                                <ThumbsUp className="h-5 w-5 md:h-6 md:w-6" />
-                              </button>
-                              <button
-                                className={`hover:bg-gray-100 p-1.5 md:p-2 rounded-full ${message.feedback === "negative" ? "text-red-600" : ""}`}
-                                onClick={() => handleFeedback(message.id, "negative")}
-                                aria-label="Thumbs down"
-                              >
-                                <ThumbsDown className="h-5 w-5 md:h-6 md:w-6" />
-                              </button>
-                            </>
-                          )}
-
-                          {message.submittedFeedback && message.feedback === "positive" && (
-                            <button className="p-1.5 md:p-2 rounded-full text-blue-600" aria-label="Thumbs up selected">
-                              <ThumbsUpFilled className="h-5 w-5 md:h-6 md:w-6" />
-                            </button>
-                          )}
-
-                          {message.submittedFeedback && message.feedback === "negative" && (
-                            <button
-                              className="p-1.5 md:p-2 rounded-full text-red-600"
-                              aria-label="Thumbs down selected"
-                            >
-                              <ThumbsDownFilled className="h-5 w-5 md:h-6 md:w-6" />
-                            </button>
-                          )}
-                        </div>
+                      <div className="flex justify-end mt-2">
                         <button
                           className="bg-gray-400 hover:bg-gray-500 text-white px-3 py-1 rounded flex items-center w-fit"
                           onClick={() => setIsSidebarOpen(true)}
@@ -596,12 +546,22 @@ export default function SmartSearchAssistant() {
             </div>
           ))}
 
+          {showFeedback && (
+            <FeedbackComponent
+              feedback={feedback}
+              setFeedback={setFeedback}
+              onSubmit={handleFeedbackSubmit}
+              isSubmitting={isSendingFeedback}
+              onClose={() => setShowFeedback(false)}
+            />
+          )}
+
           {(isLoading || isCreatingSession) && (
             <div className="flex">
               <div className="mr-2 md:mr-3 mt-1">
                 <div className="maple-leaf-container border rounded p-1 w-8 h-8 md:w-10 md:h-10 flex items-center justify-center cursor-pointer">
                   <Image
-                    src={mapleLeaf || "/placeholder.svg"}
+                    src={mapleLeaf}
                     alt="Maple Leaf"
                     width={30}
                     height={30}
@@ -680,9 +640,6 @@ export default function SmartSearchAssistant() {
 
           <p className="text-center text-sm text-gray-600">This virtual assistant can make mistakes.</p>
         </div>
-
-        {/* Disclaimer */}
-        {/* <p className="text-center text-xs md:text-sm text-gray-600 mt-4">This virtual assistant can make mistakes.</p> */}
       </main>
 
       <ToastContainer
@@ -700,4 +657,5 @@ export default function SmartSearchAssistant() {
     </div>
   )
 }
+
 
