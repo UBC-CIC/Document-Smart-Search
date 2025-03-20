@@ -340,50 +340,35 @@ export default function SmartSearchAssistant() {
 
   // Add the handleFeedbackSubmit function
   const handleFeedbackSubmit = async () => {
-    if (!feedback.rating || isSendingFeedback) return
-
-    setIsSendingFeedback(true)
-
+    if (!feedback.rating || isSendingFeedback) return;
+  
+    setIsSendingFeedback(true);
+  
+    const userRole = getUserRole(messages); // Ensure this is correctly retrieved
+  
     try {
-      // Check for feedback fields and set them to null if they don't exist
-      const feedbackRating = feedback.rating ? (feedback.rating === 5 ? "positive" : "negative") : null
-      const feedbackDescription = feedback.description?.join(", ") || null
-
-      await fetch(
-        `${process.env.NEXT_PUBLIC_API_ENDPOINT}user/create_feedback?user_info=${encodeURIComponent(
-          fingerprint,
-        )}&session_id=${encodeURIComponent(session)}&user_role=${getUserRole(
-          messages,
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_ENDPOINT}/user/create_feedback?user_info=${encodeURIComponent(
+          fingerprint
+        )}&session_id=${encodeURIComponent(session)}&user_role=${encodeURIComponent(
+          userRole
         )}&feedback_rating=${encodeURIComponent(
-          feedbackRating,
-        )}&feedback_description=${encodeURIComponent(feedbackDescription)}`,
-        { method: "POST" },
-      )
-
-      // Add thank you message
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now().toString(),
-          role: "assistant",
-          content:
-            "Thank you! Your feedback will help improve the DFO SmartSearch Assistant. You may continue asking questions or start a new session.",
-          feedback: null,
-          submittedFeedback: false,
-          Type: "ai",
-          Content:
-            "Thank you! Your feedback will help improve the DFO SmartSearch Assistant. You may continue asking questions or start a new session.",
-        },
-      ])
-      setShowFeedback(false)
+          feedback.rating
+        )}&feedback_description=${encodeURIComponent(feedback.description?.join(", "))}`,
+        { method: "POST" }
+      );
+  
+      console.log("Feedback response:", await response.json()); // Debugging line
+      if (!response.ok) throw new Error("Failed to submit feedback");
+  
+      setShowFeedback(false);
     } catch (error) {
-      console.error("Error sending feedback:", error)
-      toast.error("Failed to send feedback. Please try again.")
+      console.error("Error submitting feedback:", error);
     } finally {
-      setIsSendingFeedback(false)
+      setIsSendingFeedback(false);
     }
-  }
-
+  };
+  
   // Update the handleSessionReset function to also reset feedback
   const handleSessionReset = () => {
     setShowFeedback(false)
