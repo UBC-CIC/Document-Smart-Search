@@ -8,24 +8,18 @@ import { X } from "lucide-react";
 const FeedbackComponent = ({ feedback, setFeedback, onSubmit, isSubmitting, onClose }) => {
   const [hoverRating, setHoverRating] = useState(0);
 
-  const options = ["Not enough information", "Confusing to use", "Inaccurate reviews"];
-
-  // Handle option selection
-  const handleOptionClick = (option) => {
-    setFeedback((prev) => ({
-      ...prev,
-      description: prev.description.includes(option)
-        ? prev.description.filter((desc) => desc !== option)
-        : [...prev.description, option],
-    }));
-  };
-
   // Handle manual text input
   const handleTextChange = (e) => {
     setFeedback((prev) => ({
       ...prev,
-      customDescription: e.target.value, // Store custom text separately
+      description: e.target.value, // Store typed feedback as description
     }));
+  };
+
+  // Ensure feedback is submitted correctly
+  const handleSubmit = () => {
+    if (!feedback.description || feedback.description.trim() === "") return; // Prevent empty feedback submission
+    onSubmit(feedback);
   };
 
   return (
@@ -57,29 +51,14 @@ const FeedbackComponent = ({ feedback, setFeedback, onSubmit, isSubmitting, onCl
         </div>
       </div>
 
-      {feedback.rating > 0 && feedback.rating < 5 && (
+      {feedback.rating > 0 && (
         <>
-          <p className="text-base mb-3">How can we improve?</p>
-          <div className="flex flex-wrap gap-2 mb-4">
-            {options.map((option) => (
-              <button
-                key={option}
-                onClick={() => handleOptionClick(option)}
-                className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
-                  feedback.description.includes(option)
-                    ? "bg-gray-600 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                {option}
-              </button>
-            ))}
-          </div>
+          <p className="text-base mb-3">Please share your thoughts:</p>
           {/* Manual feedback input field */}
           <textarea
             className="w-full p-2 border rounded-md text-sm text-gray-700 bg-white focus:ring focus:ring-customMain focus:outline-none"
             placeholder="Write your feedback here..."
-            value={feedback.customDescription || ""}
+            value={feedback.description || ""}
             onChange={handleTextChange}
             rows={3}
           />
@@ -89,8 +68,8 @@ const FeedbackComponent = ({ feedback, setFeedback, onSubmit, isSubmitting, onCl
       <Button
         className="w-32 mt-4 bg-customMain hover:bg-customMain/90"
         variant="default"
-        onClick={onSubmit}
-        disabled={isSubmitting}
+        onClick={handleSubmit}
+        disabled={isSubmitting || !feedback.description?.trim()}
       >
         {isSubmitting ? "Sending..." : "Send Feedback"}
       </Button>
