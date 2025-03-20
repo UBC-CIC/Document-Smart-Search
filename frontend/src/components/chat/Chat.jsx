@@ -360,6 +360,16 @@ export default function SmartSearchAssistant() {
   
       console.log("Feedback response:", await response.json()); // Debugging line
       if (!response.ok) throw new Error("Failed to submit feedback");
+
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          role: "assistant",
+          content: "Thank you! Your feedback will help improve the DFO SmartSearch Assistant. You may continue asking questions or start a new session.",
+        },
+      ]);
   
       setShowFeedback(false);
     } catch (error) {
