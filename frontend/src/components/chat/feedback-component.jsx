@@ -1,23 +1,32 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import Image from "next/image"
-import { Button } from "@/components/ui/button"
-import { X } from "lucide-react"
+import { useState } from "react";
+import Image from "next/image";
+import { Button } from "@/components/ui/button";
+import { X } from "lucide-react";
 
 const FeedbackComponent = ({ feedback, setFeedback, onSubmit, isSubmitting, onClose }) => {
-  const [hoverRating, setHoverRating] = useState(0)
+  const [hoverRating, setHoverRating] = useState(0);
 
-  const options = ["Not enough information", "Confusing to use", "Inaccurate reviews"]
+  const options = ["Not enough information", "Confusing to use", "Inaccurate reviews"];
 
+  // Handle option selection
   const handleOptionClick = (option) => {
     setFeedback((prev) => ({
       ...prev,
       description: prev.description.includes(option)
         ? prev.description.filter((desc) => desc !== option)
         : [...prev.description, option],
-    }))
-  }
+    }));
+  };
+
+  // Handle manual text input
+  const handleTextChange = (e) => {
+    setFeedback((prev) => ({
+      ...prev,
+      customDescription: e.target.value, // Store custom text separately
+    }));
+  };
 
   return (
     <div className="relative mt-4 mb-2 pl-4 pr-8 py-4 whitespace-pre-line bg-customMessage w-9/12 border border-customMain rounded-tr-lg rounded-br-lg rounded-bl-lg">
@@ -66,11 +75,19 @@ const FeedbackComponent = ({ feedback, setFeedback, onSubmit, isSubmitting, onCl
               </button>
             ))}
           </div>
+          {/* Manual feedback input field */}
+          <textarea
+            className="w-full p-2 border rounded-md text-sm text-gray-700 bg-white focus:ring focus:ring-customMain focus:outline-none"
+            placeholder="Write your feedback here..."
+            value={feedback.customDescription || ""}
+            onChange={handleTextChange}
+            rows={3}
+          />
         </>
       )}
 
       <Button
-        className="w-32 bg-customMain hover:bg-customMain/90"
+        className="w-32 mt-4 bg-customMain hover:bg-customMain/90"
         variant="default"
         onClick={onSubmit}
         disabled={isSubmitting}
@@ -78,8 +95,7 @@ const FeedbackComponent = ({ feedback, setFeedback, onSubmit, isSubmitting, onCl
         {isSubmitting ? "Sending..." : "Send Feedback"}
       </Button>
     </div>
-  )
-}
+  );
+};
 
-export default FeedbackComponent
-
+export default FeedbackComponent;
