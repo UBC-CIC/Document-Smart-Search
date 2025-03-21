@@ -502,15 +502,6 @@ export default function SmartSearchAssistant() {
       <main className="max-w-6xl mx-auto px-4 py-6 md:py-8 flex-grow flex flex-col">
         <div className="relative mb-6 md:mb-8">
           <h2 className="text-2xl md:text-3xl font-bold text-center">SmartSearch Assistant</h2>
-          {messages.length > 1 && (
-            <button
-              onClick={downloadChatHistory}
-              className="absolute right-0 top-1/2 transform -translate-y-1/2 flex items-center bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1.5 rounded-lg"
-            >
-              <Download className="h-4 w-4 mr-1" />
-              Download Chat
-            </button>
-          )}
         </div>
 
         {/* Conversation */}
@@ -640,6 +631,15 @@ export default function SmartSearchAssistant() {
               <button onClick={handleSessionReset} className="p-1.5 hover:bg-gray-200 rounded-full">
                 <RefreshCw size={20} className="text-gray-600" />
               </button>
+              {messages.length > 1 && (
+                <button
+                  onClick={downloadChatHistory}
+                  className="p-1.5 hover:bg-gray-200 rounded-full text-gray-600"
+                  title="Download Chat"
+                >
+                  <Download size={20} />
+                </button>
+              )}
               <button
                 onClick={toggleListening}
                 className={`p-1.5 hover:bg-gray-200 rounded-full ${isListening ? "text-red-500" : "text-gray-600"}`}
