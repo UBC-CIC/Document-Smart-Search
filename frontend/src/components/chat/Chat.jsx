@@ -3,7 +3,7 @@
 import mapleLeaf from "../../app/maple_leaf.png"
 
 import { useState, useRef, useEffect, useCallback } from "react"
-import { Search, Send, User, Mic, MicOff, RefreshCw } from "lucide-react"
+import { Search, Send, User, Mic, MicOff, RefreshCw, Download } from "lucide-react"
 import { CitationsSidebar } from "../components/citations-sidebar"
 import FeedbackComponent from "./feedback-component"
 import { getFingerprint } from "@thumbmarkjs/thumbmarkjs"
@@ -340,45 +340,45 @@ export default function SmartSearchAssistant() {
 
   // Add the handleFeedbackSubmit function
   const handleFeedbackSubmit = async () => {
-    if (!feedback.rating || isSendingFeedback) return;
-  
-    setIsSendingFeedback(true);
-  
-    const userRole = getUserRole(messages); // Ensure this is correctly retrieved
-  
+    if (!feedback.rating || isSendingFeedback) return
+
+    setIsSendingFeedback(true)
+
+    const userRole = getUserRole(messages) // Ensure this is correctly retrieved
+
     try {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_ENDPOINT}/user/create_feedback?user_info=${encodeURIComponent(
-          fingerprint
+          fingerprint,
         )}&session_id=${encodeURIComponent(session)}&user_role=${encodeURIComponent(
-          userRole
+          userRole,
         )}&feedback_rating=${encodeURIComponent(
-          feedback.rating
+          feedback.rating,
         )}&feedback_description=${encodeURIComponent(feedback.description?.join(", "))}`,
-        { method: "POST" }
-      );
-  
-      console.log("Feedback response:", await response.json()); // Debugging line
-      if (!response.ok) throw new Error("Failed to submit feedback");
+        { method: "POST" },
+      )
 
+      console.log("Feedback response:", await response.json()) // Debugging line
+      if (!response.ok) throw new Error("Failed to submit feedback")
 
       setMessages((prev) => [
         ...prev,
         {
           id: Date.now().toString(),
           role: "assistant",
-          content: "Thank you! Your feedback will help improve the DFO SmartSearch Assistant. You may continue asking questions or start a new session.",
+          content:
+            "Thank you! Your feedback will help improve the DFO SmartSearch Assistant. You may continue asking questions or start a new session.",
         },
-      ]);
-  
-      setShowFeedback(false);
+      ])
+
+      setShowFeedback(false)
     } catch (error) {
-      console.error("Error submitting feedback:", error);
+      console.error("Error submitting feedback:", error)
     } finally {
-      setIsSendingFeedback(false);
+      setIsSendingFeedback(false)
     }
-  };
-  
+  }
+
   // Update the handleSessionReset function to also reset feedback
   const handleSessionReset = () => {
     setShowFeedback(false)
@@ -457,13 +457,61 @@ export default function SmartSearchAssistant() {
     }
   }
 
+  // New function to download chat history
+  const downloadChatHistory = () => {
+    // Format the chat messages into a readable text format
+    const chatContent = messages
+      .map((message) => {
+        const role = message.role === "user" ? "User" : "Assistant"
+        return `${role}: ${message.content}`
+      })
+      .join("\n\n")
+
+    // Create a title with date and time
+    const date = new Date()
+    const formattedDate = date.toLocaleDateString()
+    const formattedTime = date.toLocaleTimeString()
+    const title = `DFO SmartSearch Chat - ${formattedDate} ${formattedTime}`
+
+    // Combine title and content
+    const fullContent = `${title}\n\n${chatContent}`
+
+    // Create a Blob with the chat content
+    const blob = new Blob([fullContent], { type: "text/plain" })
+
+    // Create a download link and trigger the download
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `dfo-chat-${date.getTime()}.txt`
+    document.body.appendChild(a)
+    a.click()
+
+    // Clean up
+    URL.revokeObjectURL(url)
+    document.body.removeChild(a)
+
+    toast.success("Chat history downloaded successfully!")
+  }
+
   return (
     <div className="min-h-screen bg-white transition-all duration-300 flex flex-col">
       <CitationsSidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
       {/* Main Content */}
       <main className="max-w-6xl mx-auto px-4 py-6 md:py-8 flex-grow flex flex-col">
-        <h2 className="text-2xl md:text-3xl font-bold text-center mb-6 md:mb-8">SmartSearch Assistant</h2>
+        <div className="flex justify-between items-center mb-6 md:mb-8">
+          <h2 className="text-2xl md:text-3xl font-bold text-center flex-grow">SmartSearch Assistant</h2>
+          {messages.length > 1 && (
+            <button
+              onClick={downloadChatHistory}
+              className="flex items-center bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1.5 rounded-lg"
+            >
+              <Download className="h-4 w-4 mr-1" />
+              Download Chat
+            </button>
+          )}
+        </div>
 
         {/* Conversation */}
         <div className="space-y-4 md:space-y-6 mb-6 md:mb-8 flex-grow overflow-y-auto">
@@ -487,7 +535,7 @@ export default function SmartSearchAssistant() {
                   <div className="mr-2 md:mr-3 mt-1">
                     <div className="maple-leaf-container border rounded p-1 w-8 h-8 md:w-10 md:h-10 flex items-center justify-center cursor-pointer">
                       <Image
-                        src={mapleLeaf}
+                        src={mapleLeaf || "/placeholder.svg"}
                         alt="Maple Leaf"
                         width={30}
                         height={30}
@@ -556,7 +604,7 @@ export default function SmartSearchAssistant() {
               <div className="mr-2 md:mr-3 mt-1">
                 <div className="maple-leaf-container border rounded p-1 w-8 h-8 md:w-10 md:h-10 flex items-center justify-center cursor-pointer">
                   <Image
-                    src={mapleLeaf}
+                    src={mapleLeaf || "/placeholder.svg"}
                     alt="Maple Leaf"
                     width={30}
                     height={30}
@@ -652,5 +700,4 @@ export default function SmartSearchAssistant() {
     </div>
   )
 }
-
 
