@@ -500,12 +500,12 @@ export default function SmartSearchAssistant() {
 
       {/* Main Content */}
       <main className="max-w-6xl mx-auto px-4 py-6 md:py-8 flex-grow flex flex-col">
-        <div className="flex justify-between items-center mb-6 md:mb-8">
-          <h2 className="text-2xl md:text-3xl font-bold text-center flex-grow">SmartSearch Assistant</h2>
+        <div className="relative mb-6 md:mb-8">
+          <h2 className="text-2xl md:text-3xl font-bold text-center">SmartSearch Assistant</h2>
           {messages.length > 1 && (
             <button
               onClick={downloadChatHistory}
-              className="flex items-center bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1.5 rounded-lg"
+              className="absolute right-0 top-1/2 transform -translate-y-1/2 flex items-center bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1.5 rounded-lg"
             >
               <Download className="h-4 w-4 mr-1" />
               Download Chat
