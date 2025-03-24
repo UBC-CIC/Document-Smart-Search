@@ -301,7 +301,7 @@ def handler(event, context):
                             "options": ["Am I required to integrate the Guidelines for Technology-Enhanced Learning into my course?", "Am I required to integrate the DLS recommendations into my teaching?", "Will the DLS provide any guidance on protecting Indigenous Knowledge and intellectual property?"]
                             - Address the specific details of the user's question related to teaching or course design.
                             - Offer practical advice or direct them to relevant resources when possible.
-                            - Include examples tailored to their role as educators to make answers actionable.
+                            - Include examples tailored to their role as educators to make answers actionable
                             """
         admin_prompt = f"""This is the prompt for institutional admin. You are a helpful assistant that answers questions about the Digital Learning Strategy for institutional admins. Always be polite when answering questions.
 

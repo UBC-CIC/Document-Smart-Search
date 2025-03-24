@@ -25,7 +25,7 @@ export default function SmartSearchAssistant() {
       role: "assistant",
       content:
         "Hello! Please select the best role below that fits you. We can better answer your questions about Fisheries and Oceans Canada. Don't include personal details such as your name and private content.",
-      options: ["Student/general public", "Researcher/scientist", "Industry professional", "Government employee"],
+      options: ["General/Public", "Government employee/Admin"],
       user_role: "",
     },
   ])
@@ -114,10 +114,8 @@ export default function SmartSearchAssistant() {
     if (!firstHumanMessage) return ""
 
     const content = (firstHumanMessage.content || firstHumanMessage.Content || "").toLowerCase()
-    if (content.includes("student") || content.includes("public")) return "public"
-    if (content.includes("researcher") || content.includes("scientist")) return "public"
-    if (content.includes("industry")) return "public"
-    if (content.includes("government")) return "public"
+    if (content.includes("public")) return "public"
+    if (content.includes("government")) return "admin"
     return ""
   }
 
@@ -154,7 +152,7 @@ export default function SmartSearchAssistant() {
           role: "assistant",
           content:
             "Hello! Please select the best role below that fits you. We can better answer your questions about Fisheries and Oceans Canada. Don't include personal details such as your name and private content.",
-          options: ["Student/general public", "Researcher/scientist", "Industry professional", "Government employee"],
+          options: ["General/Public", "Government employee/Admin"],
           user_role: "",
         },
       ])
@@ -190,7 +188,7 @@ export default function SmartSearchAssistant() {
             role: "assistant",
             content:
               "Hello! Please select the best role below that fits you. We can better answer your questions about Fisheries and Oceans Canada. Don't include personal details such as your name and private content.",
-            options: ["Student/general public", "Researcher/scientist", "Industry professional", "Government employee"],
+            options: ["General/Public", "Government employee/Admin"],
             user_role: "",
           },
         ])
@@ -226,7 +224,7 @@ export default function SmartSearchAssistant() {
           role: "assistant",
           content:
             "Hello! Please select the best role below that fits you. We can better answer your questions about Fisheries and Oceans Canada. Don't include personal details such as your name and private content.",
-          options: ["Student/general public", "Researcher/scientist", "Industry professional", "Government employee"],
+          options: ["General/Public", "Government employee/Admin"],
           user_role: "",
         })
       }
@@ -240,7 +238,7 @@ export default function SmartSearchAssistant() {
           role: "assistant",
           content:
             "Hello! Please select the best role below that fits you. We can better answer your questions about Fisheries and Oceans Canada. Don't include personal details such as your name and private content.",
-          options: ["Student/general public", "Researcher/scientist", "Industry professional", "Government employee"],
+          options: ["General/Public", "Government employee/Admin"],
           user_role: "",
         },
       ])
@@ -389,7 +387,7 @@ export default function SmartSearchAssistant() {
         role: "assistant",
         content:
           "Hello! Please select the best role below that fits you. We can better answer your questions about Fisheries and Oceans Canada. Don't include personal details such as your name and private content.",
-        options: ["Student/general public", "Researcher/scientist", "Industry professional", "Government employee"],
+        options: ["General/Public", "Government employee/Admin"],
         user_role: "",
       },
     ])
