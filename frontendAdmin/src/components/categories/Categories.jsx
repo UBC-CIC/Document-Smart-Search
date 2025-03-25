@@ -37,7 +37,7 @@ const Categories = ({
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
-    console.log("categories", categories);
+    
   }, [categories]);
 
   useEffect(() => {

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { fetchAuthSession } from "aws-amplify/auth";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BookOpen, ShieldAlert, Users } from "lucide-react";
+import { ShieldAlert, Users } from "lucide-react";
 import PromptSettings from "./PromptSettings";
 import LoadingScreen from "../Loading/LoadingScreen";
 
@@ -11,6 +11,7 @@ export default function Component() {
   const [prompts, setPrompts] = useState([]);
   const [previousPrompts, setPreviousPrompts] = useState([]);
   const [loading, setLoading] = useState(true);
+
   useEffect(() => {
     console.log("prompts", prompts);
     console.log("previousPrompts", previousPrompts);
@@ -83,20 +84,17 @@ export default function Component() {
   if (loading) {
     return <LoadingScreen />;
   }
+
   return (
     <div className="ml-12 mb-8 flex justify-center p-4">
       <Tabs
         defaultValue="public"
         className="w-[600px] lg:w-[800px] xl:w-[1000px]"
       >
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="public" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             Public
-          </TabsTrigger>
-          <TabsTrigger value="educator" className="flex items-center gap-2">
-            <BookOpen className="h-4 w-4" />
-            Educator
           </TabsTrigger>
           <TabsTrigger value="admin" className="flex items-center gap-2">
             <ShieldAlert className="h-4 w-4" />
@@ -109,16 +107,6 @@ export default function Component() {
             promptId="Public"
             currentPrompt={prompts.public}
             previousPrompts={previousPrompts.public}
-            setPreviousPrompts={setPreviousPrompts}
-            setPrompts={setPrompts}
-          />
-        </TabsContent>
-
-        <TabsContent value="educator">
-          <PromptSettings
-            promptId="Educator"
-            currentPrompt={prompts.educator}
-            previousPrompts={previousPrompts.educator}
             setPreviousPrompts={setPreviousPrompts}
             setPrompts={setPrompts}
           />

@@ -1,55 +1,41 @@
-"use client";
+"use client"
 
-import { useState, useEffect } from "react";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { Button } from "@/components/ui/button";
-import {
-  ChevronDown,
-  ChevronUp,
-  Users,
-  GraduationCap,
-  ShieldCheck,
-} from "lucide-react";
-import LoadingScreen from "../Loading/LoadingScreen";
-import { fetchAuthSession } from "aws-amplify/auth";
-import Session from "./Session";
+import { useState, useEffect } from "react"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { Button } from "@/components/ui/button"
+import { ChevronDown, ChevronUp, Users, ShieldCheck } from "lucide-react"
+import LoadingScreen from "../Loading/LoadingScreen"
+import { fetchAuthSession } from "aws-amplify/auth"
+import Session from "./Session"
 
 const RoleView = ({ role, sessions, onSessionClick }) => {
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(true)
 
   const getRoleIcon = (role) => {
     switch (role) {
       case "public":
-        return <Users className="mr-2" />;
-      case "educator":
-        return <GraduationCap className="mr-2" />;
+        return <Users className="mr-2" />
       case "admin":
-        return <ShieldCheck className="mr-2" />;
+        return <ShieldCheck className="mr-2" />
       default:
-        return null;
+        return null
     }
-  };
+  }
 
   const getRoleLabel = (role) => {
     switch (role) {
       case "public":
-        return "Student/General Public";
-      case "educator":
-        return "Educator/Educational Designer";
+        return "General/Public"
       case "admin":
-        return "Post-Secondary Institution Admin/Leader";
+        return "Admin"
       default:
-        return role;
+        return role
     }
-  };
+  }
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleString();
-  };
+    return new Date(dateString).toLocaleString()
+  }
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen} className="w-full">
@@ -60,11 +46,7 @@ const RoleView = ({ role, sessions, onSessionClick }) => {
             {getRoleLabel(role)} View
           </h2>
           <Button variant="ghost" size="sm" className="w-9 p-0">
-            {isOpen ? (
-              <ChevronUp className="h-4 w-4" />
-            ) : (
-              <ChevronDown className="h-4 w-4" />
-            )}
+            {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             <span className="sr-only">Toggle</span>
           </Button>
         </div>
@@ -81,22 +63,16 @@ const RoleView = ({ role, sessions, onSessionClick }) => {
               <div className="flex flex-col space-y-3">
                 <div className="flex items-center space-x-2">
                   <span className="text-gray-500">Session ID:</span>
-                  <code className="bg-gray-50 px-2 py-1 rounded text-sm">
-                    {session.session_id}
-                  </code>
+                  <code className="bg-gray-50 px-2 py-1 rounded text-sm">{session.session_id}</code>
                 </div>
                 <div className="flex items-center space-x-2">
                   <span className="text-gray-500">Last Message:</span>
-                  <span className="text-sm">
-                    {formatDate(session.last_message_time)}
-                  </span>
+                  <span className="text-sm">{formatDate(session.last_message_time)}</span>
                 </div>
                 {session.second_message_details && (
                   <div className="flex items-center space-x-2">
                     <span className="text-gray-500">Initial Question:</span>
-                    <span className="text-sm">
-                      {session.second_message_details}
-                    </span>
+                    <span className="text-sm">{session.second_message_details}</span>
                   </div>
                 )}
               </div>
@@ -105,27 +81,24 @@ const RoleView = ({ role, sessions, onSessionClick }) => {
         ))}
       </CollapsibleContent>
     </Collapsible>
-  );
-};
+  )
+}
 
 export default function History() {
-  const [publicSessions, setPublicSessions] = useState([]);
-  const [educatorSessions, setEducatorSessions] = useState([]);
-  const [adminSessions, setAdminSessions] = useState([]);
-  const [selectedSession, setSelectedSession] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [downloadLoading, setDownloadLoading] = useState(false);
+  const [publicSessions, setPublicSessions] = useState([])
+  const [adminSessions, setAdminSessions] = useState([])
+  const [selectedSession, setSelectedSession] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [downloadLoading, setDownloadLoading] = useState(false)
 
   useEffect(() => {
     const fetchSessions = async (userRole, setSession) => {
       try {
-        const session = await fetchAuthSession();
-        const token = session.tokens.idToken;
+        const session = await fetchAuthSession()
+        const token = session.tokens.idToken
         const response = await fetch(
-          `${
-            process.env.NEXT_PUBLIC_API_ENDPOINT
-          }admin/conversation_sessions?user_role=${encodeURIComponent(
-            userRole
+          `${process.env.NEXT_PUBLIC_API_ENDPOINT}admin/conversation_sessions?user_role=${encodeURIComponent(
+            userRole,
           )}`,
           {
             method: "GET",
@@ -133,62 +106,49 @@ export default function History() {
               Authorization: token,
               "Content-Type": "application/json",
             },
-          }
-        );
+          },
+        )
 
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          throw new Error(`HTTP error! status: ${response.status}`)
         }
 
-        const data = await response.json();
-        console.log(data);
-        data.sort(
-          (a, b) =>
-            new Date(b.last_message_time) - new Date(a.last_message_time)
-        );
-        setSession(data);
+        const data = await response.json()
+        console.log(data)
+        data.sort((a, b) => new Date(b.last_message_time) - new Date(a.last_message_time))
+        setSession(data)
       } catch (error) {
-        console.error(`Error fetching ${userRole} sessions:`, error);
-        setSession([]);
+        console.error(`Error fetching ${userRole} sessions:`, error)
+        setSession([])
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
-    };
+    }
 
     const loadSessions = async () => {
       try {
-        await Promise.all([
-          fetchSessions("public", setPublicSessions),
-          fetchSessions("educator", setEducatorSessions),
-          fetchSessions("admin", setAdminSessions),
-        ]);
+        await Promise.all([fetchSessions("public", setPublicSessions), fetchSessions("admin", setAdminSessions)])
       } catch (error) {
-        console.error("Error loading sessions:", error);
+        console.error("Error loading sessions:", error)
       }
-    };
+    }
 
-    loadSessions();
-  }, [setPublicSessions, setEducatorSessions, setAdminSessions]);
+    loadSessions()
+  }, [setPublicSessions, setAdminSessions])
 
   const handleDownloadAllData = async () => {
-    setDownloadLoading(true);
-    const allSessions = [
-      ...publicSessions,
-      ...educatorSessions,
-      ...adminSessions,
-    ];
-    const csvData = [];
+    setDownloadLoading(true)
+    const allSessions = [...publicSessions, ...adminSessions]
+    const csvData = []
 
     for (const session of allSessions) {
       try {
-        const authSession = await fetchAuthSession();
-        const token = authSession.tokens.idToken;
+        const authSession = await fetchAuthSession()
+        const token = authSession.tokens.idToken
 
         const messagesResponse = await fetch(
-          `${
-            process.env.NEXT_PUBLIC_API_ENDPOINT
-          }admin/conversation_messages?session_id=${encodeURIComponent(
-            session.session_id
+          `${process.env.NEXT_PUBLIC_API_ENDPOINT}admin/conversation_messages?session_id=${encodeURIComponent(
+            session.session_id,
           )}`,
           {
             method: "GET",
@@ -196,15 +156,15 @@ export default function History() {
               Authorization: token,
               "Content-Type": "application/json",
             },
-          }
-        );
+          },
+        )
 
         if (!messagesResponse.ok) {
-          throw new Error(`HTTP error! status: ${messagesResponse.status}`);
+          throw new Error(`HTTP error! status: ${messagesResponse.status}`)
         }
 
-        const messagesData = await messagesResponse.json();
-        const messages = messagesData.messages;
+        const messagesData = await messagesResponse.json()
+        const messages = messagesData.messages
 
         messages.forEach((message) => {
           csvData.push({
@@ -214,63 +174,40 @@ export default function History() {
             MessageContent: message.Content,
             MessageOptions: JSON.stringify(message.Options),
             Timestamp: message.Timestamp,
-          });
-        });
+          })
+        })
       } catch (error) {
-        console.error("Error fetching session data:", error);
+        console.error("Error fetching session data:", error)
       }
     }
 
     const csvString =
-      Object.keys(csvData[0]).join(",") +
-      "\n" +
-      csvData.map((row) => Object.values(row).join(",")).join("\n");
+      Object.keys(csvData[0]).join(",") + "\n" + csvData.map((row) => Object.values(row).join(",")).join("\n")
 
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(
-      new Blob([csvString], { type: "text/csv" })
-    );
-    link.download = "conversation_data.csv";
-    link.click();
+    const link = document.createElement("a")
+    link.href = URL.createObjectURL(new Blob([csvString], { type: "text/csv" }))
+    link.download = "conversation_data.csv"
+    link.click()
 
-    setDownloadLoading(false);
-  };
+    setDownloadLoading(false)
+  }
 
   const handleSessionClick = (role, session) => {
-    setSelectedSession({ role, ...session });
-  };
+    setSelectedSession({ role, ...session })
+  }
 
   if (selectedSession) {
-    return (
-      <Session
-        session={selectedSession}
-        onBack={() => setSelectedSession(null)}
-        from={"History"}
-      />
-    );
+    return <Session session={selectedSession} onBack={() => setSelectedSession(null)} from={"History"} />
   }
 
   if (loading) {
-    return <LoadingScreen />;
+    return <LoadingScreen />
   }
 
   return (
     <div className="w-full mx-auto space-y-4 p-4 overflow-y-auto mb-8">
-      <RoleView
-        role="public"
-        sessions={publicSessions}
-        onSessionClick={handleSessionClick}
-      />
-      <RoleView
-        role="educator"
-        sessions={educatorSessions}
-        onSessionClick={handleSessionClick}
-      />
-      <RoleView
-        role="admin"
-        sessions={adminSessions}
-        onSessionClick={handleSessionClick}
-      />
+      <RoleView role="public" sessions={publicSessions} onSessionClick={handleSessionClick} />
+      <RoleView role="admin" sessions={adminSessions} onSessionClick={handleSessionClick} />
       <Button
         onClick={handleDownloadAllData}
         disabled={downloadLoading}
@@ -279,5 +216,6 @@ export default function History() {
         {downloadLoading ? "Downloading..." : "Download All Messages"}
       </Button>
     </div>
-  );
+  )
 }
+

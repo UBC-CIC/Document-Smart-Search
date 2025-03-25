@@ -57,7 +57,6 @@ export default function AnalyticsDashboard() {
     fetchAnalytics();
   }, []);
 
- 
   if (loading) {
     return (
       <LoadingScreen />
@@ -65,12 +64,11 @@ export default function AnalyticsDashboard() {
   }
 
   const roleDisplayMap = {
-    public: "Public",
-    educator: "Educator/Educational Designer",
-    admin: "Institutional Admin/Leader",
+    public: "General/Public",
+    admin: "Admin",
   };
 
-  const orderedRoles = ["public", "educator", "admin"];
+  const orderedRoles = ["public", "admin"];
   const displayedFeedback = orderedRoles.map((role) => {
     const feedback = avg_feedback_per_role.find(
       (item) => item.user_role === role
@@ -85,25 +83,14 @@ export default function AnalyticsDashboard() {
     ...new Set(messages_per_role_per_month.map((item) => item.month)),
   ];
 
-  // Process data to ensure all roles are represented for each month
   const processedData = uniqueMonths.map((month) => {
     const monthData = messages_per_role_per_month.filter(
       (item) => item.month === month
     );
     const [year, monthNum] = new Date(month).toISOString().split("-");
     const monthNames = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
+      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
     ];
 
     return {
@@ -111,21 +98,13 @@ export default function AnalyticsDashboard() {
       public:
         monthData.find((item) => item.user_role === "public")?.message_count ||
         0,
-      educator:
-        monthData.find((item) => item.user_role === "educator")
-          ?.message_count || 0,
       admin:
         monthData.find((item) => item.user_role === "admin")?.message_count ||
         0,
     };
   });
 
-    const maxValue = getMaxValue(processedData, [
-      "public",
-      "educator",
-      "admin",
-    ]);
-
+  const maxValue = getMaxValue(processedData, ["public", "admin"]);
 
   return (
     <main className="ml-12 flex-1 p-6 w-full">
@@ -143,18 +122,8 @@ export default function AnalyticsDashboard() {
           data={unique_users_per_month.map((item) => {
             const [year, month] = item.month.split("-");
             const monthNames = [
-              "Jan",
-              "Feb",
-              "Mar",
-              "Apr",
-              "May",
-              "Jun",
-              "Jul",
-              "Aug",
-              "Sep",
-              "Oct",
-              "Nov",
-              "Dec",
+              "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+              "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
             ];
             return {
               month: `${monthNames[parseInt(month, 10) - 1]} ${year}`,
@@ -189,12 +158,8 @@ export default function AnalyticsDashboard() {
       <ChartContainer
         config={{
           public: {
-            label: "Public Users",
+            label: "General/Public Users",
             color: "hsl(var(--chart-1))",
-          },
-          educator: {
-            label: "Educators",
-            color: "hsl(var(--chart-2))",
           },
           admin: {
             label: "Admins",
@@ -228,13 +193,6 @@ export default function AnalyticsDashboard() {
           />
           <Line
             type="monotone"
-            dataKey="educator"
-            stroke="var(--color-educator)"
-            strokeWidth={2}
-            dot={true}
-          />
-          <Line
-            type="monotone"
             dataKey="admin"
             stroke="var(--color-admin)"
             strokeWidth={2}
@@ -243,6 +201,7 @@ export default function AnalyticsDashboard() {
           <ChartTooltip content={<ChartTooltipContent />} />
         </LineChart>
       </ChartContainer>
+
       <div className=" mb-12 mt-12 space-y-6 mr-12 ">
         <div>
           <div className=" mx-4 flex justify-between">
