@@ -1,12 +1,6 @@
-import {
-  BarChart2,
-  BookOpen,
-  History,
-  PenSquare,
-  FileText,
-  MessageCircle,
-} from "lucide-react";
-import Link from "next/link";
+"use client"
+
+import { BarChart2, BookOpen, History, PenSquare, FileText, MessageCircle } from "lucide-react"
 
 const menuItems = [
   {
@@ -39,28 +33,32 @@ const menuItems = [
     label: "Feedback",
     icon: MessageCircle,
   },
-];
+]
 
-export default function Component( {selectedPage, setSelectedPage} ) {
+export default function Component({ selectedPage, setSelectedPage, isMobile = false }) {
   return (
-    <nav className="w-64 border-r border-gray-200 bg-white">
-      <div className="flex flex-col py-4 ml-2">
+    <nav className={`${isMobile ? "w-full" : "w-64"} bg-white h-full`}>
+      <div className="flex flex-col py-2">
         {menuItems.map((item) => {
-          const Icon = item.icon;
+          const Icon = item.icon
           return (
             <button
               key={item.id}
-              className="flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100"
+              className={`flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 transition-colors ${
+                selectedPage === item.id ? "bg-gray-100 font-medium text-adminMain" : ""
+              }`}
               onClick={() => {
                 console.log(item.id)
-                    setSelectedPage(item.id)}}
+                setSelectedPage(item.id)
+              }}
             >
-              <Icon className="w-5 h-5 mr-3" />
+              <Icon className={`w-5 h-5 mr-3 flex-shrink-0 ${selectedPage === item.id ? "text-adminMain" : ""}`} />
               <span>{item.label}</span>
             </button>
-          );
+          )
         })}
       </div>
     </nav>
-  );
+  )
 }
+
