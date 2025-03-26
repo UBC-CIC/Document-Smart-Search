@@ -3,7 +3,7 @@
 import mapleLeaf from "../../app/maple_leaf.png"
 
 import { useState, useRef, useEffect, useCallback } from "react"
-import { Search, Send, User, Mic, MicOff, RefreshCw, Download, Menu, X } from "lucide-react"
+import { Search, Send, User, Mic, MicOff, RefreshCw, Download } from "lucide-react"
 import { CitationsSidebar } from "../components/citations-sidebar"
 import FeedbackComponent from "./feedback-component"
 import { getFingerprint } from "@thumbmarkjs/thumbmarkjs"
@@ -17,9 +17,6 @@ export default function SmartSearchAssistant() {
   const [showFeedback, setShowFeedback] = useState(false)
   const [feedback, setFeedback] = useState({ rating: 0, description: [] })
   const [isSendingFeedback, setIsSendingFeedback] = useState(false)
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
-  const menuRef = useRef(null)
 
   // State for the conversation history
   const [messages, setMessages] = useState([
@@ -51,33 +48,14 @@ export default function SmartSearchAssistant() {
   // State for the sidebar
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
 
+  // State for mobile navigation
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+
   const router = useRouter()
 
   // State for voice input
   const [isListening, setIsListening] = useState(false)
   const recognitionRef = useRef(null)
-
-  // Navigation items with icons
-  const navItems = [
-    {
-      id: "chat",
-      label: "Smart Assistant",
-      path: "/chat",
-      icon: User,
-    },
-    {
-      id: "document-search",
-      label: "Document Search",
-      path: "/document-search",
-      icon: Search,
-    },
-    {
-      id: "topic-trends",
-      label: "Topic Trends",
-      path: "/topic-trends",
-      icon: RefreshCw,
-    },
-  ]
 
   // Function to scroll to bottom of conversation
   const scrollToBottom = useCallback(() => {
@@ -89,38 +67,16 @@ export default function SmartSearchAssistant() {
     scrollToBottom()
   }, [scrollToBottom, messages, showFeedback])
 
-  // Check if mobile and close sidebar when screen resizes to mobile
+  // Close sidebar when screen resizes to mobile
   useEffect(() => {
-    const checkIfMobile = () => {
-      setIsMobile(window.innerWidth < 768)
+    const handleResize = () => {
       if (window.innerWidth < 768) {
         setIsSidebarOpen(false)
       }
     }
 
-    // Initial check
-    checkIfMobile()
-
-    // Add event listener
-    window.addEventListener("resize", checkIfMobile)
-
-    // Cleanup
-    return () => window.removeEventListener("resize", checkIfMobile)
-  }, [])
-
-  // Close mobile menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (menuRef.current && !menuRef.current.contains(event.target)) {
-        setIsMobileMenuOpen(false)
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside)
-
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside)
-    }
+    window.addEventListener("resize", handleResize)
+    return () => window.removeEventListener("resize", handleResize)
   }, [])
 
   // Initialize fingerprint
@@ -536,11 +492,6 @@ export default function SmartSearchAssistant() {
     toast.success("Chat history downloaded successfully!")
   }
 
-  const handleNavigation = (path) => {
-    router.push(path)
-    setIsMobileMenuOpen(false)
-  }
-
   return (
     <div className="min-h-screen bg-white transition-all duration-300 flex flex-col">
       <CitationsSidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
@@ -552,7 +503,7 @@ export default function SmartSearchAssistant() {
         </div>
 
         {/* Conversation */}
-        <div className={`space-y-4 md:space-y-6 ${isMobile ? "mb-24" : "mb-6 md:mb-8"} flex-grow overflow-y-auto`}>
+        <div className="space-y-4 md:space-y-6 mb-6 md:mb-8 flex-grow overflow-y-auto">
           {messages.map((message, index) => (
             <div key={message.id} className="space-y-2">
               {message.role === "user" ? (
@@ -671,179 +622,65 @@ export default function SmartSearchAssistant() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Desktop Input Area */}
-        {!isMobile && (
-          <div className="w-full max-w-6xl mx-auto px-4 py-4 space-y-4">
-            <div className="relative flex items-center w-full bg-gray-100 rounded-full px-4 py-2">
-              <div className="flex items-center space-x-2">
-                <button onClick={handleSessionReset} className="p-1.5 hover:bg-gray-200 rounded-full">
-                  <RefreshCw size={20} className="text-gray-600" />
-                </button>
-                {messages.length > 1 && (
-                  <button
-                    onClick={downloadChatHistory}
-                    className="p-1.5 hover:bg-gray-200 rounded-full text-gray-600"
-                    title="Download Chat"
-                  >
-                    <Download size={20} />
-                  </button>
-                )}
+        {/* Input Area */}
+        <div className="w-full max-w-6xl mx-auto px-4 py-4 space-y-4">
+          <div className="relative flex items-center w-full bg-gray-100 rounded-full px-4 py-2">
+            <div className="flex items-center space-x-2">
+              <button onClick={handleSessionReset} className="p-1.5 hover:bg-gray-200 rounded-full">
+                <RefreshCw size={20} className="text-gray-600" />
+              </button>
+              {messages.length > 1 && (
                 <button
-                  onClick={toggleListening}
-                  className={`p-1.5 hover:bg-gray-200 rounded-full ${isListening ? "text-red-500" : "text-gray-600"}`}
+                  onClick={downloadChatHistory}
+                  className="p-1.5 hover:bg-gray-200 rounded-full text-gray-600"
+                  title="Download Chat"
                 >
-                  {isListening ? <MicOff size={20} /> : <Mic size={20} />}
+                  <Download size={20} />
                 </button>
-              </div>
-
-              <textarea
-                ref={textareaRef}
-                value={userInput}
-                onChange={(e) => setUserInput(e.target.value)}
-                onKeyDown={handleKeyPress}
-                className="flex-1 bg-transparent border-none outline-none resize-none px-4 py-2 text-gray-800 placeholder-gray-500"
-                placeholder="Type your query here..."
-                maxLength={2096}
-                rows={1}
-                style={{
-                  minHeight: "24px",
-                  height: "auto",
-                }}
-                onInput={(e) => {
-                  const target = e.target
-                  target.style.height = "auto"
-                  target.style.height = `${Math.min(Math.max(target.scrollHeight, 24), 120)}px`
-                }}
-              />
-
+              )}
               <button
-                onClick={() => !isLoading && userInput.trim() && sendMessage(userInput)}
-                className={`p-2 rounded-full ${
-                  isLoading || !userInput.trim()
-                    ? "opacity-50 cursor-not-allowed text-gray-400"
-                    : "text-gray-600 hover:bg-gray-200 cursor-pointer"
-                }`}
-                disabled={isLoading || !userInput.trim()}
+                onClick={toggleListening}
+                className={`p-1.5 hover:bg-gray-200 rounded-full ${isListening ? "text-red-500" : "text-gray-600"}`}
               >
-                <Send size={20} />
+                {isListening ? <MicOff size={20} /> : <Mic size={20} />}
               </button>
             </div>
 
-            <p className="text-center text-sm text-gray-600">This virtual assistant can make mistakes.</p>
+            <textarea
+              ref={textareaRef}
+              value={userInput}
+              onChange={(e) => setUserInput(e.target.value)}
+              onKeyDown={handleKeyPress}
+              className="flex-1 bg-transparent border-none outline-none resize-none px-4 py-2 text-gray-800 placeholder-gray-500"
+              placeholder="Type your query here..."
+              maxLength={2096}
+              rows={1}
+              style={{
+                minHeight: "24px",
+                height: "auto",
+              }}
+              onInput={(e) => {
+                const target = e.target
+                target.style.height = "auto"
+                target.style.height = `${Math.min(Math.max(target.scrollHeight, 24), 120)}px`
+              }}
+            />
+
+            <button
+              onClick={() => !isLoading && userInput.trim() && sendMessage(userInput)}
+              className={`p-2 rounded-full ${
+                isLoading || !userInput.trim()
+                  ? "opacity-50 cursor-not-allowed text-gray-400"
+                  : "text-gray-600 hover:bg-gray-200 cursor-pointer"
+              }`}
+              disabled={isLoading || !userInput.trim()}
+            >
+              <Send size={20} />
+            </button>
           </div>
-        )}
 
-        {/* Mobile Input Area with Menu Button */}
-        {isMobile && (
-          <div className="fixed bottom-4 left-0 right-0 z-40 px-4">
-            <div className="flex items-center max-w-3xl mx-auto">
-              {/* Chat Input */}
-              <div className="flex-1 bg-gray-100 rounded-full shadow-md flex items-center px-4 py-2 mr-3">
-                <button onClick={handleSessionReset} className="p-1.5 text-gray-600">
-                  <RefreshCw size={20} />
-                </button>
-                <button
-                  onClick={toggleListening}
-                  className={`p-1.5 ml-2 ${isListening ? "text-red-500" : "text-gray-600"}`}
-                >
-                  {isListening ? <MicOff size={20} /> : <Mic size={20} />}
-                </button>
-
-                <textarea
-                  ref={textareaRef}
-                  value={userInput}
-                  onChange={(e) => setUserInput(e.target.value)}
-                  onKeyDown={handleKeyPress}
-                  className="flex-1 bg-transparent border-none outline-none resize-none px-3 py-1 text-gray-800 placeholder-gray-500"
-                  placeholder="Type your query here..."
-                  maxLength={2096}
-                  rows={1}
-                  style={{
-                    minHeight: "24px",
-                    height: "auto",
-                  }}
-                  onInput={(e) => {
-                    const target = e.target
-                    target.style.height = "auto"
-                    target.style.height = `${Math.min(Math.max(target.scrollHeight, 24), 120)}px`
-                  }}
-                />
-
-                <button
-                  onClick={() => !isLoading && userInput.trim() && sendMessage(userInput)}
-                  className={`p-1.5 ${
-                    isLoading || !userInput.trim() ? "opacity-50 cursor-not-allowed text-gray-400" : "text-gray-600"
-                  }`}
-                  disabled={isLoading || !userInput.trim()}
-                >
-                  <Send size={20} />
-                </button>
-              </div>
-
-              {/* Menu Button */}
-              <button
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="bg-blue-600 text-white p-3 rounded-full shadow-lg flex items-center justify-center"
-                aria-label="Toggle menu"
-                ref={menuRef}
-              >
-                {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-              </button>
-            </div>
-
-            {/* Move the disclaimer text below the input area */}
-            <div className="text-center mt-2">
-              <p className="text-xs text-gray-500 max-w-3xl mx-auto">This virtual assistant can make mistakes.</p>
-            </div>
-
-            {/* Menu Items that emerge from the button */}
-            {isMobileMenuOpen && (
-              <div className="fixed z-40 bottom-20 right-4 flex flex-col-reverse items-end space-y-reverse space-y-2">
-                {navItems.map((item, index) => {
-                  const Icon = item.icon
-                  const isActive = router.pathname === item.path
-
-                  return (
-                    <div
-                      key={item.id}
-                      className="flex items-center animate-fadeIn"
-                      style={{
-                        animationDelay: `${index * 50}ms`,
-                        transform: `translateY(${isMobileMenuOpen ? "0" : "10px"})`,
-                        opacity: isMobileMenuOpen ? 1 : 0,
-                        transition: `transform 200ms ease, opacity 200ms ease`,
-                        transitionDelay: `${index * 50}ms`,
-                      }}
-                    >
-                      <div
-                        className={`
-                        mr-2 px-3 py-2 rounded-lg shadow-md bg-white
-                        ${isActive ? "text-blue-600 font-medium" : "text-gray-700"}
-                      `}
-                      >
-                        {item.label}
-                      </div>
-                      <button
-                        onClick={() => handleNavigation(item.path)}
-                        className={`
-                          p-3 rounded-full shadow-md flex items-center justify-center
-                          ${isActive ? "bg-blue-600 text-white" : "bg-white text-gray-700"}
-                        `}
-                      >
-                        <Icon className="h-5 w-5" />
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-
-            {/* Overlay when menu is open */}
-            {isMobileMenuOpen && (
-              <div className="fixed inset-0 bg-black bg-opacity-30 z-30" onClick={() => setIsMobileMenuOpen(false)} />
-            )}
-          </div>
-        )}
+          <p className="text-center text-sm text-gray-600">This virtual assistant can make mistakes.</p>
+        </div>
       </main>
 
       <ToastContainer
@@ -861,4 +698,3 @@ export default function SmartSearchAssistant() {
     </div>
   )
 }
-
