@@ -1,13 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Image from "next/image"
-import { Menu, X } from "lucide-react"
+import { Menu, X, MessageCircle, Search, BarChart2 } from "lucide-react"
 import flag from "../app/flag_of_canada.png" // Adjust if needed
 
 export default function NavigationHeader() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const menuRef = useRef(null)
   const router = useRouter()
   const pathname = usePathname()
 
@@ -16,20 +17,53 @@ export default function NavigationHeader() {
     return null
   }
 
+  // Navigation items with icons
+  const navItems = [
+    {
+      id: "chat",
+      label: "Smart Assistant",
+      path: "/chat",
+      icon: MessageCircle,
+    },
+    {
+      id: "document-search",
+      label: "Document Search",
+      path: "/document-search",
+      icon: Search,
+    },
+    {
+      id: "topic-trends",
+      label: "Topic Trends",
+      path: "/topic-trends",
+      icon: BarChart2,
+    },
+  ]
+
+  // Close mobile menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setIsMobileMenuOpen(false)
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside)
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [isMobileMenuOpen])
+
   const handleNavigation = (path) => {
     router.push(path)
     setIsMobileMenuOpen(false)
   }
 
   // Utility function to determine if a route is "active"
-  // If you have nested routes (e.g., /document-search/[id]), you can use startsWith
-  // For example: `pathname.startsWith("/document-search")`
   const isActive = (route) => pathname === route
 
   // Common classes for desktop items
   const baseDesktopClasses = "font-medium hover:text-blue-700 pb-1"
-  // Classes for mobile items
-  const baseMobileClasses = "font-medium py-2"
 
   return (
     <header className="border-b shadow-sm sticky top-0 bg-white z-10">
@@ -53,78 +87,82 @@ export default function NavigationHeader() {
         <div className="flex items-center">
           {/* Desktop Navigation */}
           <nav className="hidden md:flex space-x-6 mr-6">
-            <button
-              onClick={() => handleNavigation("/chat")}
-              className={
-                isActive("/chat")
-                  ? `text-blue-600 border-b-2 border-blue-600 ${baseDesktopClasses}`
-                  : `text-gray-500 ${baseDesktopClasses}`
-              }
-            >
-              Smart Assistant
-            </button>
-            <button
-              onClick={() => handleNavigation("/document-search")}
-              className={
-                isActive("/document-search")
-                  ? `text-blue-600 border-b-2 border-blue-600 ${baseDesktopClasses}`
-                  : `text-gray-500 ${baseDesktopClasses}`
-              }
-            >
-              Document Search
-            </button>
-            <button
-              onClick={() => handleNavigation("/topic-trends")}
-              className={
-                isActive("/topic-trends")
-                  ? `text-blue-600 border-b-2 border-blue-600 ${baseDesktopClasses}`
-                  : `text-gray-500 ${baseDesktopClasses}`
-              }
-            >
-              Topic Trends
-            </button>
+            {navItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => handleNavigation(item.path)}
+                className={
+                  isActive(item.path)
+                    ? `text-blue-600 border-b-2 border-blue-600 ${baseDesktopClasses}`
+                    : `text-gray-500 ${baseDesktopClasses}`
+                }
+              >
+                {item.label}
+              </button>
+            ))}
           </nav>
-
-          {/* Mobile Navigation Toggle */}
-          <button className="md:hidden text-gray-600" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
-            {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-          </button>
         </div>
       </div>
 
-      {/* Mobile Navigation Menu */}
-      {isMobileMenuOpen && (
-        <div className="md:hidden bg-white py-2 px-4 shadow-md">
-          <nav className="flex flex-col space-y-3">
-            <button
-              onClick={() => handleNavigation("/chat")}
-              className={
-                isActive("/chat") ? `text-blue-600 ${baseMobileClasses}` : `text-gray-700 ${baseMobileClasses}`
-              }
-            >
-              Smart Assistant
-            </button>
-            <button
-              onClick={() => handleNavigation("/document-search")}
-              className={
-                isActive("/document-search")
-                  ? `text-blue-600 ${baseMobileClasses}`
-                  : `text-gray-700 ${baseMobileClasses}`
-              }
-            >
-              Document Search
-            </button>
-            <button
-              onClick={() => handleNavigation("/topic-trends")}
-              className={
-                isActive("/topic-trends") ? `text-blue-600 ${baseMobileClasses}` : `text-gray-700 ${baseMobileClasses}`
-              }
-            >
-              Topic Trends
-            </button>
-          </nav>
-        </div>
-      )}
+      {/* Mobile Navigation Button and Popup */}
+      <div className="md:hidden" ref={menuRef}>
+        {/* Floating Action Button */}
+        <button
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          className="fixed z-50 bottom-4 right-4 bg-blue-600 text-white p-3 rounded-full shadow-lg flex items-center justify-center"
+          aria-label="Toggle menu"
+        >
+          {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+        </button>
+
+        {/* Menu Items that emerge from the button */}
+        {isMobileMenuOpen && (
+          <div className="fixed z-40 bottom-20 right-4 flex flex-col-reverse items-end space-y-reverse space-y-2">
+            {navItems.map((item, index) => {
+              const Icon = item.icon
+              const isItemActive = isActive(item.path)
+
+              return (
+                <div
+                  key={item.id}
+                  className="flex items-center animate-fadeIn"
+                  style={{
+                    animationDelay: `${index * 50}ms`,
+                    transform: `translateY(${isMobileMenuOpen ? "0" : "10px"})`,
+                    opacity: isMobileMenuOpen ? 1 : 0,
+                    transition: `transform 200ms ease, opacity 200ms ease`,
+                    transitionDelay: `${index * 50}ms`,
+                  }}
+                >
+                  <div
+                    className={`
+                    mr-2 px-3 py-2 rounded-lg shadow-md bg-white
+                    ${isItemActive ? "text-blue-600 font-medium" : "text-gray-700"}
+                  `}
+                  >
+                    {item.label}
+                  </div>
+                  <button
+                    onClick={() => handleNavigation(item.path)}
+                    className={`
+                      p-3 rounded-full shadow-md flex items-center justify-center
+                      ${isItemActive ? "bg-blue-600 text-white" : "bg-white text-gray-700"}
+                    `}
+                  >
+                    <Icon className="h-5 w-5" />
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Overlay when menu is open */}
+        {isMobileMenuOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-30 z-30" onClick={() => setIsMobileMenuOpen(false)} />
+        )}
+      </div>
     </header>
   )
 }
+
