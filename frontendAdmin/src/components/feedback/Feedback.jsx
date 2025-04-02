@@ -36,11 +36,11 @@ const EmptyFeedbackView = ({ role }) => {
   const getRoleLabel = (role) => {
     switch (role) {
       case "public":
-        return "Student/General Public";
+        return "General/Public";
       case "educator":
         return "Educator/Educational Designer";
       case "admin":
-        return "Post-Secondary Institution Admin/Leader";
+        return "Admin";
       default:
         return role;
     }
@@ -83,11 +83,11 @@ const FeedbackView = ({ role, feedbackData, onFeedbackClick }) => {
   const getRoleLabel = (role) => {
     switch (role) {
       case "public":
-        return "Student/General Public";
+        return "General/Public";
       case "educator":
         return "Educator/Educational Designer";
       case "admin":
-        return "Post-Secondary Institution Admin/Leader";
+        return "Admin";
       default:
         return role;
     }
