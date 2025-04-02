@@ -3,14 +3,10 @@ import { useEffect, useState, useRef } from "react"
 import Login from "./auth/Login.jsx"
 import { fetchAuthSession } from "aws-amplify/auth"
 import Analytics from "./analytics/Analytics.jsx"
-import Categories from "./categories/Categories.jsx"
 import Prompt from "./prompt/Prompt.jsx"
-import Files from "./files/Files.jsx"
 import Sidebar from "./Sidebar.jsx"
 import PostAuthHeader from "./PostAuthHeader.jsx"
 import History from "./history/History.jsx"
-import Category_creation from "./categories/Category_creation.jsx"
-import Edit_Category from "./categories/Edit_Category.jsx"
 import { ToastContainer } from "react-toastify"
 import "react-toastify/dist/ReactToastify.css"
 import LoadingScreen from "./Loading/LoadingScreen.jsx"
@@ -24,11 +20,6 @@ const menuItems = [
     icon: BarChart2,
   },
   {
-    id: "categories",
-    label: "Categories",
-    icon: BookOpen,
-  },
-  {
     id: "prompt",
     label: "Prompt",
     icon: PenSquare,
@@ -37,11 +28,6 @@ const menuItems = [
     id: "history",
     label: "History",
     icon: HistoryIcon,
-  },
-  {
-    id: "files",
-    label: "Files",
-    icon: FileText,
   },
   {
     id: "feedback",
@@ -103,20 +89,10 @@ const AdminHome = () => {
       switch (selectedPage) {
         case "analytics":
           return <Analytics />
-        case "categories":
-          return (
-            <Categories
-              setSelectedPage={setSelectedPage}
-              setNextCategoryNumber={setNextCategoryNumber}
-              setSelectedCategory={setSelectedCategory}
-            />
-          )
         case "prompt":
           return <Prompt />
         case "history":
           return <History />
-        case "files":
-          return <Files />
         case "category_creation":
           return (
             <Category_creation

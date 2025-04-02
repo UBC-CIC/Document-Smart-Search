@@ -9,11 +9,6 @@ const menuItems = [
     icon: BarChart2,
   },
   {
-    id: "categories",
-    label: "Categories",
-    icon: BookOpen,
-  },
-  {
     id: "prompt",
     label: "Prompt",
     icon: PenSquare,
@@ -22,11 +17,6 @@ const menuItems = [
     id: "history",
     label: "History",
     icon: History,
-  },
-  {
-    id: "files",
-    label: "Files",
-    icon: FileText,
   },
   {
     id: "feedback",
