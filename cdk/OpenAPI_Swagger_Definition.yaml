@@ -490,7 +490,7 @@ paths:
         - in: query
           name: user_role
           required: true
-          description: The role of the user for which sessions are requested (public, educator, admin)
+          description: The role of the user for which sessions are requested (public, admin)
           schema:
             type: string
       responses:
@@ -597,7 +597,7 @@ paths:
       tags:
         - Admin
       summary: Get the latest prompt
-      description: Retrieves the most recent entry in the prompts table, including public, educator, and admin prompts.
+      description: Retrieves the most recent entry in the prompts table, including public and admin prompts.
       operationId: admin_get_latest_prompt_GET
       responses:
         "200":
@@ -713,7 +713,7 @@ paths:
           schema:
             type: string
             enum: [public, educator, admin]
-          description: "The role for which the prompt is to be inserted (public, educator, admin)."
+          description: "The role for which the prompt is to be inserted (public, admin)."
       requestBody:
         required: true
         content:
@@ -900,7 +900,7 @@ paths:
       tags:
         - Admin
       summary: Get feedback grouped by user roles
-      description: Retrieves feedback grouped by user roles (admin, public, educator) with statistics and details.
+      description: Retrieves feedback grouped by user roles (admin, public) with statistics and details.
       operationId: admin_feedback_by_role_GET
       responses:
         "200":

@@ -1,120 +1,212 @@
-const { initializeConnection } = require("./libadmin.js");
+const { initializeConnection } = require("./libadmin.js")
 
-let { SM_DB_CREDENTIALS, RDS_PROXY_ENDPOINT } = process.env;
+const { SM_DB_CREDENTIALS, RDS_PROXY_ENDPOINT } = process.env
 
 // SQL conneciton from global variable at libadmin.js
-let sqlConnectionTableCreator = global.sqlConnectionTableCreator;
+let sqlConnectionTableCreator = global.sqlConnectionTableCreator
 
 exports.handler = async (event) => {
   const response = {
     statusCode: 200,
     headers: {
-      "Access-Control-Allow-Headers":
-        "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
+      "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "*",
     },
     body: "",
-  };
+  }
 
   // Initialize the database connection if not already initialized
   if (!sqlConnectionTableCreator) {
-    await initializeConnection(SM_DB_CREDENTIALS, RDS_PROXY_ENDPOINT);
-    sqlConnectionTableCreator = global.sqlConnectionTableCreator;
+    await initializeConnection(SM_DB_CREDENTIALS, RDS_PROXY_ENDPOINT)
+    sqlConnectionTableCreator = global.sqlConnectionTableCreator
   }
 
   // Function to format user full names (lowercase and spaces replaced with "_")
   const formatNames = (name) => {
-    return name.toLowerCase().replace(/\s+/g, "_");
-  };
+    return name.toLowerCase().replace(/\s+/g, "_")
+  }
 
-  let data;
+  let data
   try {
-    const pathData = event.httpMethod + " " + event.resource;
+    const pathData = event.httpMethod + " " + event.resource
     switch (pathData) {
       case "GET /admin/analytics":
         try {
-          // Get current date, subtract one year for the time range
-          const currentDate = new Date();
-          const oneYearAgo = new Date();
-          oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+          // Get time frame from query parameters, default to 'month'
+          const timeFrame = event.queryStringParameters?.timeFrame || "month"
 
-          // SQL query to get the number of unique users per month
-          const uniqueUsersPerMonth = await sqlConnectionTableCreator`
-      WITH months AS (
-        SELECT generate_series(
-          date_trunc('month', ${oneYearAgo}::date),
-          date_trunc('month', ${currentDate}::date),
-          '1 month'
-        ) AS month
-      )
-      SELECT 
-        m.month,
-        COALESCE(COUNT(DISTINCT uel.user_info), 0) AS unique_users
-      FROM months m
-      LEFT JOIN user_engagement_log uel
-        ON DATE_TRUNC('month', uel.timestamp) = m.month
-      GROUP BY m.month
-      ORDER BY m.month;
-    `;
+          // Get current date
+          const currentDate = new Date()
 
-          // SQL query to get the number of messages per month per user_role
-          const messagesPerRolePerMonth = await sqlConnectionTableCreator`
-      WITH months AS (
-            SELECT generate_series(
-                date_trunc('month', ${oneYearAgo}::date),
-                date_trunc('month', ${currentDate}::date),
-                '1 month'
-            ) AS month
-        )
-        SELECT 
-            m.month,
-            COALESCE(uel.user_role, 'unknown') AS user_role,
-            COUNT(CASE WHEN uel.engagement_type = 'message creation' THEN 1 END) AS message_count
-        FROM months m
-        LEFT JOIN user_engagement_log uel
-            ON DATE_TRUNC('month', uel.timestamp) = m.month
-        GROUP BY m.month, uel.user_role
-        ORDER BY m.month, uel.user_role;
-    `;
+          // Set the start date based on the time frame
+          const startDate = new Date()
+
+          switch (timeFrame) {
+            case "day":
+              // For day view, show the past 7 days
+              startDate.setDate(startDate.getDate() - 7)
+              break
+            case "week":
+              // For week view, show the past 3 months (approximately 12-13 weeks)
+              startDate.setMonth(startDate.getMonth() - 3)
+              break
+            case "year":
+              // For year view, show the past 5 years
+              startDate.setFullYear(startDate.getFullYear() - 5)
+              break
+            case "month":
+            default:
+              // For month view, show the past year (12 months)
+              startDate.setFullYear(startDate.getFullYear() - 1)
+              break
+          }
+
+          // Determine the date truncation based on the requested time frame
+          let dateTrunc
+          let interval
+
+          switch (timeFrame) {
+            case "day":
+              dateTrunc = "day"
+              interval = "1 day"
+              break
+            case "week":
+              dateTrunc = "week"
+              interval = "1 week"
+              break
+            case "year":
+              dateTrunc = "year"
+              interval = "1 year"
+              break
+            case "month":
+            default:
+              dateTrunc = "month"
+              interval = "1 month"
+              break
+          }
+
+          // SQL query to get the number of unique users per time period
+          const uniqueUsersPerTimePeriod = await sqlConnectionTableCreator`
+            WITH time_periods AS (
+              SELECT generate_series(
+                date_trunc(${dateTrunc}, ${startDate}::date),
+                date_trunc(${dateTrunc}, ${currentDate}::date),
+                ${interval}
+              ) AS period
+            )
+            SELECT 
+              to_char(t.period, 'YYYY-MM-DD') AS time_period,
+              COALESCE(COUNT(DISTINCT uel.user_info), 0) AS unique_users
+            FROM time_periods t
+            LEFT JOIN user_engagement_log uel
+              ON DATE_TRUNC(${dateTrunc}, uel.timestamp) = t.period
+            GROUP BY t.period
+            ORDER BY t.period;
+          `
+
+          // SQL query to get the number of messages per time period per user_role
+          const messagesPerRolePerTimePeriod = await sqlConnectionTableCreator`
+            WITH time_periods AS (
+              SELECT generate_series(
+                date_trunc(${dateTrunc}, ${startDate}::date),
+                date_trunc(${dateTrunc}, ${currentDate}::date),
+                ${interval}
+              ) AS period
+            )
+            SELECT 
+              to_char(t.period, 'YYYY-MM-DD') AS time_period,
+              COALESCE(uel.user_role, 'unknown') AS user_role,
+              COUNT(CASE WHEN uel.engagement_type = 'message creation' THEN 1 END) AS message_count
+            FROM time_periods t
+            LEFT JOIN user_engagement_log uel
+              ON DATE_TRUNC(${dateTrunc}, uel.timestamp) = t.period
+            GROUP BY t.period, uel.user_role
+            ORDER BY t.period, uel.user_role;
+          `
 
           // SQL query to get the total average feedback rating for each user_role
           const totalFeedbackAveragePerRole = await sqlConnectionTableCreator`
-    SELECT 
-        COALESCE(uel.user_role, 'unknown') AS user_role,
-        AVG(fb.feedback_rating) AS avg_feedback_rating
-    FROM feedback fb
-    LEFT JOIN user_engagement_log uel
-        ON fb.session_id = uel.session_id
-    GROUP BY uel.user_role;
-`;
+            SELECT 
+              COALESCE(uel.user_role, 'unknown') AS user_role,
+              AVG(fb.feedback_rating) AS avg_feedback_rating
+            FROM feedback fb
+            LEFT JOIN user_engagement_log uel
+              ON fb.session_id = uel.session_id
+            GROUP BY uel.user_role;
+          `
+
           const formattedFeedback = totalFeedbackAveragePerRole.map((role) => ({
             user_role: role.user_role,
-            avg_feedback_rating:
-              role.avg_feedback_rating !== null
-                ? role.avg_feedback_rating
-                : "no feedback yet",
-          }));
+            avg_feedback_rating: role.avg_feedback_rating !== null ? role.avg_feedback_rating : "no feedback yet",
+          }))
+
+          // Format the data based on the time frame
+          const formattedUniqueUsers = uniqueUsersPerTimePeriod.map((item) => {
+            // For month and year views, we'll format the date differently
+            if (timeFrame === "month") {
+              return {
+                month: item.time_period.substring(0, 7), // YYYY-MM format
+                unique_users: item.unique_users,
+              }
+            } else if (timeFrame === "year") {
+              return {
+                month: item.time_period.substring(0, 4), // YYYY format
+                unique_users: item.unique_users,
+              }
+            } else {
+              // For day and week, keep the full date
+              return {
+                month: item.time_period, // YYYY-MM-DD format
+                unique_users: item.unique_users,
+              }
+            }
+          })
+
+          const formattedMessagesPerRole = messagesPerRolePerTimePeriod.map((item) => {
+            // For month and year views, we'll format the date differently
+            if (timeFrame === "month") {
+              return {
+                month: item.time_period.substring(0, 7), // YYYY-MM format
+                user_role: item.user_role,
+                message_count: item.message_count,
+              }
+            } else if (timeFrame === "year") {
+              return {
+                month: item.time_period.substring(0, 4), // YYYY format
+                user_role: item.user_role,
+                message_count: item.message_count,
+              }
+            } else {
+              // For day and week, keep the full date
+              return {
+                month: item.time_period, // YYYY-MM-DD format
+                user_role: item.user_role,
+                message_count: item.message_count,
+              }
+            }
+          })
 
           // Return the combined data in the response
           response.body = JSON.stringify({
-            unique_users_per_month: uniqueUsersPerMonth,
-            messages_per_role_per_month: messagesPerRolePerMonth,
+            unique_users_per_month: formattedUniqueUsers,
+            messages_per_role_per_month: formattedMessagesPerRole,
             avg_feedback_per_role: formattedFeedback,
-          });
+            time_frame: timeFrame,
+            date_range: {
+              start: startDate.toISOString().split("T")[0],
+              end: currentDate.toISOString().split("T")[0],
+            },
+          })
         } catch (err) {
-          response.statusCode = 500;
-          console.error(err);
-          response.body = JSON.stringify({ error: "Internal server error" });
+          response.statusCode = 500
+          console.error(err)
+          response.body = JSON.stringify({ error: "Internal server error" })
         }
-        break;
+        break
       case "POST /admin/create_category":
-        if (
-          event.queryStringParameters.category_name &&
-          event.queryStringParameters.category_number
-        ) {
-          const { category_name, category_number } =
-            event.queryStringParameters;
+        if (event.queryStringParameters.category_name && event.queryStringParameters.category_number) {
+          const { category_name, category_number } = event.queryStringParameters
           try {
             // Insert the new category
             const categoryData = await sqlConnectionTableCreator`
@@ -125,7 +217,7 @@ exports.handler = async (event) => {
                   ${category_number}
                 )
                 RETURNING *;
-              `;
+              `
 
             // Insert a record into the user engagement log
             await sqlConnectionTableCreator`
@@ -138,27 +230,26 @@ exports.handler = async (event) => {
                   NULL,
                   'admin'
                 )
-              `;
+              `
 
-            response.statusCode = 201;
+            response.statusCode = 201
             response.body = JSON.stringify({
               category_id: categoryData[0]?.category_id,
               category_name: categoryData[0]?.category_name,
               category_number: categoryData[0]?.category_number,
-            });
+            })
           } catch (err) {
-            response.statusCode = 500;
-            console.error(err);
-            response.body = JSON.stringify({ error: "Internal server error" });
+            response.statusCode = 500
+            console.error(err)
+            response.body = JSON.stringify({ error: "Internal server error" })
           }
         } else {
-          response.statusCode = 400;
+          response.statusCode = 400
           response.body = JSON.stringify({
-            error:
-              "Invalid value: category_name and category_number are required.",
-          });
+            error: "Invalid value: category_name and category_number are required.",
+          })
         }
-        break;
+        break
       case "GET /admin/categories":
         try {
           // Query to get all categories
@@ -166,26 +257,25 @@ exports.handler = async (event) => {
             SELECT category_id, category_name, category_number
             FROM categories
             ORDER BY category_number ASC;
-          `;
+          `
 
-          response.statusCode = 200;
-          response.body = JSON.stringify(categoriesData);
+          response.statusCode = 200
+          response.body = JSON.stringify(categoriesData)
         } catch (err) {
-          response.statusCode = 500;
-          console.error(err);
-          response.body = JSON.stringify({ error: "Internal server error" });
+          response.statusCode = 500
+          console.error(err)
+          response.body = JSON.stringify({ error: "Internal server error" })
         }
-        break;
+        break
       case "PUT /admin/edit_category":
         if (
           event.queryStringParameters.category_id &&
           event.queryStringParameters.category_name &&
           event.queryStringParameters.category_number
         ) {
-          const editCategoryId = event.queryStringParameters.category_id;
-          const editCategoryName = event.queryStringParameters.category_name;
-          const editCategoryNumber =
-            event.queryStringParameters.category_number;
+          const editCategoryId = event.queryStringParameters.category_id
+          const editCategoryName = event.queryStringParameters.category_name
+          const editCategoryNumber = event.queryStringParameters.category_number
 
           try {
             // Update category query
@@ -194,14 +284,14 @@ exports.handler = async (event) => {
               SET category_name = ${editCategoryName}, category_number = ${editCategoryNumber}
               WHERE category_id = ${editCategoryId}
               RETURNING *;
-            `;
+            `
 
             if (updateResult.length === 0) {
-              response.statusCode = 404;
-              response.body = JSON.stringify({ error: "Category not found" });
+              response.statusCode = 404
+              response.body = JSON.stringify({ error: "Category not found" })
             } else {
-              const userRole = "admin";
-              const engagementType = "category edited";
+              const userRole = "admin"
+              const engagementType = "category edited"
 
               await sqlConnectionTableCreator`
                 INSERT INTO user_engagement_log (log_id, session_id, timestamp, engagement_type, user_info, user_role)
@@ -213,29 +303,26 @@ exports.handler = async (event) => {
                   NULL,
                   ${userRole}
                 )
-              `;
+              `
 
-              response.statusCode = 200;
-              response.body = JSON.stringify(updateResult[0]);
+              response.statusCode = 200
+              response.body = JSON.stringify(updateResult[0])
             }
           } catch (err) {
-            response.statusCode = 500;
-            console.error(err);
-            response.body = JSON.stringify({ error: "Internal server error" });
+            response.statusCode = 500
+            console.error(err)
+            response.body = JSON.stringify({ error: "Internal server error" })
           }
         } else {
-          response.statusCode = 400;
+          response.statusCode = 400
           response.body = JSON.stringify({
             error: "Missing required parameters",
-          });
+          })
         }
-        break;
+        break
       case "DELETE /admin/delete_category":
-        if (
-          event.queryStringParameters &&
-          event.queryStringParameters.category_id
-        ) {
-          const categoryId = event.queryStringParameters.category_id;
+        if (event.queryStringParameters && event.queryStringParameters.category_id) {
+          const categoryId = event.queryStringParameters.category_id
 
           try {
             // Delete category query
@@ -243,14 +330,14 @@ exports.handler = async (event) => {
                 DELETE FROM categories
                 WHERE category_id = ${categoryId}
                 RETURNING *; 
-              `;
+              `
 
             if (deleteResult.length === 0) {
-              response.statusCode = 404;
-              response.body = JSON.stringify({ error: "Category not found" });
+              response.statusCode = 404
+              response.body = JSON.stringify({ error: "Category not found" })
             } else {
-              const userRole = "admin";
-              const engagementType = "category deleted";
+              const userRole = "admin"
+              const engagementType = "category deleted"
 
               // Log the category deletion in user engagement log
               await sqlConnectionTableCreator`
@@ -263,25 +350,25 @@ exports.handler = async (event) => {
                     NULL,
                     ${userRole}
                   )
-                `;
+                `
 
-              response.statusCode = 200;
+              response.statusCode = 200
               response.body = JSON.stringify({
                 message: "Category deleted successfully",
-              });
+              })
             }
           } catch (err) {
-            response.statusCode = 500;
-            console.error(err);
-            response.body = JSON.stringify({ error: "Internal server error" });
+            response.statusCode = 500
+            console.error(err)
+            response.body = JSON.stringify({ error: "Internal server error" })
           }
         } else {
-          response.statusCode = 400;
+          response.statusCode = 400
           response.body = JSON.stringify({
             error: "Missing required parameters",
-          });
+          })
         }
-        break;
+        break
       case "PUT /admin/update_metadata":
         if (
           event.queryStringParameters != null &&
@@ -289,10 +376,10 @@ exports.handler = async (event) => {
           event.queryStringParameters.document_name &&
           event.queryStringParameters.document_type
         ) {
-          const categoryId = event.queryStringParameters.category_id;
-          const documentName = event.queryStringParameters.document_name;
-          const documentType = event.queryStringParameters.document_type;
-          const { metadata } = JSON.parse(event.body);
+          const categoryId = event.queryStringParameters.category_id
+          const documentName = event.queryStringParameters.document_name
+          const documentType = event.queryStringParameters.document_type
+          const { metadata } = JSON.parse(event.body)
 
           try {
             // Query to find the document with the given category_id, document_name, and document_type
@@ -301,7 +388,7 @@ exports.handler = async (event) => {
         WHERE category_id = ${categoryId}
         AND document_name = ${documentName}
         AND document_type = ${documentType};
-      `;
+      `
 
             if (existingDocument.length === 0) {
               // If document does not exist, insert a new entry
@@ -309,12 +396,12 @@ exports.handler = async (event) => {
           INSERT INTO documents (document_id, category_id, document_s3_file_path, document_name, document_type, metadata, time_created)
           VALUES (uuid_generate_v4(), ${categoryId}, NULL, ${documentName}, ${documentType}, ${metadata}, CURRENT_TIMESTAMP)
           RETURNING *;
-        `;
-              response.statusCode = 201;
+        `
+              response.statusCode = 201
               response.body = JSON.stringify({
                 message: "Document metadata added successfully",
                 document: result[0],
-              });
+              })
             } else {
               // Update the metadata field for an existing document
               const result = await sqlConnectionTableCreator`
@@ -324,33 +411,33 @@ exports.handler = async (event) => {
           AND document_name = ${documentName}
           AND document_type = ${documentType}
           RETURNING *;
-        `;
+        `
 
               if (result.length > 0) {
-                response.statusCode = 200;
+                response.statusCode = 200
                 response.body = JSON.stringify({
                   message: "Document metadata updated successfully",
                   document: result[0],
-                });
+                })
               } else {
-                response.statusCode = 500;
+                response.statusCode = 500
                 response.body = JSON.stringify({
                   error: "Failed to update metadata.",
-                });
+                })
               }
             }
           } catch (err) {
-            response.statusCode = 500;
-            console.error(err);
-            response.body = JSON.stringify({ error: "Internal server error" });
+            response.statusCode = 500
+            console.error(err)
+            response.body = JSON.stringify({ error: "Internal server error" })
           }
         } else {
-          response.statusCode = 400;
+          response.statusCode = 400
           response.body = JSON.stringify({
             error: "category_id, document_name, and document_type are required",
-          });
+          })
         }
-        break;
+        break
       case "GET /admin/conversation_history_preview":
         try {
           const result = await sqlConnectionTableCreator`
@@ -370,29 +457,26 @@ exports.handler = async (event) => {
               FROM RankedMessages
               WHERE rn <= 10
               ORDER BY user_role, timestamp DESC;
-            `;
+            `
 
           const groupedResults = result.reduce((acc, row) => {
             if (!acc[row.user_role]) {
-              acc[row.user_role] = [];
+              acc[row.user_role] = []
             }
-            acc[row.user_role].push(row);
-            return acc;
-          }, {});
+            acc[row.user_role].push(row)
+            return acc
+          }, {})
 
-          response.body = JSON.stringify(groupedResults);
+          response.body = JSON.stringify(groupedResults)
         } catch (err) {
-          response.statusCode = 500;
-          console.error(err);
-          response.body = JSON.stringify({ error: "Internal server error" });
+          response.statusCode = 500
+          console.error(err)
+          response.body = JSON.stringify({ error: "Internal server error" })
         }
-        break;
+        break
       case "GET /admin/conversation_sessions":
-        if (
-          event.queryStringParameters &&
-          event.queryStringParameters.user_role
-        ) {
-          const userRole = event.queryStringParameters.user_role;
+        if (event.queryStringParameters && event.queryStringParameters.user_role) {
+          const userRole = event.queryStringParameters.user_role
 
           try {
             const sessions = await sqlConnectionTableCreator`
@@ -430,22 +514,22 @@ exports.handler = async (event) => {
         FROM latest_messages lm
         LEFT JOIN second_messages sm ON lm.session_id = sm.session_id
         ORDER BY lm.last_message_time DESC;
-      `;
+      `
 
-            response.body = JSON.stringify(sessions);
-            response.statusCode = 200; // OK
+            response.body = JSON.stringify(sessions)
+            response.statusCode = 200 // OK
           } catch (err) {
-            response.statusCode = 500; // Internal Server Error
-            console.error(err);
-            response.body = JSON.stringify({ error: "Internal server error" });
+            response.statusCode = 500 // Internal Server Error
+            console.error(err)
+            response.body = JSON.stringify({ error: "Internal server error" })
           }
         } else {
-          response.statusCode = 400; // Bad Request
+          response.statusCode = 400 // Bad Request
           response.body = JSON.stringify({
             error: "Missing required parameter: user_role",
-          });
+          })
         }
-        break;
+        break
       case "GET /admin/latest_prompt":
         try {
           // Queries to get the most recent non-null entries for each role
@@ -455,7 +539,7 @@ exports.handler = async (event) => {
       WHERE public IS NOT NULL
       ORDER BY time_created DESC NULLS LAST
       LIMIT 1;
-    `;
+    `
 
           const latestEducatorPrompt = await sqlConnectionTableCreator`
       SELECT educator, time_created
@@ -463,7 +547,7 @@ exports.handler = async (event) => {
       WHERE educator IS NOT NULL
       ORDER BY time_created DESC NULLS LAST
       LIMIT 1;
-    `;
+    `
 
           const latestAdminPrompt = await sqlConnectionTableCreator`
       SELECT admin, time_created
@@ -471,44 +555,44 @@ exports.handler = async (event) => {
       WHERE admin IS NOT NULL
       ORDER BY time_created DESC NULLS LAST
       LIMIT 1;
-    `;
+    `
 
           // Building the response object with non-null values for each role
-          const latestPrompt = {};
+          const latestPrompt = {}
           if (latestPublicPrompt.length > 0) {
             latestPrompt.public = {
               prompt: latestPublicPrompt[0].public,
               time_created: latestPublicPrompt[0].time_created,
-            };
+            }
           }
           if (latestEducatorPrompt.length > 0) {
             latestPrompt.educator = {
               prompt: latestEducatorPrompt[0].educator,
               time_created: latestEducatorPrompt[0].time_created,
-            };
+            }
           }
           if (latestAdminPrompt.length > 0) {
             latestPrompt.admin = {
               prompt: latestAdminPrompt[0].admin,
               time_created: latestAdminPrompt[0].time_created,
-            };
+            }
           }
 
           // Check if any non-null prompts were found
           if (Object.keys(latestPrompt).length === 0) {
-            response.statusCode = 404;
-            response.body = JSON.stringify({ error: "No prompts found" });
+            response.statusCode = 404
+            response.body = JSON.stringify({ error: "No prompts found" })
           } else {
-            response.statusCode = 200;
-            response.body = JSON.stringify(latestPrompt);
+            response.statusCode = 200
+            response.body = JSON.stringify(latestPrompt)
           }
         } catch (err) {
           // Handle any errors that occur during the query
-          response.statusCode = 500;
-          console.error(err);
-          response.body = JSON.stringify({ error: "Internal server error" });
+          response.statusCode = 500
+          console.error(err)
+          response.body = JSON.stringify({ error: "Internal server error" })
         }
-        break;
+        break
       case "GET /admin/previous_prompts":
         try {
           // Subquery to get the latest non-null time_created for each role
@@ -518,10 +602,9 @@ exports.handler = async (event) => {
         MAX(time_created) FILTER (WHERE educator IS NOT NULL) AS latest_educator,
         MAX(time_created) FILTER (WHERE admin IS NOT NULL) AS latest_admin
       FROM prompts;
-    `;
+    `
 
-          const { latest_public, latest_educator, latest_admin } =
-            latestTimestamps[0];
+          const { latest_public, latest_educator, latest_admin } = latestTimestamps[0]
 
           // Query to get all previous non-null entries for each role after the latest entry
           const previousPrompts = await sqlConnectionTableCreator`
@@ -532,7 +615,7 @@ exports.handler = async (event) => {
         (educator IS NOT NULL AND time_created < ${latest_educator}) OR
         (admin IS NOT NULL AND time_created < ${latest_admin})
       ORDER BY time_created DESC;
-    `;
+    `
 
           // Organize prompts by role and ignore null values
           const organizedPrompts = {
@@ -554,42 +637,38 @@ exports.handler = async (event) => {
                 prompt: entry.admin,
                 time_created: entry.time_created,
               })),
-          };
+          }
 
           // Return the organized prompts by role
-          response.statusCode = 200;
-          response.body = JSON.stringify(organizedPrompts);
+          response.statusCode = 200
+          response.body = JSON.stringify(organizedPrompts)
         } catch (err) {
           // Handle any errors that occur during the query
-          response.statusCode = 500;
-          console.error(err);
-          response.body = JSON.stringify({ error: "Internal server error" });
+          response.statusCode = 500
+          console.error(err)
+          response.body = JSON.stringify({ error: "Internal server error" })
         }
-        break;
+        break
       case "POST /admin/insert_prompt":
         try {
           // Check if the required query parameter and body are provided
-          if (
-            !event.queryStringParameters ||
-            !event.queryStringParameters.role ||
-            !event.body
-          ) {
-            response.statusCode = 400;
+          if (!event.queryStringParameters || !event.queryStringParameters.role || !event.body) {
+            response.statusCode = 400
             response.body = JSON.stringify({
               error: "Missing required parameters",
-            });
-            break;
+            })
+            break
           }
 
           // Get role from query string and prompt from request body
-          const role = event.queryStringParameters.role;
-          const { prompt } = JSON.parse(event.body);
+          const role = event.queryStringParameters.role
+          const { prompt } = JSON.parse(event.body)
 
           // Validate that role is one of the accepted roles
           if (!["public", "educator", "admin"].includes(role)) {
-            response.statusCode = 400;
-            response.body = JSON.stringify({ error: "Invalid role provided" });
-            break;
+            response.statusCode = 400
+            response.body = JSON.stringify({ error: "Invalid role provided" })
+            break
           }
 
           // Prepare the prompt data with null values for other roles
@@ -598,61 +677,58 @@ exports.handler = async (event) => {
             educator: role === "educator" ? prompt : null,
             admin: role === "admin" ? prompt : null,
             time_created: new Date(), // Current timestamp
-          };
+          }
 
           // Insert into the prompts table
           await sqlConnectionTableCreator`
       INSERT INTO prompts (public, educator, admin, time_created)
       VALUES (${promptData.public}, ${promptData.educator}, ${promptData.admin}, ${promptData.time_created});
-    `;
+    `
 
           // Return success response
-          response.statusCode = 201;
+          response.statusCode = 201
           response.body = JSON.stringify({
             message: "Prompt inserted successfully",
-          });
+          })
         } catch (err) {
           // Handle any errors that occur during the insert
-          response.statusCode = 500;
-          console.error(err);
-          response.body = JSON.stringify({ error: "Internal server error" });
+          response.statusCode = 500
+          console.error(err)
+          response.body = JSON.stringify({ error: "Internal server error" })
         }
-        break;
+        break
       case "GET /admin/get_feedback":
         try {
-          if (
-            !event.queryStringParameters ||
-            !event.queryStringParameters.session_id
-          ) {
-            response.statusCode = 400;
+          if (!event.queryStringParameters || !event.queryStringParameters.session_id) {
+            response.statusCode = 400
             response.body = JSON.stringify({
               error: "Missing required parameter: session_id",
-            });
-            break;
+            })
+            break
           }
 
-          const session_id = event.queryStringParameters.session_id;
+          const session_id = event.queryStringParameters.session_id
           const feedbackEntries = await sqlConnectionTableCreator`
         SELECT feedback_id, session_id, feedback_rating, feedback_description, timestamp
         FROM feedback
         WHERE session_id = ${session_id}
         ORDER BY timestamp DESC;
-        `;
+        `
           if (feedbackEntries.length === 0) {
-            response.statusCode = 404;
+            response.statusCode = 404
             response.body = JSON.stringify({
               error: "No feedback found for the given session_id",
-            });
+            })
           } else {
-            response.statusCode = 200;
-            response.body = JSON.stringify(feedbackEntries);
+            response.statusCode = 200
+            response.body = JSON.stringify(feedbackEntries)
           }
         } catch (err) {
-          response.statusCode = 500;
-          console.error(err);
-          response.body = JSON.stringify({ error: "Internal server error" });
+          response.statusCode = 500
+          console.error(err)
+          response.body = JSON.stringify({ error: "Internal server error" })
         }
-        break;
+        break
       case "GET /admin/feedback_by_role":
         try {
           const feedbackData = await sqlConnectionTableCreator`
@@ -684,24 +760,25 @@ exports.handler = async (event) => {
                 ) AS feedback_details
               FROM feedback_with_roles
               GROUP BY user_role;
-              `;
+              `
 
-          response.body = JSON.stringify(feedbackData);
-          response.statusCode = 200;
+          response.body = JSON.stringify(feedbackData)
+          response.statusCode = 200
         } catch (err) {
-          response.statusCode = 500;
-          console.error(err);
-          response.body = JSON.stringify({ error: "Internal server error" });
+          response.statusCode = 500
+          console.error(err)
+          response.body = JSON.stringify({ error: "Internal server error" })
         }
-        break;
+        break
       default:
-        throw new Error(`Unsupported route: "${pathData}"`);
+        throw new Error(`Unsupported route: "${pathData}"`)
     }
   } catch (error) {
-    response.statusCode = 400;
-    console.log(error);
-    response.body = JSON.stringify(error.message);
+    response.statusCode = 400
+    console.log(error)
+    response.body = JSON.stringify(error.message)
   }
-  console.log(response);
-  return response;
-};
+  console.log(response)
+  return response
+}
+
