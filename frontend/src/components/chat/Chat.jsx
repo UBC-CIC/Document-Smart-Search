@@ -122,7 +122,7 @@ export default function SmartSearchAssistant() {
       if (messages.length <= 1 && !isCreatingSession) {
         setShowDisclaimer(true)
       }
-    }, 1500) // 1 second delay to allow messages to load
+    }, 2000) // 1 second delay to allow messages to load
 
     return () => clearTimeout(disclaimerTimer)
   }, [messages, isCreatingSession])
