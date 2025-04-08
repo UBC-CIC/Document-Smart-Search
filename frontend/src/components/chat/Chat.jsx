@@ -17,7 +17,7 @@ export default function SmartSearchAssistant() {
   const [showFeedback, setShowFeedback] = useState(false)
   const [feedback, setFeedback] = useState({ rating: 0, description: [] })
   const [isSendingFeedback, setIsSendingFeedback] = useState(false)
-  const [showDisclaimer, setShowDisclaimer] = useState(true)
+  const [showDisclaimer, setShowDisclaimer] = useState(false)
 
   // State for the conversation history
   const [messages, setMessages] = useState([
@@ -110,10 +110,22 @@ export default function SmartSearchAssistant() {
     }
   }, [session])
 
-  // Show disclaimer on initial load
+  // Show disclaimer only when starting a new conversation
   useEffect(() => {
-    setShowDisclaimer(true)
-  }, [])
+    // Start with disclaimer hidden
+    setShowDisclaimer(false)
+
+    // Create a timer to check if we should show the disclaimer
+    const disclaimerTimer = setTimeout(() => {
+      // Only show disclaimer if we have just the initial message (no conversation)
+      // or if we're creating a new session
+      if (messages.length <= 1 && !isCreatingSession) {
+        setShowDisclaimer(true)
+      }
+    }, 1500) // 1 second delay to allow messages to load
+
+    return () => clearTimeout(disclaimerTimer)
+  }, [messages, isCreatingSession])
 
   const getUserRole = (messageHistory) => {
     const firstHumanMessage = messageHistory.find((msg) => msg.role === "user" || msg.Type === "human")
@@ -177,6 +189,8 @@ export default function SmartSearchAssistant() {
     if (!sessionId) return
 
     try {
+      setShowDisclaimer(false) // Hide disclaimer while fetching messages
+
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_ENDPOINT}user/get_messages?session_id=${encodeURIComponent(sessionId)}`,
         {
@@ -398,6 +412,7 @@ export default function SmartSearchAssistant() {
       },
     ])
     localStorage.removeItem("dfoSession")
+    setShowDisclaimer(true) // Show disclaimer when resetting session
     createNewSession(fingerprint)
   }
 
@@ -742,4 +757,3 @@ export default function SmartSearchAssistant() {
     </div>
   )
 }
-
