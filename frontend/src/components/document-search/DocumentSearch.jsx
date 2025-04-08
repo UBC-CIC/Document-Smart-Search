@@ -1,9 +1,8 @@
 "use client"
 
-
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { Search, ChevronDown, ChevronRight, Menu, X } from "lucide-react"
+import { Search, ChevronDown, ChevronRight, FileText, Download } from "lucide-react"
 
 export default function DocumentSearch() {
   const [activeTab, setActiveTab] = useState("document")
@@ -12,33 +11,16 @@ export default function DocumentSearch() {
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [filteredResults, setFilteredResults] = useState([])
+  const [documents, setDocuments] = useState({})
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [categoryId, setCategoryId] = useState("default") // Default category ID
 
   // Filter states
-  const [yearFilters, setYearFilters] = useState({
-    2021: false,
-    2020: false,
-    2019: false,
-  })
-
-  const [topicFilters, setTopicFilters] = useState({
-    "Salmon Population": false,
-    "Climate Change": false,
-    Conservation: false,
-    "Indigenous Rights": false,
-  })
-
-  const [documentTypeFilters, setDocumentTypeFilters] = useState({
-    Research: false,
-    Policy: false,
-    Assessment: false,
-    Report: false,
-  })
-
-  const [authorFilters, setAuthorFilters] = useState({
-    "DFO Research Team": false,
-    "External Researchers": false,
-    "Policy Division": false,
-  })
+  const [yearFilters, setYearFilters] = useState({})
+  const [topicFilters, setTopicFilters] = useState({})
+  const [documentTypeFilters, setDocumentTypeFilters] = useState({})
+  const [authorFilters, setAuthorFilters] = useState({})
 
   // Expanded sections state
   const [expandedSections, setExpandedSections] = useState({
@@ -56,104 +38,91 @@ export default function DocumentSearch() {
     }))
   }
 
-  // Sample search results
-  const allSearchResults = [
-    {
-      id: "6472",
-      title: "Salmon Fishing Impact Assessment",
-      highlights: [
-        "The Salmon population has declined by 15% in the past decade",
-        "Experts say that Salmon fishing has impacted population growth rates",
-      ],
-      year: "2021",
-      category: "Impact Assessment",
-      documentType: "Assessment",
-      author: "DFO Research Team",
-      topics: ["Salmon Population", "Fishing Impact"],
-    },
-    {
-      id: "6273",
-      title: "Sustainable Aquaculture Practices",
-      highlights: [
-        "New sustainable practices in aquaculture show promising results",
-        "Reduced environmental impact through closed-containment systems",
-      ],
-      year: "2021",
-      category: "Sustainability",
-      documentType: "Report",
-      author: "External Researchers",
-      topics: ["Aquaculture", "Sustainability"],
-    },
-    {
-      id: "5981",
-      title: "Climate Change Effects on Marine Ecosystems",
-      highlights: [
-        "Rising ocean temperatures affecting marine biodiversity",
-        "Coral reef systems showing signs of stress due to climate change",
-      ],
-      year: "2020",
-      category: "Climate Research",
-      documentType: "Research",
-      author: "DFO Research Team",
-      topics: ["Climate Change", "Marine Ecosystems"],
-    },
-    {
-      id: "5742",
-      title: "Conservation Strategies for Atlantic Cod",
-      highlights: [
-        "Atlantic cod populations require immediate conservation measures",
-        "Proposed strategies include seasonal fishing restrictions",
-      ],
-      year: "2020",
-      category: "Conservation",
-      documentType: "Policy",
-      author: "Policy Division",
-      topics: ["Conservation", "Atlantic Cod"],
-    },
-    {
-      id: "5391",
-      title: "Indigenous Fishing Rights Framework",
-      highlights: [
-        "New framework developed in consultation with Indigenous communities",
-        "Recognition of traditional fishing practices and knowledge",
-      ],
-      year: "2019",
-      category: "Policy",
-      documentType: "Policy",
-      author: "Policy Division",
-      topics: ["Indigenous Rights", "Fishing Policy"],
-    },
-    {
-      id: "5127",
-      title: "Ocean Plastic Pollution Study",
-      highlights: [
-        "Microplastics detected in 85% of sampled marine species",
-        "Long-term effects on marine food chains remain concerning",
-      ],
-      year: "2019",
-      category: "Pollution",
-      documentType: "Research",
-      author: "External Researchers",
-      topics: ["Pollution", "Marine Ecosystems"],
-    },
-    {
-      id: "4983",
-      title: "Salmon Migration Patterns",
-      highlights: [
-        "Changes in salmon migration timing observed over past decade",
-        "Correlation with changing water temperatures and currents",
-      ],
-      year: "2019",
-      category: "Research",
-      documentType: "Research",
-      author: "DFO Research Team",
-      topics: ["Salmon Population", "Migration"],
-    },
-  ]
+  // Fetch documents from API
+  const fetchDocuments = async (category = categoryId) => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const response = await fetch(`/user/documents?category_id=${category}`)
+
+      if (!response.ok) {
+        throw new Error(`Error fetching documents: ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      setDocuments(data.document_files || {})
+
+      // Extract unique filter values from documents
+      const years = {}
+      const topics = {}
+      const types = {}
+      const authors = {}
+
+      // Process documents to create filterable results
+      const processedResults = Object.entries(data.document_files || {}).map(([fileName, fileData]) => {
+        const metadata = fileData.metadata ? JSON.parse(fileData.metadata) : {}
+        const year = metadata.year || "Unknown"
+        const documentType = metadata.type || "Unknown"
+        const author = metadata.author || "Unknown"
+        const documentTopics = metadata.topics || []
+
+        // Add to filter options
+        years[year] = false
+        types[documentType] = false
+        authors[author] = false
+        documentTopics.forEach((topic) => {
+          topics[topic] = false
+        })
+
+        return {
+          id: fileName.split(".")[0],
+          title: metadata.title || fileName,
+          highlights: metadata.highlights || [],
+          year,
+          category: metadata.category || "Unknown",
+          documentType,
+          author,
+          topics: documentTopics,
+          url: fileData.url,
+          fileName,
+        }
+      })
+
+      setYearFilters(years)
+      setTopicFilters(topics)
+      setDocumentTypeFilters(types)
+      setAuthorFilters(authors)
+      setFilteredResults(processedResults)
+    } catch (err) {
+      console.error("Error fetching documents:", err)
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   // Apply all filters
   const applyFilters = () => {
-    const filtered = allSearchResults.filter((result) => {
+    if (!documents || Object.keys(documents).length === 0) return
+
+    const processedResults = Object.entries(documents).map(([fileName, fileData]) => {
+      const metadata = fileData.metadata ? JSON.parse(fileData.metadata) : {}
+      return {
+        id: fileName.split(".")[0],
+        title: metadata.title || fileName,
+        highlights: metadata.highlights || [],
+        year: metadata.year || "Unknown",
+        category: metadata.category || "Unknown",
+        documentType: metadata.type || "Unknown",
+        author: metadata.author || "Unknown",
+        topics: metadata.topics || [],
+        url: fileData.url,
+        fileName,
+      }
+    })
+
+    const filtered = processedResults.filter((result) => {
       // Check if any year filter is active, if not, show all years
       const anyYearFilterActive = Object.values(yearFilters).some((value) => value)
 
@@ -196,7 +165,8 @@ export default function DocumentSearch() {
           result.title.toLowerCase().includes(query) ||
           result.category.toLowerCase().includes(query) ||
           result.highlights.some((highlight) => highlight.toLowerCase().includes(query)) ||
-          result.topics.some((topic) => topic.toLowerCase().includes(query))
+          result.topics.some((topic) => topic.toLowerCase().includes(query)) ||
+          result.fileName.toLowerCase().includes(query)
         )
       }
 
@@ -208,30 +178,36 @@ export default function DocumentSearch() {
 
   // Reset all filters
   const resetFilters = () => {
-    setYearFilters({
-      2021: false,
-      2020: false,
-      2019: false,
+    setYearFilters((prevFilters) => {
+      const resetFilters = {}
+      Object.keys(prevFilters).forEach((key) => {
+        resetFilters[key] = false
+      })
+      return resetFilters
     })
 
-    setTopicFilters({
-      "Salmon Population": false,
-      "Climate Change": false,
-      Conservation: false,
-      "Indigenous Rights": false,
+    setTopicFilters((prevFilters) => {
+      const resetFilters = {}
+      Object.keys(prevFilters).forEach((key) => {
+        resetFilters[key] = false
+      })
+      return resetFilters
     })
 
-    setDocumentTypeFilters({
-      Research: false,
-      Policy: false,
-      Assessment: false,
-      Report: false,
+    setDocumentTypeFilters((prevFilters) => {
+      const resetFilters = {}
+      Object.keys(prevFilters).forEach((key) => {
+        resetFilters[key] = false
+      })
+      return resetFilters
     })
 
-    setAuthorFilters({
-      "DFO Research Team": false,
-      "External Researchers": false,
-      "Policy Division": false,
+    setAuthorFilters((prevFilters) => {
+      const resetFilters = {}
+      Object.keys(prevFilters).forEach((key) => {
+        resetFilters[key] = false
+      })
+      return resetFilters
     })
 
     // Clear search query
@@ -243,15 +219,22 @@ export default function DocumentSearch() {
     applyFilters()
   }, [searchQuery, yearFilters, topicFilters, documentTypeFilters, authorFilters])
 
-  // Initial load of all results
+  // Initial load of documents
   useEffect(() => {
-    setFilteredResults(allSearchResults)
+    fetchDocuments()
   }, [])
 
   // Handle search input
   const handleSearch = (e) => {
     e.preventDefault()
     applyFilters()
+  }
+
+  // Handle category change
+  const handleCategoryChange = (e) => {
+    const newCategory = e.target.value
+    setCategoryId(newCategory)
+    fetchDocuments(newCategory)
   }
 
   return (
@@ -261,6 +244,24 @@ export default function DocumentSearch() {
         <h2 className="text-2xl md:text-3xl font-bold text-center mb-6 md:mb-8 dark:text-white">
           Document & Metadata Search
         </h2>
+
+        {/* Category Selector */}
+        <div className="mb-4">
+          <label htmlFor="category" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Select Category
+          </label>
+          <select
+            id="category"
+            value={categoryId}
+            onChange={handleCategoryChange}
+            className="w-full py-2 px-3 bg-gray-200 dark:bg-gray-700 rounded-lg text-gray-800 dark:text-gray-100 focus:outline-none"
+          >
+            <option value="default">Default Category</option>
+            <option value="reports">Reports</option>
+            <option value="policies">Policies</option>
+            <option value="research">Research</option>
+          </select>
+        </div>
 
         {/* Search Box */}
         <div className="mb-6 md:mb-8">
@@ -318,48 +319,21 @@ export default function DocumentSearch() {
                 </button>
                 {expandedSections.topics && (
                   <div className="mt-2 pl-2">
-                    <label className="flex items-center space-x-2 text-sm dark:text-gray-300">
-                      <input
-                        type="checkbox"
-                        checked={topicFilters["Salmon Population"]}
-                        onChange={() =>
-                          setTopicFilters((prev) => ({ ...prev, "Salmon Population": !prev["Salmon Population"] }))
-                        }
-                        className="rounded"
-                      />
-                      <span>Salmon Population</span>
-                    </label>
-                    <label className="flex items-center space-x-2 text-sm dark:text-gray-300">
-                      <input
-                        type="checkbox"
-                        checked={topicFilters["Climate Change"]}
-                        onChange={() =>
-                          setTopicFilters((prev) => ({ ...prev, "Climate Change": !prev["Climate Change"] }))
-                        }
-                        className="rounded"
-                      />
-                      <span>Climate Change</span>
-                    </label>
-                    <label className="flex items-center space-x-2 text-sm dark:text-gray-300">
-                      <input
-                        type="checkbox"
-                        checked={topicFilters["Conservation"]}
-                        onChange={() => setTopicFilters((prev) => ({ ...prev, Conservation: !prev["Conservation"] }))}
-                        className="rounded"
-                      />
-                      <span>Conservation</span>
-                    </label>
-                    <label className="flex items-center space-x-2 text-sm dark:text-gray-300">
-                      <input
-                        type="checkbox"
-                        checked={topicFilters["Indigenous Rights"]}
-                        onChange={() =>
-                          setTopicFilters((prev) => ({ ...prev, "Indigenous Rights": !prev["Indigenous Rights"] }))
-                        }
-                        className="rounded"
-                      />
-                      <span>Indigenous Rights</span>
-                    </label>
+                    {Object.keys(topicFilters).length > 0 ? (
+                      Object.keys(topicFilters).map((topic) => (
+                        <label key={topic} className="flex items-center space-x-2 text-sm dark:text-gray-300">
+                          <input
+                            type="checkbox"
+                            checked={topicFilters[topic]}
+                            onChange={() => setTopicFilters((prev) => ({ ...prev, [topic]: !prev[topic] }))}
+                            className="rounded"
+                          />
+                          <span>{topic}</span>
+                        </label>
+                      ))
+                    ) : (
+                      <p className="text-sm text-gray-500 dark:text-gray-400">No topics available</p>
+                    )}
                   </div>
                 )}
               </div>
@@ -375,33 +349,21 @@ export default function DocumentSearch() {
                 </button>
                 {expandedSections.year && (
                   <div className="mt-2 pl-2">
-                    <label className="flex items-center space-x-2 text-sm dark:text-gray-300">
-                      <input
-                        type="checkbox"
-                        checked={yearFilters["2021"]}
-                        onChange={() => setYearFilters((prev) => ({ ...prev, 2021: !prev["2021"] }))}
-                        className="rounded"
-                      />
-                      <span>2021</span>
-                    </label>
-                    <label className="flex items-center space-x-2 text-sm dark:text-gray-300">
-                      <input
-                        type="checkbox"
-                        checked={yearFilters["2020"]}
-                        onChange={() => setYearFilters((prev) => ({ ...prev, 2020: !prev["2020"] }))}
-                        className="rounded"
-                      />
-                      <span>2020</span>
-                    </label>
-                    <label className="flex items-center space-x-2 text-sm dark:text-gray-300">
-                      <input
-                        type="checkbox"
-                        checked={yearFilters["2019"]}
-                        onChange={() => setYearFilters((prev) => ({ ...prev, 2019: !prev["2019"] }))}
-                        className="rounded"
-                      />
-                      <span>2019</span>
-                    </label>
+                    {Object.keys(yearFilters).length > 0 ? (
+                      Object.keys(yearFilters).map((year) => (
+                        <label key={year} className="flex items-center space-x-2 text-sm dark:text-gray-300">
+                          <input
+                            type="checkbox"
+                            checked={yearFilters[year]}
+                            onChange={() => setYearFilters((prev) => ({ ...prev, [year]: !prev[year] }))}
+                            className="rounded"
+                          />
+                          <span>{year}</span>
+                        </label>
+                      ))
+                    ) : (
+                      <p className="text-sm text-gray-500 dark:text-gray-400">No years available</p>
+                    )}
                   </div>
                 )}
               </div>
@@ -421,44 +383,21 @@ export default function DocumentSearch() {
                 </button>
                 {expandedSections.documentType && (
                   <div className="mt-2 pl-2">
-                    <label className="flex items-center space-x-2 text-sm dark:text-gray-300">
-                      <input
-                        type="checkbox"
-                        checked={documentTypeFilters["Research"]}
-                        onChange={() => setDocumentTypeFilters((prev) => ({ ...prev, Research: !prev["Research"] }))}
-                        className="rounded"
-                      />
-                      <span>Research</span>
-                    </label>
-                    <label className="flex items-center space-x-2 text-sm dark:text-gray-300">
-                      <input
-                        type="checkbox"
-                        checked={documentTypeFilters["Policy"]}
-                        onChange={() => setDocumentTypeFilters((prev) => ({ ...prev, Policy: !prev["Policy"] }))}
-                        className="rounded"
-                      />
-                      <span>Policy</span>
-                    </label>
-                    <label className="flex items-center space-x-2 text-sm dark:text-gray-300">
-                      <input
-                        type="checkbox"
-                        checked={documentTypeFilters["Assessment"]}
-                        onChange={() =>
-                          setDocumentTypeFilters((prev) => ({ ...prev, Assessment: !prev["Assessment"] }))
-                        }
-                        className="rounded"
-                      />
-                      <span>Assessment</span>
-                    </label>
-                    <label className="flex items-center space-x-2 text-sm dark:text-gray-300">
-                      <input
-                        type="checkbox"
-                        checked={documentTypeFilters["Report"]}
-                        onChange={() => setDocumentTypeFilters((prev) => ({ ...prev, Report: !prev["Report"] }))}
-                        className="rounded"
-                      />
-                      <span>Report</span>
-                    </label>
+                    {Object.keys(documentTypeFilters).length > 0 ? (
+                      Object.keys(documentTypeFilters).map((type) => (
+                        <label key={type} className="flex items-center space-x-2 text-sm dark:text-gray-300">
+                          <input
+                            type="checkbox"
+                            checked={documentTypeFilters[type]}
+                            onChange={() => setDocumentTypeFilters((prev) => ({ ...prev, [type]: !prev[type] }))}
+                            className="rounded"
+                          />
+                          <span>{type}</span>
+                        </label>
+                      ))
+                    ) : (
+                      <p className="text-sm text-gray-500 dark:text-gray-400">No document types available</p>
+                    )}
                   </div>
                 )}
               </div>
@@ -474,42 +413,21 @@ export default function DocumentSearch() {
                 </button>
                 {expandedSections.author && (
                   <div className="mt-2 pl-2">
-                    <label className="flex items-center space-x-2 text-sm dark:text-gray-300">
-                      <input
-                        type="checkbox"
-                        checked={authorFilters["DFO Research Team"]}
-                        onChange={() =>
-                          setAuthorFilters((prev) => ({ ...prev, "DFO Research Team": !prev["DFO Research Team"] }))
-                        }
-                        className="rounded"
-                      />
-                      <span>DFO Research Team</span>
-                    </label>
-                    <label className="flex items-center space-x-2 text-sm dark:text-gray-300">
-                      <input
-                        type="checkbox"
-                        checked={authorFilters["External Researchers"]}
-                        onChange={() =>
-                          setAuthorFilters((prev) => ({
-                            ...prev,
-                            "External Researchers": !prev["External Researchers"],
-                          }))
-                        }
-                        className="rounded"
-                      />
-                      <span>External Researchers</span>
-                    </label>
-                    <label className="flex items-center space-x-2 text-sm dark:text-gray-300">
-                      <input
-                        type="checkbox"
-                        checked={authorFilters["Policy Division"]}
-                        onChange={() =>
-                          setAuthorFilters((prev) => ({ ...prev, "Policy Division": !prev["Policy Division"] }))
-                        }
-                        className="rounded"
-                      />
-                      <span>Policy Division</span>
-                    </label>
+                    {Object.keys(authorFilters).length > 0 ? (
+                      Object.keys(authorFilters).map((author) => (
+                        <label key={author} className="flex items-center space-x-2 text-sm dark:text-gray-300">
+                          <input
+                            type="checkbox"
+                            checked={authorFilters[author]}
+                            onChange={() => setAuthorFilters((prev) => ({ ...prev, [author]: !prev[author] }))}
+                            className="rounded"
+                          />
+                          <span>{author}</span>
+                        </label>
+                      ))
+                    ) : (
+                      <p className="text-sm text-gray-500 dark:text-gray-400">No authors available</p>
+                    )}
                   </div>
                 )}
               </div>
@@ -531,22 +449,36 @@ export default function DocumentSearch() {
               <span className="text-sm text-gray-600 dark:text-gray-400">{filteredResults.length} results</span>
             </div>
 
+            {/* Loading State */}
+            {loading && (
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
+                <p className="text-gray-600 dark:text-gray-400">Loading documents...</p>
+              </div>
+            )}
+
+            {/* Error State */}
+            {error && (
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center border border-red-300">
+                <p className="text-red-600 dark:text-red-400">Error: {error}</p>
+              </div>
+            )}
+
             {/* Search Results */}
             <div className="space-y-4">
-              {filteredResults.length > 0 ? (
+              {!loading && !error && filteredResults.length > 0 ? (
                 filteredResults.map((result) => (
                   <div
-                    key={result.id}
+                    key={result.id + result.fileName}
                     className="bg-white dark:bg-gray-800 rounded-lg shadow p-3 md:p-4 border dark:border-gray-700"
                   >
                     <div className="flex justify-between mb-2">
-                      <div className="text-xs md:text-sm text-gray-500 dark:text-gray-400">Reference: #{result.id}</div>
+                      <div className="text-xs md:text-sm text-gray-500 dark:text-gray-400">File: {result.fileName}</div>
                       <div className="text-xs md:text-sm text-blue-600 dark:text-blue-400">{result.category}</div>
                     </div>
 
                     <div className="flex justify-between mb-2">
                       <div className="text-xs md:text-sm text-gray-500 dark:text-gray-400">
-                        Created: 4/5/{result.year}
+                        Type: {result.documentType}
                       </div>
                       <div className="text-xs md:text-sm text-gray-500 dark:text-gray-400">Year: {result.year}</div>
                     </div>
@@ -555,66 +487,89 @@ export default function DocumentSearch() {
                       <div className="flex flex-col sm:flex-row sm:justify-between gap-2 mb-2">
                         <div className="font-medium dark:text-white text-sm md:text-base">{result.title}</div>
                         <div className="flex space-x-2 text-xs md:text-sm">
-                          <button className="text-blue-600 dark:text-blue-400">Document Summary</button>
-                          <button className="text-blue-600 dark:text-blue-400">Query Summary</button>
+                          <span className="text-gray-500 dark:text-gray-400">Author: {result.author}</span>
                         </div>
                       </div>
 
-                      <div className="mt-2 bg-gray-100 dark:bg-gray-700 p-2 md:p-3 rounded-md">
-                        <ul className="list-disc pl-5 text-xs md:text-sm dark:text-gray-300">
-                          {result.highlights.map((highlight, index) => (
-                            <li key={index}>{highlight}</li>
+                      {result.highlights && result.highlights.length > 0 && (
+                        <div className="mt-2 bg-gray-100 dark:bg-gray-700 p-2 md:p-3 rounded-md">
+                          <ul className="list-disc pl-5 text-xs md:text-sm dark:text-gray-300">
+                            {result.highlights.map((highlight, index) => (
+                              <li key={index}>{highlight}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {result.topics && result.topics.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {result.topics.map((topic, index) => (
+                            <span
+                              key={index}
+                              className="text-xs bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded-full text-gray-700 dark:text-gray-300"
+                            >
+                              {topic}
+                            </span>
                           ))}
-                        </ul>
-                      </div>
+                        </div>
+                      )}
                     </div>
 
-                    <div className="flex justify-end mt-2">
+                    <div className="flex justify-end mt-2 space-x-2">
+                      <a
+                        href={result.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 dark:text-blue-400 text-xs md:text-sm flex items-center"
+                      >
+                        <Download className="h-3 w-3 md:h-4 md:w-4 mr-1" /> Download
+                      </a>
                       <Link
                         href={`/document-view/${result.id}`}
                         className="text-blue-600 dark:text-blue-400 text-xs md:text-sm flex items-center"
                       >
-                        View Document <ChevronRight className="h-3 w-3 md:h-4 md:w-4 ml-1" />
+                        <FileText className="h-3 w-3 md:h-4 md:w-4 mr-1" /> View
                       </Link>
                     </div>
                   </div>
                 ))
-              ) : (
+              ) : !loading && !error ? (
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
                   <p className="text-gray-600 dark:text-gray-400">No documents found matching your search criteria.</p>
                 </div>
-              )}
+              ) : null}
             </div>
 
             {/* Pagination */}
-            <div className="flex justify-center mt-6 md:mt-8">
-              <nav className="flex items-center space-x-1">
-                <button className="px-2 py-1 rounded text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700">
-                  &laquo;
-                </button>
-                {[1, 2, 3, 4, 5].map((page) => (
-                  <button
-                    key={page}
-                    className={`px-2 md:px-3 py-1 rounded text-xs md:text-sm ${
-                      currentPage === page
-                        ? "bg-blue-600 text-white"
-                        : "text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-                    }`}
-                    onClick={() => setCurrentPage(page)}
-                  >
-                    {page}
+            {filteredResults.length > 0 && (
+              <div className="flex justify-center mt-6 md:mt-8">
+                <nav className="flex items-center space-x-1">
+                  <button className="px-2 py-1 rounded text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700">
+                    &laquo;
                   </button>
-                ))}
-                <span className="px-1 text-gray-600 dark:text-gray-300">...</span>
-                <button className="px-2 py-1 rounded text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700">
-                  &raquo;
-                </button>
-              </nav>
-            </div>
+                  {[1, 2, 3, 4, 5].map((page) => (
+                    <button
+                      key={page}
+                      className={`px-2 md:px-3 py-1 rounded text-xs md:text-sm ${
+                        currentPage === page
+                          ? "bg-blue-600 text-white"
+                          : "text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                      }`}
+                      onClick={() => setCurrentPage(page)}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                  <span className="px-1 text-gray-600 dark:text-gray-300">...</span>
+                  <button className="px-2 py-1 rounded text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700">
+                    &raquo;
+                  </button>
+                </nav>
+              </div>
+            )}
           </div>
         </div>
       </main>
     </div>
   )
 }
-
