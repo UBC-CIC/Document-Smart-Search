@@ -176,7 +176,7 @@ export default function AnalyticsDashboard() {
       <div className="flex flex-col space-y-8">
         <div>
           <div className="flex justify-between items-center mb-4">
-            <div className="text-lg">Number of Users by Time Period</div>
+            <div className="text-lg">Number of Sessions by Time Period</div>
             <Tabs value={usersTimeFrame} onValueChange={setUsersTimeFrame} className="w-auto">
               <TabsList>
                 <TabsTrigger value="day">Day</TabsTrigger>
@@ -199,7 +199,7 @@ export default function AnalyticsDashboard() {
             <ChartContainer
               config={{
                 unique_users: {
-                  label: "Unique Users",
+                  label: "Unique Sessions",
                   color: "hsl(var(--chart-1))",
                 },
               }}
@@ -220,7 +220,7 @@ export default function AnalyticsDashboard() {
                 />
                 <YAxis
                   label={{
-                    value: "Unique Users",
+                    value: "Unique Sessions",
                     angle: -90,
                     position: "insideLeft",
                     fontSize: 12,
