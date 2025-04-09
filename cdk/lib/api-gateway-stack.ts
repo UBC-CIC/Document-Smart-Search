@@ -53,7 +53,7 @@ export class ApiGatewayStack extends cdk.Stack {
   ) {
     super(scope, id, props);
     this.layerList = {};
-    const { embeddingStorageBucket, dataIngestionBucket } = createS3Buckets(
+    const { embeddingStorageBucket, dataIngestionBucket, files } = createS3Buckets(
       this,
       id
     );
@@ -813,7 +813,7 @@ export class ApiGatewayStack extends cdk.Stack {
         environment: {
           SM_DB_CREDENTIALS: db.secretPathUser.secretName,
           RDS_PROXY_ENDPOINT: db.rdsProxyEndpoint,
-          BUCKET: dataIngestionBucket.bucketName,
+          BUCKET: files.bucketName,
           REGION: this.region,
         },
         functionName: `${id}-GetDocumentsFunction`,
@@ -828,7 +828,13 @@ export class ApiGatewayStack extends cdk.Stack {
     cfnGetDocumentsFunction.overrideLogicalId("GetDocumentsFunction");
 
     // Grant the Lambda function read-only permissions to the S3 bucket
-    dataIngestionBucket.grantRead(getDocumentsFunction);
+    files.grantRead(getDocumentsFunction);
+    files.addToResourcePolicy(new iam.PolicyStatement({
+      actions: ["s3:ListBucket"],
+      principals: [getDocumentsFunction.grantPrincipal],
+      resources: [files.bucketArn],
+    }));
+
 
     // Grant access to Secret Manager
     getDocumentsFunction.addToRolePolicy(
@@ -848,8 +854,10 @@ export class ApiGatewayStack extends cdk.Stack {
     getDocumentsFunction.addPermission("AllowApiGatewayInvoke", {
       principal: new iam.ServicePrincipal("apigateway.amazonaws.com"),
       action: "lambda:InvokeFunction",
-      sourceArn: `arn:aws:execute-api:${this.region}:${this.account}:${this.api.restApiId}/*/*/admin*`,
+      // This ARN pattern covers any stage and method invoking an endpoint starting with "user"
+      sourceArn: `arn:aws:execute-api:${this.region}:${this.account}:${this.api.restApiId}/*/*/user*`,
     });
+    
 
     /**
      *

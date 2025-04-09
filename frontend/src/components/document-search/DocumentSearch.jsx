@@ -14,7 +14,6 @@ export default function DocumentSearch() {
   const [documents, setDocuments] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [categoryId, setCategoryId] = useState("default") // Default category ID
 
   // Filter states
   const [yearFilters, setYearFilters] = useState({})
@@ -38,13 +37,17 @@ export default function DocumentSearch() {
     }))
   }
 
-  // Fetch documents from API
-  const fetchDocuments = async (category = categoryId) => {
+  // Use the full API endpoint from your environment variable
+  const API_ENDPOINT = process.env.NEXT_PUBLIC_API_ENDPOINT || ""
+
+  // Fetch documents from API without using category
+  const fetchDocuments = async () => {
     setLoading(true)
     setError(null)
 
     try {
-      const response = await fetch(`/user/documents?category_id=${category}`)
+      // Use absolute URL (API Gateway endpoint) instead of a relative URL
+      const response = await fetch(`${API_ENDPOINT}/user/documents`)
 
       if (!response.ok) {
         throw new Error(`Error fetching documents: ${response.statusText}`)
@@ -80,7 +83,7 @@ export default function DocumentSearch() {
           title: metadata.title || fileName,
           highlights: metadata.highlights || [],
           year,
-          category: metadata.category || "Unknown",
+          category: "", // Category removed
           documentType,
           author,
           topics: documentTopics,
@@ -102,7 +105,7 @@ export default function DocumentSearch() {
     }
   }
 
-  // Apply all filters
+  // Apply all filters on the fetched documents
   const applyFilters = () => {
     if (!documents || Object.keys(documents).length === 0) return
 
@@ -113,7 +116,7 @@ export default function DocumentSearch() {
         title: metadata.title || fileName,
         highlights: metadata.highlights || [],
         year: metadata.year || "Unknown",
-        category: metadata.category || "Unknown",
+        category: "",
         documentType: metadata.type || "Unknown",
         author: metadata.author || "Unknown",
         topics: metadata.topics || [],
@@ -123,18 +126,14 @@ export default function DocumentSearch() {
     })
 
     const filtered = processedResults.filter((result) => {
-      // Check if any year filter is active, if not, show all years
+      // Filter by year if any filter is active
       const anyYearFilterActive = Object.values(yearFilters).some((value) => value)
-
-      // Filter by year
       if (anyYearFilterActive && !yearFilters[result.year]) {
         return false
       }
 
-      // Check if any topic filter is active
+      // Filter by topic if active
       const anyTopicFilterActive = Object.values(topicFilters).some((value) => value)
-
-      // Filter by topic
       if (anyTopicFilterActive) {
         const hasMatchingTopic = result.topics.some((topic) => topicFilters[topic])
         if (!hasMatchingTopic) {
@@ -142,18 +141,14 @@ export default function DocumentSearch() {
         }
       }
 
-      // Check if any document type filter is active
+      // Filter by document type if active
       const anyDocTypeFilterActive = Object.values(documentTypeFilters).some((value) => value)
-
-      // Filter by document type
       if (anyDocTypeFilterActive && !documentTypeFilters[result.documentType]) {
         return false
       }
 
-      // Check if any author filter is active
+      // Filter by author if active
       const anyAuthorFilterActive = Object.values(authorFilters).some((value) => value)
-
-      // Filter by author
       if (anyAuthorFilterActive && !authorFilters[result.author]) {
         return false
       }
@@ -163,7 +158,6 @@ export default function DocumentSearch() {
         const query = searchQuery.toLowerCase()
         return (
           result.title.toLowerCase().includes(query) ||
-          result.category.toLowerCase().includes(query) ||
           result.highlights.some((highlight) => highlight.toLowerCase().includes(query)) ||
           result.topics.some((topic) => topic.toLowerCase().includes(query)) ||
           result.fileName.toLowerCase().includes(query)
@@ -185,7 +179,6 @@ export default function DocumentSearch() {
       })
       return resetFilters
     })
-
     setTopicFilters((prevFilters) => {
       const resetFilters = {}
       Object.keys(prevFilters).forEach((key) => {
@@ -193,7 +186,6 @@ export default function DocumentSearch() {
       })
       return resetFilters
     })
-
     setDocumentTypeFilters((prevFilters) => {
       const resetFilters = {}
       Object.keys(prevFilters).forEach((key) => {
@@ -201,7 +193,6 @@ export default function DocumentSearch() {
       })
       return resetFilters
     })
-
     setAuthorFilters((prevFilters) => {
       const resetFilters = {}
       Object.keys(prevFilters).forEach((key) => {
@@ -209,60 +200,30 @@ export default function DocumentSearch() {
       })
       return resetFilters
     })
-
-    // Clear search query
     setSearchQuery("")
   }
 
-  // Apply filters when search query changes
+  // Apply filters when dependencies change
   useEffect(() => {
     applyFilters()
   }, [searchQuery, yearFilters, topicFilters, documentTypeFilters, authorFilters])
 
-  // Initial load of documents
+  // Initial load of documents (no category needed)
   useEffect(() => {
     fetchDocuments()
   }, [])
 
-  // Handle search input
   const handleSearch = (e) => {
     e.preventDefault()
     applyFilters()
   }
 
-  // Handle category change
-  const handleCategoryChange = (e) => {
-    const newCategory = e.target.value
-    setCategoryId(newCategory)
-    fetchDocuments(newCategory)
-  }
-
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900 transition-all duration-300">
-      {/* Main Content */}
       <main className="max-w-3xl mx-auto px-4 py-6 md:py-8">
         <h2 className="text-2xl md:text-3xl font-bold text-center mb-6 md:mb-8 dark:text-white">
           Document & Metadata Search
         </h2>
-
-        {/* Category Selector */}
-        <div className="mb-4">
-          <label htmlFor="category" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Select Category
-          </label>
-          <select
-            id="category"
-            value={categoryId}
-            onChange={handleCategoryChange}
-            className="w-full py-2 px-3 bg-gray-200 dark:bg-gray-700 rounded-lg text-gray-800 dark:text-gray-100 focus:outline-none"
-          >
-            <option value="default">Default Category</option>
-            <option value="reports">Reports</option>
-            <option value="policies">Policies</option>
-            <option value="research">Research</option>
-          </select>
-        </div>
-
         {/* Search Box */}
         <div className="mb-6 md:mb-8">
           <form onSubmit={handleSearch} className="relative">
@@ -297,16 +258,19 @@ export default function DocumentSearch() {
         <div className="flex flex-col md:flex-row gap-6">
           {/* Filters */}
           <div
-            className={`w-full md:w-64 bg-gray-100 dark:bg-gray-800 rounded-lg p-4 h-fit ${isFilterOpen ? "block" : "hidden md:block"}`}
+            className={`w-full md:w-64 bg-gray-100 dark:bg-gray-800 rounded-lg p-4 h-fit ${
+              isFilterOpen ? "block" : "hidden md:block"
+            }`}
           >
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-medium dark:text-white">Search Settings</h3>
-              <button className="text-blue-600 dark:text-blue-400 text-sm hover:underline" onClick={resetFilters}>
+              <button
+                className="text-blue-600 dark:text-blue-400 text-sm hover:underline"
+                onClick={resetFilters}
+              >
                 Reset
               </button>
             </div>
-
-            {/* Filter sections */}
             <div className="space-y-4">
               {/* Topic Filters */}
               <div>
@@ -315,7 +279,11 @@ export default function DocumentSearch() {
                   onClick={() => toggleSection("topics")}
                 >
                   <span>Topics</span>
-                  {expandedSections.topics ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  {expandedSections.topics ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
                 </button>
                 {expandedSections.topics && (
                   <div className="mt-2 pl-2">
@@ -325,7 +293,9 @@ export default function DocumentSearch() {
                           <input
                             type="checkbox"
                             checked={topicFilters[topic]}
-                            onChange={() => setTopicFilters((prev) => ({ ...prev, [topic]: !prev[topic] }))}
+                            onChange={() =>
+                              setTopicFilters((prev) => ({ ...prev, [topic]: !prev[topic] }))
+                            }
                             className="rounded"
                           />
                           <span>{topic}</span>
@@ -337,7 +307,6 @@ export default function DocumentSearch() {
                   </div>
                 )}
               </div>
-
               {/* Year Filters */}
               <div>
                 <button
@@ -345,7 +314,11 @@ export default function DocumentSearch() {
                   onClick={() => toggleSection("year")}
                 >
                   <span>Year</span>
-                  {expandedSections.year ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  {expandedSections.year ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
                 </button>
                 {expandedSections.year && (
                   <div className="mt-2 pl-2">
@@ -355,7 +328,9 @@ export default function DocumentSearch() {
                           <input
                             type="checkbox"
                             checked={yearFilters[year]}
-                            onChange={() => setYearFilters((prev) => ({ ...prev, [year]: !prev[year] }))}
+                            onChange={() =>
+                              setYearFilters((prev) => ({ ...prev, [year]: !prev[year] }))
+                            }
                             className="rounded"
                           />
                           <span>{year}</span>
@@ -367,7 +342,6 @@ export default function DocumentSearch() {
                   </div>
                 )}
               </div>
-
               {/* Document Type Filters */}
               <div>
                 <button
@@ -389,7 +363,9 @@ export default function DocumentSearch() {
                           <input
                             type="checkbox"
                             checked={documentTypeFilters[type]}
-                            onChange={() => setDocumentTypeFilters((prev) => ({ ...prev, [type]: !prev[type] }))}
+                            onChange={() =>
+                              setDocumentTypeFilters((prev) => ({ ...prev, [type]: !prev[type] }))
+                            }
                             className="rounded"
                           />
                           <span>{type}</span>
@@ -401,7 +377,6 @@ export default function DocumentSearch() {
                   </div>
                 )}
               </div>
-
               {/* Author Filters */}
               <div>
                 <button
@@ -409,7 +384,11 @@ export default function DocumentSearch() {
                   onClick={() => toggleSection("author")}
                 >
                   <span>Author</span>
-                  {expandedSections.author ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  {expandedSections.author ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
                 </button>
                 {expandedSections.author && (
                   <div className="mt-2 pl-2">
@@ -419,7 +398,9 @@ export default function DocumentSearch() {
                           <input
                             type="checkbox"
                             checked={authorFilters[author]}
-                            onChange={() => setAuthorFilters((prev) => ({ ...prev, [author]: !prev[author] }))}
+                            onChange={() =>
+                              setAuthorFilters((prev) => ({ ...prev, [author]: !prev[author] }))
+                            }
                             className="rounded"
                           />
                           <span>{author}</span>
@@ -443,27 +424,23 @@ export default function DocumentSearch() {
                   <button className="px-3 py-1 rounded-full bg-white dark:bg-gray-600 text-sm font-medium shadow-sm">
                     Relevance
                   </button>
-                  <button className="px-3 py-1 rounded-full text-sm font-medium dark:text-gray-300">Date</button>
+                  <button className="px-3 py-1 rounded-full text-sm font-medium dark:text-gray-300">
+                    Date
+                  </button>
                 </div>
               </div>
               <span className="text-sm text-gray-600 dark:text-gray-400">{filteredResults.length} results</span>
             </div>
-
-            {/* Loading State */}
             {loading && (
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
                 <p className="text-gray-600 dark:text-gray-400">Loading documents...</p>
               </div>
             )}
-
-            {/* Error State */}
             {error && (
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center border border-red-300">
                 <p className="text-red-600 dark:text-red-400">Error: {error}</p>
               </div>
             )}
-
-            {/* Search Results */}
             <div className="space-y-4">
               {!loading && !error && filteredResults.length > 0 ? (
                 filteredResults.map((result) => (
@@ -473,16 +450,13 @@ export default function DocumentSearch() {
                   >
                     <div className="flex justify-between mb-2">
                       <div className="text-xs md:text-sm text-gray-500 dark:text-gray-400">File: {result.fileName}</div>
-                      <div className="text-xs md:text-sm text-blue-600 dark:text-blue-400">{result.category}</div>
                     </div>
-
                     <div className="flex justify-between mb-2">
                       <div className="text-xs md:text-sm text-gray-500 dark:text-gray-400">
                         Type: {result.documentType}
                       </div>
                       <div className="text-xs md:text-sm text-gray-500 dark:text-gray-400">Year: {result.year}</div>
                     </div>
-
                     <div className="mt-3 md:mt-4 mb-2">
                       <div className="flex flex-col sm:flex-row sm:justify-between gap-2 mb-2">
                         <div className="font-medium dark:text-white text-sm md:text-base">{result.title}</div>
@@ -490,7 +464,6 @@ export default function DocumentSearch() {
                           <span className="text-gray-500 dark:text-gray-400">Author: {result.author}</span>
                         </div>
                       </div>
-
                       {result.highlights && result.highlights.length > 0 && (
                         <div className="mt-2 bg-gray-100 dark:bg-gray-700 p-2 md:p-3 rounded-md">
                           <ul className="list-disc pl-5 text-xs md:text-sm dark:text-gray-300">
@@ -500,7 +473,6 @@ export default function DocumentSearch() {
                           </ul>
                         </div>
                       )}
-
                       {result.topics && result.topics.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-1">
                           {result.topics.map((topic, index) => (
@@ -514,7 +486,6 @@ export default function DocumentSearch() {
                         </div>
                       )}
                     </div>
-
                     <div className="flex justify-end mt-2 space-x-2">
                       <a
                         href={result.url}
@@ -539,8 +510,6 @@ export default function DocumentSearch() {
                 </div>
               ) : null}
             </div>
-
-            {/* Pagination */}
             {filteredResults.length > 0 && (
               <div className="flex justify-center mt-6 md:mt-8">
                 <nav className="flex items-center space-x-1">
