@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { ChevronLeft, Plus, Minus } from "lucide-react"
+import { ChevronLeft, Plus, Minus, User } from "lucide-react"
 
 export default function DocumentDetail({ documentId }) {
   // State for expandable sections
@@ -10,7 +10,7 @@ export default function DocumentDetail({ documentId }) {
     summary: false,
     keyWords: false,
     relatedMandates: false,
-    researchTopics: true,
+    researchTopics: false,
     primaryTopics: false,
     secondaryTopics: true,
   })
@@ -45,11 +45,11 @@ export default function DocumentDetail({ documentId }) {
         description: "",
       },
     ],
+    author: "Dr. Sarah Johnson", // Added author field
   }
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900 transition-all duration-300">
-
       {/* Main Content */}
       <main className="max-w-6xl mx-auto px-4 py-4">
         <div className="mb-4">
@@ -68,12 +68,31 @@ export default function DocumentDetail({ documentId }) {
           {/* Left Sidebar - Metadata */}
           <div className="w-full md:w-64">
             <div className="bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden">
-              <button className="w-full text-center py-2 bg-gray-200 dark:bg-gray-700 font-medium dark:text-white text-sm">
-                View Article
-              </button>
+              <a
+                href="https://publications.gc.ca/site/archivee-archived.html?url=https://publications.gc.ca/collections/collection_2023/mpo-dfo/fs70-7/Fs70-7-2023-036-eng.pdf"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block w-full text-center py-2 bg-gray-200 dark:bg-gray-700 font-medium dark:text-white text-sm hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              >
+                View Document
+              </a>
 
               <div className="p-3 text-center bg-gray-200 dark:bg-gray-700 m-2 rounded">
                 <div className="text-sm dark:text-gray-300">Research Article</div>
+              </div>
+
+              {/* Author Information - Added this section */}
+              <div className="p-2">
+                <div className="bg-gray-200 dark:bg-gray-700 p-3 rounded">
+                  <div className="flex items-center justify-center mb-1">
+                    <User className="h-4 w-4 mr-1 text-gray-600 dark:text-gray-400" />
+                    <div className="text-xs font-medium dark:text-gray-300">Author:</div>
+                  </div>
+                  <div className="text-sm text-center dark:text-gray-300">{documentData.author}</div>
+                  <div className="text-xs text-center text-gray-500 dark:text-gray-400 mt-1">
+                    {documentData.authorDepartment}
+                  </div>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-2 p-2">

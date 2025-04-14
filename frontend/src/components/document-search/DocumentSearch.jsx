@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
-import { Search, ChevronDown, ChevronRight } from "lucide-react"
+import { Search, ChevronDown, ChevronRight, X } from "lucide-react"
 
 export default function DocumentSearch() {
   const [activeTab, setActiveTab] = useState("document")
@@ -11,6 +11,10 @@ export default function DocumentSearch() {
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [filteredResults, setFilteredResults] = useState([])
+  const [sortBy, setSortBy] = useState("recent") // Default sort is recent (newest first)
+  const [isQuerySummaryOpen, setIsQuerySummaryOpen] = useState(false)
+  const [selectedDocumentId, setSelectedDocumentId] = useState(null)
+  const modalRef = useRef(null)
 
   // Filter states
   const [yearFilters, setYearFilters] = useState({
@@ -26,11 +30,11 @@ export default function DocumentSearch() {
     "Indigenous Rights": false,
   })
 
-  const [documentTypeFilters, setDocumentTypeFilters] = useState({
-    Research: false,
-    Policy: false,
-    Assessment: false,
-    Report: false,
+  const [mandateFilters, setMandateFilters] = useState({
+    "Sustainable Fisheries": false,
+    "Species at Risk": false,
+    "Aquatic Ecosystem": false,
+    "Indigenous Fisheries": false,
   })
 
   const [authorFilters, setAuthorFilters] = useState({
@@ -43,8 +47,8 @@ export default function DocumentSearch() {
   const [expandedSections, setExpandedSections] = useState({
     topics: true,
     year: true,
-    documentType: false,
-    author: false,
+    mandates: true,
+    author: true,
   })
 
   // Toggle section expansion
@@ -54,6 +58,138 @@ export default function DocumentSearch() {
       [section]: !prev[section],
     }))
   }
+
+  const [querySummaryLoading, setQuerySummaryLoading] = useState(false)
+  const [querySummaryData, setQuerySummaryData] = useState(null)
+
+  const getQuerySummary = async (documentId) => {
+    // Find the document by ID
+    const document = allSearchResults.find((doc) => doc.id === documentId)
+
+    if (!document) {
+      return {
+        title: "Document Not Found",
+        summary: "The requested document could not be found.",
+        keyInsights: ["No information available"],
+      }
+    }
+
+    // Return cached summary if available
+    if (querySummaryData && querySummaryData.documentId === documentId) {
+      return querySummaryData
+    }
+
+    setQuerySummaryLoading(true)
+
+    try {
+      // Create a prompt that asks for a summary of the document
+      const prompt = `Please provide a comprehensive summary of the document titled "${document.title}" (ID: ${document.id}). 
+      The document is about ${document.topics.join(", ")} and was authored by ${document.author} in ${document.year}.
+      Include key insights and main points from the document.`
+
+      // Call the LLM API endpoint
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/text_generation`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message_content: prompt,
+          user_role: "public", // Default to public role
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to generate summary")
+      }
+
+      const data = await response.json()
+
+      // Parse the response to extract key insights
+      // This is a simple approach - in production you might want to prompt the LLM to format its response
+      const paragraphs = data.content.split("\n\n").filter((p) => p.trim().length > 0)
+      const summary = paragraphs[0] || data.content
+
+      // Extract key insights (assuming they might be in bullet points or separate paragraphs)
+      let keyInsights = []
+      if (paragraphs.length > 1) {
+        // Try to find bullet points
+        const bulletMatches = data.content.match(/[•\-*]\s+(.*?)(?=\n[•\-*]|\n\n|$)/gs)
+        if (bulletMatches && bulletMatches.length > 0) {
+          keyInsights = bulletMatches.map((point) => point.replace(/^[•\-*]\s+/, "").trim())
+        } else {
+          // Use additional paragraphs as insights
+          keyInsights = paragraphs.slice(1).map((p) => p.trim())
+        }
+      }
+
+      // Limit to 4 key insights
+      keyInsights = keyInsights.slice(0, 4)
+
+      // If no key insights were found, create some generic ones
+      if (keyInsights.length === 0) {
+        keyInsights = [
+          "This is an important document in the field of " + document.topics[0],
+          "Published in " + document.year + " by " + document.author,
+          "Relates to " + document.mandates.join(", "),
+        ]
+      }
+
+      const summaryData = {
+        documentId,
+        title: document.title,
+        summary,
+        keyInsights,
+      }
+
+      setQuerySummaryData(summaryData)
+      return summaryData
+    } catch (error) {
+      console.error("Error generating summary:", error)
+      return {
+        title: document.title,
+        summary:
+          "We couldn't generate a summary for this document. Please try again later or view the full document for more information.",
+        keyInsights: [
+          "Summary generation failed",
+          "Please try again later",
+          "You can view the full document for complete information",
+        ],
+      }
+    } finally {
+      setQuerySummaryLoading(false)
+    }
+  }
+
+  // Update the openQuerySummary function to call the API
+  const openQuerySummary = async (documentId) => {
+    setSelectedDocumentId(documentId)
+    setIsQuerySummaryOpen(true)
+
+    // Start loading the summary immediately
+    getQuerySummary(documentId)
+  }
+
+  const closeQuerySummary = () => {
+    setIsQuerySummaryOpen(false)
+    setSelectedDocumentId(null)
+  }
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (modalRef.current && !modalRef.current.contains(event.target)) {
+        closeQuerySummary()
+      }
+    }
+
+    if (isQuerySummaryOpen) {
+      document.addEventListener("mousedown", handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [isQuerySummaryOpen])
 
   // Sample search results
   const allSearchResults = [
@@ -69,6 +205,7 @@ export default function DocumentSearch() {
       documentType: "Assessment",
       author: "DFO Research Team",
       topics: ["Salmon Population", "Fishing Impact"],
+      mandates: ["Sustainable Fisheries", "Species at Risk"],
     },
     {
       id: "6273",
@@ -82,6 +219,7 @@ export default function DocumentSearch() {
       documentType: "Report",
       author: "External Researchers",
       topics: ["Aquaculture", "Sustainability"],
+      mandates: ["Sustainable Fisheries", "Aquatic Ecosystem"],
     },
     {
       id: "5981",
@@ -95,6 +233,7 @@ export default function DocumentSearch() {
       documentType: "Research",
       author: "DFO Research Team",
       topics: ["Climate Change", "Marine Ecosystems"],
+      mandates: ["Aquatic Ecosystem"],
     },
     {
       id: "5742",
@@ -108,6 +247,7 @@ export default function DocumentSearch() {
       documentType: "Policy",
       author: "Policy Division",
       topics: ["Conservation", "Atlantic Cod"],
+      mandates: ["Species at Risk", "Sustainable Fisheries"],
     },
     {
       id: "5391",
@@ -121,6 +261,7 @@ export default function DocumentSearch() {
       documentType: "Policy",
       author: "Policy Division",
       topics: ["Indigenous Rights", "Fishing Policy"],
+      mandates: ["Indigenous Fisheries"],
     },
     {
       id: "5127",
@@ -134,6 +275,7 @@ export default function DocumentSearch() {
       documentType: "Research",
       author: "External Researchers",
       topics: ["Pollution", "Marine Ecosystems"],
+      mandates: ["Aquatic Ecosystem"],
     },
     {
       id: "4983",
@@ -147,6 +289,7 @@ export default function DocumentSearch() {
       documentType: "Research",
       author: "DFO Research Team",
       topics: ["Salmon Population", "Migration"],
+      mandates: ["Sustainable Fisheries", "Species at Risk"],
     },
   ]
 
@@ -172,12 +315,15 @@ export default function DocumentSearch() {
         }
       }
 
-      // Check if any document type filter is active
-      const anyDocTypeFilterActive = Object.values(documentTypeFilters).some((value) => value)
+      // Check if any mandate filter is active
+      const anyMandateFilterActive = Object.values(mandateFilters).some((value) => value)
 
-      // Filter by document type
-      if (anyDocTypeFilterActive && !documentTypeFilters[result.documentType]) {
-        return false
+      // Filter by mandate
+      if (anyMandateFilterActive) {
+        const hasMatchingMandate = result.mandates.some((mandate) => mandateFilters[mandate])
+        if (!hasMatchingMandate) {
+          return false
+        }
       }
 
       // Check if any author filter is active
@@ -195,12 +341,22 @@ export default function DocumentSearch() {
           result.title.toLowerCase().includes(query) ||
           result.category.toLowerCase().includes(query) ||
           result.highlights.some((highlight) => highlight.toLowerCase().includes(query)) ||
-          result.topics.some((topic) => topic.toLowerCase().includes(query))
+          result.topics.some((topic) => topic.toLowerCase().includes(query)) ||
+          result.mandates.some((mandate) => mandate.toLowerCase().includes(query))
         )
       }
 
       return true
     })
+
+    // Sort results based on sortBy
+    if (sortBy === "recent") {
+      filtered.sort((a, b) => Number.parseInt(b.year) - Number.parseInt(a.year))
+    } else if (sortBy === "oldest") {
+      filtered.sort((a, b) => Number.parseInt(a.year) - Number.parseInt(b.year))
+    } else if (sortBy === "a-z") {
+      filtered.sort((a, b) => a.title.localeCompare(b.title))
+    }
 
     setFilteredResults(filtered)
   }
@@ -220,11 +376,11 @@ export default function DocumentSearch() {
       "Indigenous Rights": false,
     })
 
-    setDocumentTypeFilters({
-      Research: false,
-      Policy: false,
-      Assessment: false,
-      Report: false,
+    setMandateFilters({
+      "Sustainable Fisheries": false,
+      "Species at Risk": false,
+      "Aquatic Ecosystem": false,
+      "Indigenous Fisheries": false,
     })
 
     setAuthorFilters({
@@ -240,7 +396,7 @@ export default function DocumentSearch() {
   // Apply filters when search query changes
   useEffect(() => {
     applyFilters()
-  }, [searchQuery, yearFilters, topicFilters, documentTypeFilters, authorFilters])
+  }, [searchQuery, yearFilters, topicFilters, mandateFilters, authorFilters, sortBy])
 
   // Initial load of all results
   useEffect(() => {
@@ -251,6 +407,11 @@ export default function DocumentSearch() {
   const handleSearch = (e) => {
     e.preventDefault()
     applyFilters()
+  }
+
+  // Handle sort change
+  const handleSortChange = (sort) => {
+    setSortBy(sort)
   }
 
   return (
@@ -405,58 +566,70 @@ export default function DocumentSearch() {
                 )}
               </div>
 
-              {/* Document Type Filters */}
+              {/* Mandate Filters */}
               <div>
                 <button
                   className="flex justify-between items-center w-full py-2 text-left font-medium dark:text-white"
-                  onClick={() => toggleSection("documentType")}
+                  onClick={() => toggleSection("mandates")}
                 >
-                  <span>Document Type</span>
-                  {expandedSections.documentType ? (
+                  <span>Mandates</span>
+                  {expandedSections.mandates ? (
                     <ChevronDown className="h-4 w-4" />
                   ) : (
                     <ChevronRight className="h-4 w-4" />
                   )}
                 </button>
-                {expandedSections.documentType && (
+                {expandedSections.mandates && (
                   <div className="mt-2 pl-2">
                     <label className="flex items-center space-x-2 text-sm dark:text-gray-300">
                       <input
                         type="checkbox"
-                        checked={documentTypeFilters["Research"]}
-                        onChange={() => setDocumentTypeFilters((prev) => ({ ...prev, Research: !prev["Research"] }))}
-                        className="rounded"
-                      />
-                      <span>Research</span>
-                    </label>
-                    <label className="flex items-center space-x-2 text-sm dark:text-gray-300">
-                      <input
-                        type="checkbox"
-                        checked={documentTypeFilters["Policy"]}
-                        onChange={() => setDocumentTypeFilters((prev) => ({ ...prev, Policy: !prev["Policy"] }))}
-                        className="rounded"
-                      />
-                      <span>Policy</span>
-                    </label>
-                    <label className="flex items-center space-x-2 text-sm dark:text-gray-300">
-                      <input
-                        type="checkbox"
-                        checked={documentTypeFilters["Assessment"]}
+                        checked={mandateFilters["Sustainable Fisheries"]}
                         onChange={() =>
-                          setDocumentTypeFilters((prev) => ({ ...prev, Assessment: !prev["Assessment"] }))
+                          setMandateFilters((prev) => ({
+                            ...prev,
+                            "Sustainable Fisheries": !prev["Sustainable Fisheries"],
+                          }))
                         }
                         className="rounded"
                       />
-                      <span>Assessment</span>
+                      <span>Sustainable Fisheries</span>
                     </label>
                     <label className="flex items-center space-x-2 text-sm dark:text-gray-300">
                       <input
                         type="checkbox"
-                        checked={documentTypeFilters["Report"]}
-                        onChange={() => setDocumentTypeFilters((prev) => ({ ...prev, Report: !prev["Report"] }))}
+                        checked={mandateFilters["Species at Risk"]}
+                        onChange={() =>
+                          setMandateFilters((prev) => ({ ...prev, "Species at Risk": !prev["Species at Risk"] }))
+                        }
                         className="rounded"
                       />
-                      <span>Report</span>
+                      <span>Species at Risk</span>
+                    </label>
+                    <label className="flex items-center space-x-2 text-sm dark:text-gray-300">
+                      <input
+                        type="checkbox"
+                        checked={mandateFilters["Aquatic Ecosystem"]}
+                        onChange={() =>
+                          setMandateFilters((prev) => ({ ...prev, "Aquatic Ecosystem": !prev["Aquatic Ecosystem"] }))
+                        }
+                        className="rounded"
+                      />
+                      <span>Aquatic Ecosystem</span>
+                    </label>
+                    <label className="flex items-center space-x-2 text-sm dark:text-gray-300">
+                      <input
+                        type="checkbox"
+                        checked={mandateFilters["Indigenous Fisheries"]}
+                        onChange={() =>
+                          setMandateFilters((prev) => ({
+                            ...prev,
+                            "Indigenous Fisheries": !prev["Indigenous Fisheries"],
+                          }))
+                        }
+                        className="rounded"
+                      />
+                      <span>Indigenous Fisheries</span>
                     </label>
                   </div>
                 )}
@@ -519,12 +692,32 @@ export default function DocumentSearch() {
           <div className="flex-1">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
               <div className="flex items-center">
-                <span className="text-sm text-gray-600 dark:text-gray-400">Default to:</span>
+                <span className="text-sm text-gray-600 dark:text-gray-400">Sort by:</span>
                 <div className="ml-2 flex items-center bg-gray-200 dark:bg-gray-700 rounded-full p-1">
-                  <button className="px-3 py-1 rounded-full bg-white dark:bg-gray-600 text-sm font-medium shadow-sm">
-                    Relevance
+                  <button
+                    className={`px-3 py-1 rounded-full text-sm font-medium ${
+                      sortBy === "recent" ? "bg-white dark:bg-gray-600 shadow-sm" : "dark:text-gray-300"
+                    }`}
+                    onClick={() => handleSortChange("recent")}
+                  >
+                    Recent
                   </button>
-                  <button className="px-3 py-1 rounded-full text-sm font-medium dark:text-gray-300">Date</button>
+                  <button
+                    className={`px-3 py-1 rounded-full text-sm font-medium ${
+                      sortBy === "oldest" ? "bg-white dark:bg-gray-600 shadow-sm" : "dark:text-gray-300"
+                    }`}
+                    onClick={() => handleSortChange("oldest")}
+                  >
+                    Oldest
+                  </button>
+                  <button
+                    className={`px-3 py-1 rounded-full text-sm font-medium ${
+                      sortBy === "a-z" ? "bg-white dark:bg-gray-600 shadow-sm" : "dark:text-gray-300"
+                    }`}
+                    onClick={() => handleSortChange("a-z")}
+                  >
+                    A-Z
+                  </button>
                 </div>
               </div>
               <span className="text-sm text-gray-600 dark:text-gray-400">{filteredResults.length} results</span>
@@ -539,7 +732,6 @@ export default function DocumentSearch() {
                     className="bg-white dark:bg-gray-800 rounded-lg shadow p-3 md:p-4 border dark:border-gray-700"
                   >
                     <div className="flex justify-between mb-2">
-                      <div className="text-xs md:text-sm text-gray-500 dark:text-gray-400">Reference: #{result.id}</div>
                       <div className="text-xs md:text-sm text-blue-600 dark:text-blue-400">{result.category}</div>
                     </div>
 
@@ -550,6 +742,13 @@ export default function DocumentSearch() {
                       <div className="text-xs md:text-sm text-gray-500 dark:text-gray-400">Year: {result.year}</div>
                     </div>
 
+                    <div className="flex justify-between mb-2">
+                      <div className="text-xs md:text-sm text-gray-500 dark:text-gray-400">Author: {result.author}</div>
+                      <div className="text-xs md:text-sm text-gray-500 dark:text-gray-400">
+                        Mandates: {result.mandates.join(", ")}
+                      </div>
+                    </div>
+
                     <div className="mt-3 md:mt-4 mb-2">
                       <div className="flex flex-col sm:flex-row sm:justify-between gap-2 mb-2">
                         <div className="font-medium dark:text-white text-sm md:text-base">{result.title}</div>
@@ -557,7 +756,12 @@ export default function DocumentSearch() {
                           <Link href={`/document-summary/`} className="text-blue-600 dark:text-blue-400">
                             Document Summary
                           </Link>
-                          <button className="text-blue-600 dark:text-blue-400">Query Summary</button>
+                          <button
+                            className="text-blue-600 dark:text-blue-400"
+                            onClick={() => openQuerySummary(result.id)}
+                          >
+                            Query Summary
+                          </button>
                         </div>
                       </div>
 
@@ -571,12 +775,14 @@ export default function DocumentSearch() {
                     </div>
 
                     <div className="flex justify-end mt-2">
-                      <Link
-                        href={`/document-view/${result.id}`}
+                      <a
+                        href="https://publications.gc.ca/site/archivee-archived.html?url=https://publications.gc.ca/collections/collection_2023/mpo-dfo/fs70-7/Fs70-7-2023-036-eng.pdf"
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="text-blue-600 dark:text-blue-400 text-xs md:text-sm flex items-center"
                       >
                         View Document <ChevronRight className="h-3 w-3 md:h-4 md:w-4 ml-1" />
-                      </Link>
+                      </a>
                     </div>
                   </div>
                 ))
@@ -615,6 +821,72 @@ export default function DocumentSearch() {
           </div>
         </div>
       </main>
+      {isQuerySummaryOpen && selectedDocumentId && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div
+            ref={modalRef}
+            className="bg-white dark:bg-gray-800 rounded-lg shadow-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto"
+          >
+            <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
+              <h3 className="text-lg font-medium dark:text-white">
+                {querySummaryData?.title ||
+                  allSearchResults.find((doc) => doc.id === selectedDocumentId)?.title ||
+                  "Loading..."}
+              </h3>
+              <button
+                onClick={closeQuerySummary}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-4">
+              {querySummaryLoading ? (
+                <div className="flex flex-col items-center justify-center py-8">
+                  <div className="flex items-center space-x-2 mb-4">
+                    <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce"></div>
+                    <div
+                      className="w-3 h-3 bg-blue-500 rounded-full animate-bounce"
+                      style={{ animationDelay: "0.2s" }}
+                    ></div>
+                    <div
+                      className="w-3 h-3 bg-blue-500 rounded-full animate-bounce"
+                      style={{ animationDelay: "0.4s" }}
+                    ></div>
+                  </div>
+                  <p className="text-gray-600 dark:text-gray-400 text-sm">Generating AI summary...</p>
+                </div>
+              ) : (
+                <>
+                  <div className="mb-4">
+                    <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
+                      AI-Generated Document Summary
+                    </h4>
+                    <p className="text-gray-800 dark:text-gray-200 text-sm leading-relaxed">
+                      {querySummaryData?.summary || "Summary not available"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Key Insights</h4>
+                    <ul className="list-disc pl-5 text-sm dark:text-gray-300 space-y-1">
+                      {(querySummaryData?.keyInsights || ["No key insights available"]).map((insight, index) => (
+                        <li key={index}>{insight}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="p-4 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-700 text-xs text-gray-500 dark:text-gray-400 italic">
+              This summary was generated using AI and may not capture all nuances of the document. Please refer to the
+              original document for complete information.
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
