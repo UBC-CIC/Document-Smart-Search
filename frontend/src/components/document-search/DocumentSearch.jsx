@@ -1,9 +1,8 @@
 "use client"
 
-
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { Search, ChevronDown, ChevronRight, Menu, X } from "lucide-react"
+import { Search, ChevronDown, ChevronRight } from "lucide-react"
 
 export default function DocumentSearch() {
   const [activeTab, setActiveTab] = useState("document")
@@ -555,7 +554,9 @@ export default function DocumentSearch() {
                       <div className="flex flex-col sm:flex-row sm:justify-between gap-2 mb-2">
                         <div className="font-medium dark:text-white text-sm md:text-base">{result.title}</div>
                         <div className="flex space-x-2 text-xs md:text-sm">
-                          <button className="text-blue-600 dark:text-blue-400">Document Summary</button>
+                          <Link href={`/document-summary/`} className="text-blue-600 dark:text-blue-400">
+                            Document Summary
+                          </Link>
                           <button className="text-blue-600 dark:text-blue-400">Query Summary</button>
                         </div>
                       </div>
@@ -617,4 +618,3 @@ export default function DocumentSearch() {
     </div>
   )
 }
-
