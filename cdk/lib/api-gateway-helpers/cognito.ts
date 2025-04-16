@@ -17,7 +17,7 @@ export const createCognitoResources = (scope: Construct, id: string) => {
         userVerification: {
             emailSubject: "You need to verify your email",
             emailBody:
-                "Thanks for signing up to the DSA. \n Your verification code is {####}",
+                "Thanks for signing up to DFO Smart Search. \n Your verification code is {####}",
             emailStyle: cognito.VerificationEmailStyle.CODE,
         },
         passwordPolicy: {
@@ -43,7 +43,7 @@ export const createCognitoResources = (scope: Construct, id: string) => {
 
     const identityPool = new cognito.CfnIdentityPool(scope, `${id}-identity-pool`, {
         allowUnauthenticatedIdentities: true,
-        identityPoolName: "DSAIdentityPool",
+        identityPoolName: "DFOIdentityPool",
         cognitoIdentityProviders: [
             {
                 clientId: appClient.userPoolClientId,
@@ -52,7 +52,7 @@ export const createCognitoResources = (scope: Construct, id: string) => {
         ],
     });
 
-    const secretsName = `${id}-DSA_Cognito_Secrets`;
+    const secretsName = `${id}-DFO_Cognito_Secrets`;
     const secret = new secretsmanager.Secret(scope, secretsName, {
         secretName: secretsName,
         description: "Cognito Secrets for authentication",

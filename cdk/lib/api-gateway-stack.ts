@@ -482,7 +482,7 @@ export class ApiGatewayStack extends cdk.Stack {
       handler: "preSignup.handler",
       timeout: Duration.seconds(300),
       environment: {
-        ALLOWED_EMAIL_DOMAINS: "/DSA/AllowedEmailDomains",
+        ALLOWED_EMAIL_DOMAINS: "/DFO/AllowedEmailDomains",
       },
       vpc: vpcStack.vpc,
       functionName: `${id}-preSignupLambda`,
@@ -533,7 +533,7 @@ export class ApiGatewayStack extends cdk.Stack {
       this,
       "BedrockLLMParameter",
       {
-        parameterName: `/${id}/DSA/BedrockLLMId`,
+        parameterName: `/${id}/DFO/BedrockLLMId`,
         description: "Parameter containing the Bedrock LLM ID",
         stringValue: "meta.llama3-70b-instruct-v1:0",
       }
@@ -542,7 +542,7 @@ export class ApiGatewayStack extends cdk.Stack {
       this,
       "EmbeddingModelParameter",
       {
-        parameterName: `/${id}/DSA/EmbeddingModelId`,
+        parameterName: `/${id}/DFO/EmbeddingModelId`,
         description: "Parameter containing the Embedding Model ID",
         stringValue: "amazon.titan-embed-text-v2:0",
       }
@@ -552,7 +552,7 @@ export class ApiGatewayStack extends cdk.Stack {
       this,
       "TableNameParameter",
       {
-        parameterName: `/${id}/DSA/TableName`,
+        parameterName: `/${id}/DFO/TableName`,
         description: "Parameter containing the DynamoDB table name",
         stringValue: "DynamoDB-Conversation-Table",
       }

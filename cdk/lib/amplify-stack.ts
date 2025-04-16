@@ -72,7 +72,7 @@ import {
   
       const username = cdk.aws_ssm.StringParameter.valueForStringParameter(
         this,
-        "DSA-owner-name"
+        "DFO-owner-name"
       );
   
       const amplifyApp = new App(this, `${id}-amplifyApp`, {
