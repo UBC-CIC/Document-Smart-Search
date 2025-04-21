@@ -15,7 +15,7 @@ logger = logging.getLogger()
 
 def initialize_tools(
     opensearch_client: OpenSearch, 
-    conn_info: Dict[str, Any], 
+    conn, 
     embedder: BedrockEmbeddings,
     html_index_name: str,
     mandate_index_name: str,
@@ -30,8 +30,8 @@ def initialize_tools(
     -----------
     opensearch_client : OpenSearch
         The OpenSearch client
-    conn_info : Dict[str, Any]
-        Database connection information
+    conn : psycopg2.extensions.connection
+        An existing database connection to reuse
     embedder : BedrockEmbeddings
         The embeddings model for semantic search
     html_index_name : str
@@ -59,20 +59,20 @@ def initialize_tools(
         opensearch_client=opensearch_client,
         mandate_index_name=mandate_index_name,
         region=region,
-        conn_info=conn_info
+        conn=conn  # Only pass the connection
     )
     
     topic_tools = TopicTools(
         opensearch_client=opensearch_client,
         topic_index_name=topic_index_name,
         region=region,
-        conn_info=conn_info
+        conn=conn  # Only pass the connection
     )
     
     document_tools = DocumentTools(
         opensearch_client=opensearch_client,
         html_index_name=html_index_name,
-        conn_info=conn_info
+        conn=conn  # Only pass the connection
     )
     
     search_tools = SearchTools(

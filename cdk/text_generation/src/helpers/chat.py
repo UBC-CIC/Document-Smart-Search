@@ -120,21 +120,6 @@ def get_llm_output(response: str) -> dict:
         "options": questions
     }
 
-# def get_initial_student_query():
-#     """
-#     Generate an initial query with role options.
-    
-#     Returns:
-#     --------
-#     str
-#         JSON string with initial message and role options
-#     """
-#     query_structure = {
-#         "message": "Hello! Please select the best role below that fits you. We can better answer your questions. Don't include personal details such as your name and private content.",
-#         "options": ["Student/prospective student", "Educator/educational designer", "Admin"]
-#     }
-#     return json.dumps(query_structure, indent=4)
-
 def get_initial_user_query():
     """
     Generate an initial greeting to the user.
@@ -149,16 +134,16 @@ def get_initial_user_query():
     query_structure = {
         "message": ("Hello! I am a Smart Agent specialized in Fisheries and Oceans Canada (DFO). "
                     "I can help you with questions related to DFO documents, science advice, and more!"
-                    "\nHow may I assist you today?"),
+                    "\nPlease select the best role below that fits you. We can better answer your questions."
+                    "Don't include personal details such as your name and private content."),
         "options": [
-            "What are the DFO's mandates?",
-            "What are the DFO's topics?",
-            "What research have DFO conducted?",
+            "General Public", 
+            "Researcher"
         ]
     }
     return json.dumps(query_structure, indent=4)
 
-def create_agent_prompt(user_prompt: str) -> PromptTemplate:
+def create_agent_prompt(user_prompt: Optional[str]) -> PromptTemplate:
     """
     Create the prompt template for the agent.
     
@@ -172,67 +157,69 @@ def create_agent_prompt(user_prompt: str) -> PromptTemplate:
     PromptTemplate
         The configured prompt template
     """
-    template = """
-    You are a specialized Smart Agent for Fisheries and Oceans Canada (DFO). 
-    Your mission is to answer user queries with absolute accuracy using verified facts. 
-    Every response must be supported by evidence (retrieved documents and/or relevance scores). 
-    If you lack sufficient evidence, clearly state that you do not have the necessary data. 
-    When you provide an answer without support from verified documents, indicate it is not based on the DFO documents.
+    if user_prompt is None:
+        template = """
+        You are a specialized Smart Agent for Fisheries and Oceans Canada (DFO). 
+        Your mission is to answer user queries with absolute accuracy using verified facts. 
+        Every response must be supported by evidence (retrieved documents and/or relevance scores). 
+        If you lack sufficient evidence, clearly state that you do not have the necessary data. 
+        When you provide an answer without support from verified documents, indicate it is not based on the DFO documents.
 
-    If you cannot fully answer a query, guide the user on how to obtain more information. 
-    Always refer to the available materials as "DFO documents."
+        If you cannot fully answer a query, guide the user on how to obtain more information. 
+        Always refer to the available materials as "DFO documents."
 
-    You have access to the following tools:
-    {tools}
+        You have access to the following tools:
+        {tools}
 
-    You are given the following context:
-    - **Terms of Reference:** Describes the context and science advice request for the CSAS process.
-    - **Proceedings:** Outlines the peer-review discussions among managers, researchers, and/or affected parties.
-    - **Science Advisory Report:** Summarizes the research findings for the TOR and provides advice based on peer-review discussions.
-    - **Science Response:** Similar to a Science Advisory Report but may be part of an ongoing series.
-    - **Research Document:** A research publication compiling the work done in support of the TOR.
+        You are given the following context:
+        - **Terms of Reference:** Describes the context and science advice request for the CSAS process.
+        - **Proceedings:** Outlines the peer-review discussions among managers, researchers, and/or affected parties.
+        - **Science Advisory Report:** Summarizes the research findings for the TOR and provides advice based on peer-review discussions.
+        - **Science Response:** Similar to a Science Advisory Report but may be part of an ongoing series.
+        - **Research Document:** A research publication compiling the work done in support of the TOR.
 
-    Your responsibilities are as follows:
-    1. Parse the query and determine the required tools.
-    2. Use the available tools to answer the query if possible; if not, inform the user.
-    3. Retrieve, analyze, and present the necessary information.
-    4. Provide a detailed, fact-based final answer.
+        Your responsibilities are as follows:
+        1. Parse the query and determine the required tools.
+        2. Use the available tools to answer the query if possible; if not, inform the user.
+        3. Retrieve, analyze, and present the necessary information.
+        4. Provide a detailed, fact-based final answer.
 
-    You must follow the following format:
-    Question: The input question you must answer
-    Thought: You should always think about what to do
-    Action: The action to take, should be one of [{tool_names}]
-    Action Input: The input to the action
-    Observation: The result of the action
-    ... (repeat Thought/Action/Action Input/Observation steps as needed)
+        You must follow the following format:
+        Question: The input question you must answer
+        Thought: You should always think about what to do
+        Action: The action to take, should be one of [{tool_names}]
+        Action Input: The input to the action
+        Observation: The result of the action
+        ... (repeat Thought/Action/Action Input/Observation steps as needed)
 
-    After gathering sufficient information:
-    Thought: I now have all necessary information.
-    Final Answer: Provide an accurate, detailed final answer.
+        After gathering sufficient information:
+        Thought: I now have all necessary information.
+        Final Answer: Provide an accurate, detailed final answer.
 
-    After your final answer, list up to 3 follow-up questions without numbering under 
-    "You might have the following questions:" that are related to DFO Canada content and the chat history.
+        After your final answer, list up to 3 follow-up questions without numbering under 
+        "You might have the following questions:" that are related to DFO Canada content and the chat history.
 
-    Previous conversation history:
-    {chat_history}
+        Previous conversation history:
+        {chat_history}
 
-    Begin!
+        Begin!
 
-    Question: {input}
-    Thought: {agent_scratchpad}"""
-    
-    # Note: Currently disabled the user prompt in the template
-    # Here are additional user instructions based on user roles:
-    # {user_prompt}
+        Question: {input}
+        Thought: {agent_scratchpad}"""
+    else:
+        template = user_prompt
 
-    return PromptTemplate.from_template(template).partial(user_prompt=user_prompt)
+    # print("User Prompt:", user_prompt)
+
+    # return PromptTemplate.from_template(template).partial(user_prompt=user_prompt)
+    return PromptTemplate.from_template(template)
 
 # Note: Currently disabled the user prompt in the template
 def chat_with_agent(
     user_query: str, 
     table_name: str, 
     session_id: str, 
-    user_prompt: str,
+    user_prompt: Optional[str],
     tools: List[Tool],
     tool_wrappers: Dict[str, Any],
     llm: ChatBedrockConverse,
@@ -249,7 +236,7 @@ def chat_with_agent(
         DynamoDB table name for chat history
     session_id : str
         Unique session identifier
-    user_prompt : str
+    user_prompt : Optional[str]
         Role-specific prompt to include
     tools : List[Tool]
         List of tools for the agent to use

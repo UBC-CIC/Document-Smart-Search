@@ -12,11 +12,11 @@ class DocumentTools:
         self, 
         opensearch_client: OpenSearch,
         html_index_name: str,
-        conn_info: Dict
+        conn 
     ):
         self.opensearch_client = opensearch_client
         self.html_index_name = html_index_name
-        self.conn_info = conn_info
+        self.conn = conn 
     
     def document_html_raw_text_tool(self, document_url: str) -> str:
         """
@@ -132,7 +132,7 @@ class DocumentTools:
             """
 
         def _fetch_classifications(url: str) -> Tuple[List[Dict], List[Dict], List[Dict]]:
-            rows = execute_query(_classification_sql(url), self.conn_info)
+            rows = execute_query(_classification_sql(url), self.conn)
 
             mandates, dfo_topics, non_dfo = [], [], []
             for entity_type, name, sem_score, llm_score, explain in rows:
@@ -151,6 +151,7 @@ class DocumentTools:
 
         try:
             base_results = _fetch_document_metadata(document_url)
+            # Use the connection directly
             mandates, dfo_topics, other_topics = _fetch_classifications(document_url)
 
             base_results.update(

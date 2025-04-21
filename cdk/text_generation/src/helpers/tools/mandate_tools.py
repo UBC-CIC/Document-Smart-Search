@@ -15,12 +15,12 @@ class MandateTools:
         opensearch_client: OpenSearch,
         mandate_index_name: str,
         region: str,
-        conn_info: Dict
+        conn 
     ):
         self.opensearch_client = opensearch_client
         self.mandate_index_name = mandate_index_name
         self.region = region
-        self.conn_info = conn_info
+        self.conn = conn 
     
     def get_all_items(self) -> Dict[str, List[Document]]:
         """
@@ -108,8 +108,9 @@ class MandateTools:
             """
         
         try:
-            total_count = execute_query(_count_sql(mandate_name), self.conn_info)[0][0]
-            rows = execute_query(_top_docs_sql(mandate_name, limit), self.conn_info)
+            # Use the connection directly
+            total_count = execute_query(_count_sql(mandate_name), self.conn)[0][0]
+            rows = execute_query(_top_docs_sql(mandate_name, limit), self.conn)
 
             documents = [
                 {

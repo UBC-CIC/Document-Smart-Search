@@ -1,16 +1,20 @@
-import os
 import json
 import boto3
 import logging
 import uuid
 import datetime
-from typing import Dict, Any, Optional
 
 # Import helpers
-from helpers.db import get_secret, get_rds_connection
-# from helpers.chat import get_bedrock_llm, create_dynamodb_history_table, get_llm_output, get_initial_student_query, chat_with_agent, get_prompt_for_role, get_initial_user_query
-from helpers.chat import get_bedrock_llm, create_dynamodb_history_table, get_llm_output, chat_with_agent, get_prompt_for_role, get_initial_user_query
-from helpers.vectorstore import get_opensearch_client, create_hybrid_search_pipeline, initialize_embeddings, initialize_opensearch_and_db
+from helpers.db import get_rds_connection
+from helpers.chat import (
+    get_bedrock_llm, 
+    create_dynamodb_history_table,
+    get_llm_output, 
+    chat_with_agent, 
+    get_prompt_for_role, 
+    get_initial_user_query
+)
+from helpers.vectorstore import initialize_embeddings, initialize_opensearch_and_db
 from helpers.tools.setup import initialize_tools
 
 # Set up basic logging
@@ -68,7 +72,6 @@ def get_parameter(param_name: str):
         logger.error(f"Error fetching parameter {param_name}: {e}")
         raise
 
-# Note: I have not tested this function, so unsure if this works
 def log_user_engagement(conn, session_id: str, message: str, user_role: str = None, user_info: str = None):
     """Log user engagement in database"""
     try:
@@ -134,7 +137,6 @@ def handler(event, context):
     # If no question, return initial greeting
     if not question:
         logger.info("Start of conversation. Creating conversation history table in DynamoDB.")
-        # initial_query = get_initial_student_query()
         initial_query = get_initial_user_query()
         query_data = json.loads(initial_query)
         message = query_data["message"]
@@ -149,7 +151,6 @@ def handler(event, context):
             },
             "body": json.dumps({
                 "type": "ai",
-                # "content": "Hello! Please select the best role below that fits you. We can better answer your questions. Don't include personal details such as your name and private content.",
                 "content": message,
                 "options": options,
                 "user_role": user_role
@@ -157,19 +158,19 @@ def handler(event, context):
         }
     
     # Note: Currently disables user role check
-    # # Check for user role
-    # if not user_role:
-    #     logger.error("Missing required parameter: user_role")
-    #     return {
-    #         'statusCode': 400,
-    #         "headers": {
-    #             "Content-Type": "application/json",
-    #             "Access-Control-Allow-Headers": "*",
-    #             "Access-Control-Allow-Origin": "*",
-    #             "Access-Control-Allow-Methods": "*",
-    #         },
-    #         'body': json.dumps('Missing required parameter: user_role')
-    #     }
+    # Check for user role
+    if not user_role and question:
+        logger.error("Missing required parameter: user_role")
+        return {
+            'statusCode': 400,
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Headers": "*",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "*",
+            },
+            'body': json.dumps('Missing required parameter: user_role')
+        }
     
     try:
         # Initialize OpenSearch, DB, and get configuration values
@@ -192,8 +193,6 @@ def handler(event, context):
         
         # print("Starting SQL Database connection")
         
-
-        
         # print("SQL Database connection started")
         
         # Initialize embeddings
@@ -205,34 +204,35 @@ def handler(event, context):
         
         print("Embeddings initialized")
         
-        # # Get role-specific prompt from database -> Note right now user_promp is not used
+        # Get role-specific prompt from database -> Note right now user_promp is not used
         # Create RDS database connection
-        # conn = get_rds_connection(rds_conn_info)
-        # user_prompt = get_prompt_for_role(conn, user_role)
-        # if not user_prompt:
-        #     logger.error(f"Failed to retrieve prompt for role: {user_role}")
-        #     return {
-        #         'statusCode': 500,
-        #         "headers": {
-        #             "Content-Type": "application/json",
-        #             "Access-Control-Allow-Headers": "*",
-        #             "Access-Control-Allow-Origin": "*",
-        #             "Access-Control-Allow-Methods": "*",
-        #         },
-        #         'body': json.dumps('Error getting prompt for specified role')
-        #     }
+        conn = get_rds_connection(rds_conn_info)
+        user_prompt = get_prompt_for_role(conn, user_role)
+        if not user_prompt:
+            logger.error(f"Failed to retrieve prompt for role: {user_role}")
+            # For now we will not fail the request if we cannot get the prompt 
+            # But we will log the error
+            # return {
+            #     'statusCode': 500,
+            #     "headers": {
+            #         "Content-Type": "application/json",
+            #         "Access-Control-Allow-Headers": "*",
+            #         "Access-Control-Allow-Origin": "*",
+            #         "Access-Control-Allow-Methods": "*",
+            #     },
+            #     'body': json.dumps('Error getting prompt for specified role')
+            # }
         
-        # print(user_prompt)
-        user_prompt: str = "N/A" # Placeholder for user prompt, currently not used
+        # print("User Prompt:", user_prompt)
+        # user_prompt: str = "N/A" # Placeholder for user prompt, currently not used
 
-
-#         # Log the user's question -> Doesnt work right now
-#         log_user_engagement(conn, session_id, question, user_role, user_info)
+        # Log the user's question -> Doesnt work right now (No database table exists)
+        log_user_engagement(conn, session_id, question, user_role, user_info)
         
         # Initialize tools using helper function
         tools, tool_wrappers = initialize_tools(
             opensearch_client=opensearch_client,
-            conn_info=rds_conn_info,
+            conn=conn, 
             embedder=embedder,
             html_index_name=DFO_HTML_FULL_INDEX_NAME,
             mandate_index_name=DFO_MANDATE_FULL_INDEX_NAME,
@@ -252,7 +252,6 @@ def handler(event, context):
         
         print("\nLLM Initialized\n")
 
-        
         # Process the question with the agent
         response, tools_summary, duration = chat_with_agent(
             user_query=question,
@@ -305,10 +304,10 @@ def handler(event, context):
             },
             'body': json.dumps(f'Error processing request: {str(e)}')
         }
-    # finally:
-    #     # Close any database connections
-    #     if 'conn' in locals() and conn:
-    #         conn.close()
+    finally:
+        # Close any database connections
+        if 'conn' in locals() and conn:
+            conn.close()
 
 # ------------ TESTING CODE (can be removed for production) ------------
 def run_test(
@@ -324,7 +323,7 @@ def run_test(
     query : str
         The query to test with
     user_role : str
-        The user role (public, educator, admin)
+        The user role (public, researcher)
     session_id : str
         Session ID for the chat
     """
@@ -336,9 +335,108 @@ def run_test(
     
     # Create test prompts
     test_user_prompts = {
-        "public": "You are responding to a member of the public.",
-        "educator": "You are responding to an educator.",
-        "admin": "You are responding to an admin."
+        "public": """
+        You are a specialized Smart Agent for Fisheries and Oceans Canada (DFO). 
+        Your mission is to answer user queries with absolute accuracy using verified facts. 
+        Every response must be supported by evidence (retrieved documents and/or relevance scores). 
+        If you lack sufficient evidence, clearly state that you do not have the necessary data. 
+        When you provide an answer without support from verified documents, indicate it is not based on the DFO documents.
+
+        If you cannot fully answer a query, guide the user on how to obtain more information. 
+        Always refer to the available materials as "DFO documents."
+
+        The user is a member of the public, and you should provide information in a clear and accessible manner.
+        Let them know that as well.
+
+        You have access to the following tools:
+        {tools}
+
+        You are given the following context:
+        - **Terms of Reference:** Describes the context and science advice request for the CSAS process.
+        - **Proceedings:** Outlines the peer-review discussions among managers, researchers, and/or affected parties.
+        - **Science Advisory Report:** Summarizes the research findings for the TOR and provides advice based on peer-review discussions.
+        - **Science Response:** Similar to a Science Advisory Report but may be part of an ongoing series.
+        - **Research Document:** A research publication compiling the work done in support of the TOR.
+
+        Your responsibilities are as follows:
+        1. Parse the query and determine the required tools.
+        2. Use the available tools to answer the query if possible; if not, inform the user.
+        3. Retrieve, analyze, and present the necessary information.
+        4. Provide a detailed, fact-based final answer.
+
+        You must follow the following format:
+        Question: The input question you must answer
+        Thought: You should always think about what to do
+        Action: The action to take, should be one of [{tool_names}]
+        Action Input: The input to the action
+        Observation: The result of the action
+        ... (repeat Thought/Action/Action Input/Observation steps as needed)
+
+        After gathering sufficient information:
+        Thought: I now have all necessary information.
+        Final Answer: Provide an accurate, detailed final answer.
+
+        After your final answer, list up to 3 follow-up questions without numbering under 
+        "You might have the following questions:" that are related to DFO Canada content and the chat history.
+
+        Previous conversation history:
+        {chat_history}
+
+        Begin!
+
+        Question: {input}
+        Thought: {agent_scratchpad}""",
+
+        "researcher": """
+        You are a specialized Smart Agent for Fisheries and Oceans Canada (DFO). 
+        Your mission is to answer user queries with absolute accuracy using verified facts. 
+        Every response must be supported by evidence (retrieved documents and/or relevance scores). 
+        If you lack sufficient evidence, clearly state that you do not have the necessary data. 
+        When you provide an answer without support from verified documents, indicate it is not based on the DFO documents.
+
+        If you cannot fully answer a query, guide the user on how to obtain more information. 
+        Always refer to the available materials as "DFO documents."
+
+        The user is a advanced researcher with a good understanding of the DFO context. Please let them know that as well.
+
+        You have access to the following tools:
+        {tools}
+
+        You are given the following context:
+        - **Terms of Reference:** Describes the context and science advice request for the CSAS process.
+        - **Proceedings:** Outlines the peer-review discussions among managers, researchers, and/or affected parties.
+        - **Science Advisory Report:** Summarizes the research findings for the TOR and provides advice based on peer-review discussions.
+        - **Science Response:** Similar to a Science Advisory Report but may be part of an ongoing series.
+        - **Research Document:** A research publication compiling the work done in support of the TOR.
+
+        Your responsibilities are as follows:
+        1. Parse the query and determine the required tools.
+        2. Use the available tools to answer the query if possible; if not, inform the user.
+        3. Retrieve, analyze, and present the necessary information.
+        4. Provide a detailed, fact-based final answer.
+
+        You must follow the following format:
+        Question: The input question you must answer
+        Thought: You should always think about what to do
+        Action: The action to take, should be one of [{tool_names}]
+        Action Input: The input to the action
+        Observation: The result of the action
+        ... (repeat Thought/Action/Action Input/Observation steps as needed)
+
+        After gathering sufficient information:
+        Thought: I now have all necessary information.
+        Final Answer: Provide an accurate, detailed final answer.
+
+        After your final answer, list up to 3 follow-up questions without numbering under 
+        "You might have the following questions:" that are related to DFO Canada content and the chat history.
+
+        Previous conversation history:
+        {chat_history}
+
+        Begin!
+
+        Question: {input}
+        Thought: {agent_scratchpad}""",
     }
     
     # Override get_prompt_for_role for testing
@@ -386,7 +484,7 @@ if __name__ == "__main__":
     parser.add_argument("--query", type=str, default="What can you help me with?", 
                       help="Query to test")
     parser.add_argument("--role", type=str, default="public", 
-                      choices=["public", "educator", "admin"],
+                      choices=["public", "researcher"],
                       help="User role")
     parser.add_argument("--session-id", type=str, default="test-session-123", 
                       help="Session ID for chat history")

@@ -64,16 +64,16 @@ def get_rds_connection(rds_conn_info: Dict[str, Any]) -> psycopg2.extensions.con
         logger.error(f"Failed to connect to database: {e}")
         raise
 
-def execute_query(q: str, conn_info: Dict, verbose=False) -> Optional[List[Tuple]]:
+def execute_query(q: str, conn, verbose=False) -> Optional[List[Tuple]]:
     """
-    Execute a SQL statement string.
+    Execute a SQL statement string using an existing connection.
     
     Parameters:
     -----------
     q : str
         SQL statement string
-    conn_info : dict
-        A dictionary containing the connection parameters for PostgreSQL
+    conn : psycopg2.extensions.connection
+        An existing database connection
     verbose : bool, default=False
         Whether to log query execution
         
@@ -82,15 +82,14 @@ def execute_query(q: str, conn_info: Dict, verbose=False) -> Optional[List[Tuple
     List of tuples or None
         Query results if SELECT, None otherwise
     """
-    with psycopg2.connect(**conn_info) as conn:
-        res = None
-        if "select" in q.lower():
-            with conn.cursor() as cur:
-                cur.execute(q)
-                res = cur.fetchall()
-        else:
-            with conn.cursor() as cur:
-                cur.execute(q)
-        if verbose:
-            logger.info("Query executed!")
-        return res
+    res = None
+    if "select" in q.lower():
+        with conn.cursor() as cur:
+            cur.execute(q)
+            res = cur.fetchall()
+    else:
+        with conn.cursor() as cur:
+            cur.execute(q)
+    if verbose:
+        logger.info("Query executed!")
+    return res
