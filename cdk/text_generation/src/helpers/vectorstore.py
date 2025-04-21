@@ -39,7 +39,8 @@ def create_hybrid_search_pipeline(
     client: OpenSearch,
     pipeline_name: str,
     keyword_weight: float,
-    semantic_weight: float
+    semantic_weight: float,
+    overwrite: bool = False
 ) -> None:
     """
     Create or update a hybrid search pipeline in OpenSearch.
@@ -60,11 +61,14 @@ def create_hybrid_search_pipeline(
     try:
         # Check if the pipeline exists
         response = client.transport.perform_request("GET", path)
-        logger.info(f'Search pipeline "{pipeline_name}" already exists!')
-
-        # Delete the existing pipeline before recreating it
-        client.transport.perform_request("DELETE", path)
-
+        if not overwrite:
+            # If the pipeline exists and overwrite is False, skip creation
+            logger.info(f'Search pipeline "{pipeline_name}" already exists! Skipping creation.')
+            return  # Pipeline exists, no need to recreate it
+        else:
+            # If overwrite is True, delete the existing pipeline
+            client.transport.perform_request("DELETE", path)
+            logger.info(f'Search pipeline "{pipeline_name}" already exists! Removing existing pipeline.')
     except NotFoundError:
         logger.info(f'Search pipeline "{pipeline_name}" does not exist. Creating a new one.')
 
