@@ -12,7 +12,8 @@ from helpers.chat import (
     get_llm_output, 
     chat_with_agent, 
     get_prompt_for_role, 
-    get_initial_user_query
+    INITIAL_GREETING,
+    ROLE_SELECTION_RESPONSE
 )
 from helpers.vectorstore import initialize_embeddings, initialize_opensearch_and_db
 from helpers.tools.setup import initialize_tools
@@ -130,6 +131,7 @@ def handler(event, context):
     body = {} if event.get("body") is None else json.loads(event.get("body"))
     question = body.get("message_content", "")
     user_role = body.get("user_role", "")
+    is_role_selection = body.get("is_role_selection", False)
     
     # Create DynamoDB table if it doesn't exist
     create_dynamodb_history_table(DYNAMODB_TABLE_NAME, REGION)
@@ -137,10 +139,7 @@ def handler(event, context):
     # If no question, return initial greeting
     if not question:
         logger.info("Start of conversation. Creating conversation history table in DynamoDB.")
-        initial_query = get_initial_user_query()
-        query_data = json.loads(initial_query)
-        message = query_data["message"]
-        options = query_data["options"]
+        # Use the centralized greeting constant directly
         return {
             "statusCode": 200,
             "headers": {
@@ -151,8 +150,30 @@ def handler(event, context):
             },
             "body": json.dumps({
                 "type": "ai",
-                "content": message,
-                "options": options,
+                "content": INITIAL_GREETING["message"],
+                "options": INITIAL_GREETING["options"],
+                "user_role": user_role
+            })
+        }
+    
+    # Handle role selection - respond directly without calling the LLM
+    if is_role_selection:
+        logger.info(f"User selected role: {user_role}")
+        # Store the selection in DynamoDB or other storage if needed
+        # ...
+        
+        return {
+            "statusCode": 200,
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Headers": "*",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "*",
+            },
+            "body": json.dumps({
+                "type": "ai",
+                "content": ROLE_SELECTION_RESPONSE,
+                "options": [],
                 "user_role": user_role
             })
         }

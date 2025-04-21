@@ -12,6 +12,16 @@ import "react-toastify/dist/ReactToastify.css"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 
+// Define message templates once to avoid duplication
+const INITIAL_GREETING = 
+  "Hello! I am a Smart Agent specialized in Fisheries and Oceans Canada (DFO). " +
+  "I can help you with questions related to DFO documents, science advice, and more! " +
+  "Please select the best role below that fits you. We can better answer your questions. " +
+  "Don't include personal details such as your name and private content.";
+
+const ROLE_SELECTION_RESPONSE = 
+  "Thank you for selecting your role. How can I help you with your questions about Fisheries and Oceans Canada today?";
+
 export default function SmartSearchAssistant() {
   // Add these state variables to the component
   const [showFeedback, setShowFeedback] = useState(false)
@@ -24,9 +34,8 @@ export default function SmartSearchAssistant() {
     {
       id: "initial",
       role: "assistant",
-      content:
-        "Hello! Please select the best role below that fits you. We can better answer your questions about Fisheries and Oceans Canada. Don't include personal details such as your name and private content.",
-      options: ["General/Public", "Government employee/Admin"],
+      content: INITIAL_GREETING,
+      options: ["General Public", "Researcher"],
       user_role: "",
     },
   ])
@@ -168,8 +177,7 @@ export default function SmartSearchAssistant() {
         {
           id: "initial",
           role: "assistant",
-          content:
-            "Hello! Please select the best role below that fits you. We can better answer your questions about Fisheries and Oceans Canada. Don't include personal details such as your name and private content.",
+          content: INITIAL_GREETING,
           options: ["General/Public", "Government employee/Admin"],
           user_role: "",
         },
@@ -206,9 +214,8 @@ export default function SmartSearchAssistant() {
           {
             id: "initial",
             role: "assistant",
-            content:
-              "Hello! Please select the best role below that fits you. We can better answer your questions about Fisheries and Oceans Canada. Don't include personal details such as your name and private content.",
-            options: ["General/Public", "Government employee/Admin"],
+            content: INITIAL_GREETING,
+            options: ["General Public", "Researcher"],
             user_role: "",
           },
         ])
@@ -225,6 +232,7 @@ export default function SmartSearchAssistant() {
         content: msg.Content,
         options: msg.Options || [],
         user_role: msg.user_role,
+        tools_used: msg.tools_used || {},
         feedback: null,
         submittedFeedback: false,
         // Keep original properties for compatibility
@@ -236,15 +244,14 @@ export default function SmartSearchAssistant() {
       const hasInitialMessage =
         convertedMessages.length > 0 &&
         convertedMessages[0].role === "assistant" &&
-        convertedMessages[0].content.includes("Please select the best role below")
+        convertedMessages[0].content.includes("I am a Smart Agent specialized in Fisheries and Oceans Canada")
 
       if (!hasInitialMessage) {
         convertedMessages.unshift({
           id: "initial",
           role: "assistant",
-          content:
-            "Hello! Please select the best role below that fits you. We can better answer your questions about Fisheries and Oceans Canada. Don't include personal details such as your name and private content.",
-          options: ["General/Public", "Government employee/Admin"],
+          content: INITIAL_GREETING,
+          options: ["General Public", "Researcher"],
           user_role: "",
         })
       }
@@ -256,14 +263,45 @@ export default function SmartSearchAssistant() {
         {
           id: "initial",
           role: "assistant",
-          content:
-            "Hello! Please select the best role below that fits you. We can better answer your questions about Fisheries and Oceans Canada. Don't include personal details such as your name and private content.",
-          options: ["General/Public", "Government employee/Admin"],
+          content: INITIAL_GREETING,
+          options: ["General Public", "Researcher"],
           user_role: "",
         },
       ])
     }
   }
+
+  // Handle when a user selects a role option
+  const handleRoleSelection = (selectedRole) => {
+    if (!session || !fingerprint) return;
+    
+    // Convert the role to the proper format for later use
+    const roleValue = selectedRole === "General Public" ? "public" : "researcher";
+    
+    // Add the user message showing their selection
+    const userMessage = {
+      id: Date.now().toString(),
+      role: "user",
+      content: selectedRole,
+      Type: "human",
+      Content: selectedRole,
+    };
+    
+    // Add the welcome message directly in the frontend
+    const aiResponse = {
+      id: Date.now() + 1,
+      role: "assistant",
+      content: ROLE_SELECTION_RESPONSE,
+      options: [],
+      user_role: roleValue,
+      Type: "ai",
+      Content: ROLE_SELECTION_RESPONSE,
+      Options: [],
+    };
+    
+    // Add both messages to the chat history
+    setMessages(prev => [...prev, userMessage, aiResponse]);
+  };
 
   const sendMessage = async (content, isOption = false) => {
     if (!session || !fingerprint || (!content.trim() && !isOption)) return
@@ -280,6 +318,18 @@ export default function SmartSearchAssistant() {
     setIsLoading(true)
 
     try {
+      // Check if this is a role selection message (first message and is one of the role options)
+      const isRoleSelection = currentMessages.length === 1 && isOption && 
+        (content === "General Public" || content === "Researcher")
+
+      // Handle role selection directly in the frontend without calling the backend
+      if (isRoleSelection) {
+        handleRoleSelection(content)
+        setIsLoading(false)
+        return
+      }
+
+      // For all other messages, continue with normal flow
       const userMessage = {
         id: Date.now().toString(),
         role: "user",
@@ -290,10 +340,10 @@ export default function SmartSearchAssistant() {
 
       setMessages((prev) => [...prev, userMessage])
 
-      // Send the HTTP request for text generation
+      // Send to backend for LLM processing
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_ENDPOINT}user/text_generation?session_id=${encodeURIComponent(
-          session,
+        `${process.env.NEXT_PUBLIC_API_ENDPOINT}text_generation?session_id=${encodeURIComponent(
+          session
         )}&user_info=${encodeURIComponent(fingerprint)}`,
         {
           method: "POST",
@@ -302,7 +352,7 @@ export default function SmartSearchAssistant() {
           },
           body: JSON.stringify({
             message_content: content,
-            user_role: getUserRole([...currentMessages, userMessage]),
+            user_role: userRole || "public", // Default to "public" if no role is set
           }),
         },
       )
@@ -324,6 +374,7 @@ export default function SmartSearchAssistant() {
           content: data.content,
           options: data.options || [],
           user_role: data.user_role,
+          tools_used: data.tools_used || {},
           feedback: null,
           submittedFeedback: false,
           Type: "ai",
@@ -331,6 +382,11 @@ export default function SmartSearchAssistant() {
           Options: data.options || [],
         },
       ])
+
+      // If tools were used, open sidebar to show sources
+      if (data.tools_used && Object.keys(data.tools_used).length > 0) {
+        setIsSidebarOpen(true);
+      }
     } catch (error) {
       console.error("Error sending message:", error.message)
       toast.error(error.message || "Failed to send message. Please try again.")
@@ -405,8 +461,7 @@ export default function SmartSearchAssistant() {
       {
         id: "initial",
         role: "assistant",
-        content:
-          "Hello! Please select the best role below that fits you. We can better answer your questions about Fisheries and Oceans Canada. Don't include personal details such as your name and private content.",
+        content: INITIAL_GREETING,
         options: ["General/Public", "Government employee/Admin"],
         user_role: "",
       },
@@ -515,7 +570,11 @@ export default function SmartSearchAssistant() {
 
   return (
     <div className="min-h-screen bg-white transition-all duration-300 flex flex-col">
-      <CitationsSidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+      <CitationsSidebar 
+        isOpen={isSidebarOpen} 
+        onClose={() => setIsSidebarOpen(false)} 
+        toolsUsed={messages.length > 0 ? messages[messages.length - 1]?.tools_used : {}}
+      />
 
       {/* Main Content */}
       <main className="max-w-6xl mx-auto px-4 py-6 md:py-8 flex-grow flex flex-col">

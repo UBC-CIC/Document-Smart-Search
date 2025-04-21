@@ -1,7 +1,7 @@
+import json
 import boto3
 import re
 import logging
-import json
 import time
 from typing import Dict, List, Any, Optional, Tuple
 
@@ -15,6 +15,21 @@ from langchain_aws import ChatBedrockConverse
 from helpers.tools.tool_wrapper import get_tool_calls_summary, reset_all_tool_wrappers
 
 logger = logging.getLogger()
+
+# Define the initial greeting message once to avoid duplication
+INITIAL_GREETING = {
+    "message": ("Hello! I am a Smart Agent specialized in Fisheries and Oceans Canada (DFO). "
+                "I can help you with questions related to DFO documents, science advice, and more!"
+                "\nPlease select the best role below that fits you. We can better answer your questions."
+                "Don't include personal details such as your name and private content."),
+    "options": [
+        "General Public", 
+        "Researcher"
+    ]
+}
+
+# Define the welcome message after role selection
+ROLE_SELECTION_RESPONSE = "Thank you for selecting your role. How can I help you with your questions about Fisheries and Oceans Canada today?"
 
 def create_dynamodb_history_table(table_name: str, region_name: str):
     """
@@ -131,17 +146,7 @@ def get_initial_user_query():
     str
         JSON string with initial message and role options
     """
-    query_structure = {
-        "message": ("Hello! I am a Smart Agent specialized in Fisheries and Oceans Canada (DFO). "
-                    "I can help you with questions related to DFO documents, science advice, and more!"
-                    "\nPlease select the best role below that fits you. We can better answer your questions."
-                    "Don't include personal details such as your name and private content."),
-        "options": [
-            "General Public", 
-            "Researcher"
-        ]
-    }
-    return json.dumps(query_structure, indent=4)
+    return json.dumps(INITIAL_GREETING, indent=4)
 
 def create_agent_prompt(user_prompt: Optional[str]) -> PromptTemplate:
     """

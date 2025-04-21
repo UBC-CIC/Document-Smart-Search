@@ -1,61 +1,71 @@
-import { X, Minus, Plus } from "lucide-react"
+import { X } from "lucide-react"
 import React from "react"
 import { useState, useEffect } from "react"
 
-interface Citation {
-  score: number
-  url: string
+interface Source {
+  title?: string
+  url?: string
+  text?: string
 }
 
-interface Section {
-  title: string
-  isExpanded: boolean
-  citations: Citation[]
+interface Tool {
+  order: number
+  tool_name: string
+  description?: string
+  sources?: Source[]
+}
+
+interface ToolsUsed {
+  tools_and_sources?: Tool[]
 }
 
 interface CitationsSidebarProps {
   isOpen: boolean
   onClose: () => void
+  toolsUsed?: ToolsUsed
 }
 
-export function CitationsSidebar({ isOpen, onClose }: CitationsSidebarProps) {
-  const [sections, setSections] = useState<Section[]>([
-    {
-      title: "Query 1: TOR",
-      isExpanded: true,
-      citations: [
-        {
-          score: 0.85,
-          url: "https://waves-vagues.dfo-mpo.gc.ca/term-of-references-1.pdf",
-        },
-        {
-          score: 0.25,
-          url: "https://waves-vagues.dfo-mpo.gc.ca/term-of-references-2.pdf",
-        },
-      ],
-    },
-    {
-      title: "Query 2: Other Documents",
-      isExpanded: true,
-      citations: [
-        {
-          score: 0.45,
-          url: "https://waves-vagues.dfo-mpo.gc.ca/salmon-farming-impact.pdf",
-        },
-      ],
-    },
-    {
-      title: "Query 3: Web search",
-      isExpanded: false,
-      citations: [],
-    },
-  ])
+export function CitationsSidebar({ isOpen, onClose, toolsUsed }: CitationsSidebarProps) {
+  const [currentTab, setCurrentTab] = useState<"sources" | "tools">("sources")
 
-  const toggleSection = (index: number) => {
-    setSections((prev) =>
-      prev.map((section, i) => (i === index ? { ...section, isExpanded: !section.isExpanded } : section)),
-    )
+  // Extract sources from tools_used data
+  const getSources = (): Source[] => {
+    if (!toolsUsed || !toolsUsed.tools_and_sources) {
+      return [];
+    }
+    
+    // Filter tools that have sources property and combine all sources
+    const allSources: Source[] = [];
+    toolsUsed.tools_and_sources.forEach(tool => {
+      if (tool.sources && tool.sources.length > 0) {
+        tool.sources.forEach(source => {
+          if (source) {
+            allSources.push(source);
+          }
+        });
+      }
+    });
+    
+    return allSources;
   }
+
+  const sources = getSources();
+  
+  // Get unique tool names for the tools tab
+  const getToolNames = (): Tool[] => {
+    if (!toolsUsed || !toolsUsed.tools_and_sources) {
+      return [];
+    }
+    
+    return toolsUsed.tools_and_sources.map(tool => ({
+      tool_name: tool.tool_name,
+      description: tool.description || "",
+      order: tool.order,
+      sources: tool.sources
+    }));
+  }
+  
+  const tools = getToolNames();
 
   // Close sidebar on small screens when clicking outside
   useEffect(() => {
@@ -91,8 +101,8 @@ export function CitationsSidebar({ isOpen, onClose }: CitationsSidebarProps) {
         style={{ transform: isOpen ? "translateX(0)" : "translateX(-100%)" }}
       >
         <div className="p-4">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold dark:text-white">Citations</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold dark:text-white">References</h2>
             <button
               onClick={onClose}
               className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full dark:text-gray-300"
@@ -100,37 +110,85 @@ export function CitationsSidebar({ isOpen, onClose }: CitationsSidebarProps) {
               <X className="h-6 w-6" />
             </button>
           </div>
-
-          <div className="space-y-4">
-            {sections.map((section, index) => (
-              <div key={section.title} className="bg-white dark:bg-gray-700 rounded-lg p-4">
-                <div className="flex justify-between items-center cursor-pointer" onClick={() => toggleSection(index)}>
-                  <h3 className="font-medium dark:text-white">{section.title}</h3>
-                  <button className="p-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-full dark:text-gray-300">
-                    {section.isExpanded ? <Minus className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-                  </button>
-                </div>
-
-                {section.isExpanded && section.citations.length > 0 && (
-                  <div className="mt-2 space-y-2">
-                    {section.citations.map((citation, citationIndex) => (
-                      <div key={citationIndex} className="flex items-baseline">
-                        <span className="text-sm mr-2 dark:text-gray-300">{citation.score}:</span>
-                        <a
-                          href={citation.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 dark:text-blue-400 hover:underline text-sm break-all"
-                        >
-                          {citation.url}
-                        </a>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
+          
+          {/* Tabs */}
+          <div className="flex mb-4 border-b">
+            <button
+              onClick={() => setCurrentTab("sources")}
+              className={`px-4 py-2 ${
+                currentTab === "sources"
+                  ? "border-b-2 border-blue-500 font-medium"
+                  : "text-gray-500 dark:text-gray-400"
+              }`}
+            >
+              Sources ({sources.length})
+            </button>
+            <button
+              onClick={() => setCurrentTab("tools")}
+              className={`px-4 py-2 ${
+                currentTab === "tools"
+                  ? "border-b-2 border-blue-500 font-medium"
+                  : "text-gray-500 dark:text-gray-400"
+              }`}
+            >
+              Tools Used ({tools.length})
+            </button>
           </div>
+
+          {currentTab === "sources" && (
+            <div className="space-y-4">
+              {sources.length > 0 ? (
+                sources.map((source, index) => (
+                  <div key={index} className="bg-white dark:bg-gray-700 rounded-lg p-3">
+                    <h3 className="font-medium text-sm dark:text-white">
+                      {source.title || "Source"}
+                    </h3>
+                    {source.url && (
+                      <a
+                        href={source.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 dark:text-blue-400 hover:underline text-xs mt-1 block truncate"
+                      >
+                        {source.url}
+                      </a>
+                    )}
+                    {source.text && (
+                      <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 line-clamp-3">
+                        {source.text}
+                      </p>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <p className="text-gray-500 dark:text-gray-400">No sources available.</p>
+              )}
+            </div>
+          )}
+
+          {currentTab === "tools" && (
+            <div className="space-y-4">
+              {tools.length > 0 ? (
+                tools.map((tool, index) => (
+                  <div key={index} className="bg-white dark:bg-gray-700 rounded-lg p-3">
+                    <h3 className="font-medium dark:text-white">
+                      {tool.tool_name || "Unknown Tool"}
+                    </h3>
+                    {tool.description && (
+                      <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+                        {tool.description}
+                      </p>
+                    )}
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                      Used in step {tool.order}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-gray-500 dark:text-gray-400">No tools were used.</p>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
