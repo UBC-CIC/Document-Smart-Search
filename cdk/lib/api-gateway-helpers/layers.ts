@@ -41,6 +41,17 @@ import {
         compatibleRuntimes: [Runtime.PYTHON_3_9],
         description: "Lambda layer containing the psycopg2 Python library",
       });
+
+
+      /**
+       *
+       * Create Lambda layer for OpenSearch
+       */
+      const opensearchLayer = new lambda.LayerVersion(scope, `${id}-opensearch-py`, {
+        code: lambda.Code.fromAsset("./layers/opensearch-layer.zip"),
+        compatibleRuntimes: [lambda.Runtime.PYTHON_3_11],
+        description: "OpenSearch Python client + AWS4Auth",
+      });
     
-      return { jwt, postgres, psycopgLayer };
+      return { jwt, postgres, psycopgLayer, opensearchLayer };
 };

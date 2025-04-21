@@ -58,10 +58,12 @@ export class ApiGatewayStack extends cdk.Stack {
       id
     );
 
-    const { jwt, postgres, psycopgLayer } = createLayers(this, id);
+    const { jwt, postgres, psycopgLayer, opensearchLayer } = createLayers(this, id);
     this.layerList["psycopg2"] = psycopgLayer;
     this.layerList["postgres"] = postgres;
     this.layerList["jwt"] = jwt;
+    this.layerList["opensearchLayer"] = opensearchLayer;
+
 
     // powertoolsLayer does not follow the format of layerList
     const powertoolsLayer = lambda.LayerVersion.fromLayerVersionArn(
