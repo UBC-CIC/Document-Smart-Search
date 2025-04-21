@@ -35,6 +35,8 @@ const osStack = new OpenSearchStack(
   { env }
 );
 
+apiStack.addDependency(osStack);
+
 // 5) DBFlow (wires in the RDS _and_ the OpenSearch initializers)
 const dbFlowStack = new DBFlowStack(
   app,
