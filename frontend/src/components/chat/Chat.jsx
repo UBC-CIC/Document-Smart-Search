@@ -287,20 +287,30 @@ export default function SmartSearchAssistant() {
       Content: selectedRole,
     };
     
-    // Add the welcome message directly in the frontend
-    const aiResponse = {
-      id: Date.now() + 1,
-      role: "assistant",
-      content: ROLE_SELECTION_RESPONSE,
-      options: [],
-      user_role: roleValue,
-      Type: "ai",
-      Content: ROLE_SELECTION_RESPONSE,
-      Options: [],
-    };
+    // Add user selection immediately
+    setMessages(prev => [...prev, userMessage]);
     
-    // Add both messages to the chat history
-    setMessages(prev => [...prev, userMessage, aiResponse]);
+    // Show loading indicator
+    setIsLoading(true);
+    
+    // Add a slight delay (1 second) to simulate processing
+    setTimeout(() => {
+      // Add the welcome message directly in the frontend
+      const aiResponse = {
+        id: Date.now() + 1,
+        role: "assistant",
+        content: ROLE_SELECTION_RESPONSE,
+        options: [],
+        user_role: roleValue,
+        Type: "ai",
+        Content: ROLE_SELECTION_RESPONSE,
+        Options: [],
+      };
+      
+      // Add AI response to the chat history
+      setMessages(prev => [...prev, aiResponse]);
+      setIsLoading(false);
+    }, 1000);
   };
 
   const sendMessage = async (content, isOption = false) => {
@@ -569,7 +579,7 @@ export default function SmartSearchAssistant() {
   }
 
   return (
-    <div className="min-h-screen bg-white transition-all duration-300 flex flex-col">
+    <div className={`min-h-screen bg-white transition-all duration-300 flex flex-col ${isSidebarOpen ? 'md:ml-96' : ''}`}>
       <CitationsSidebar 
         isOpen={isSidebarOpen} 
         onClose={() => setIsSidebarOpen(false)} 
@@ -641,7 +651,7 @@ export default function SmartSearchAssistant() {
                       </button>
                     )}
 
-                    {message.role === "assistant" && (
+                    {message.role === "assistant" && message.tools_used && Object.keys(message.tools_used).length > 0 && (
                       <div className="flex justify-end mt-2">
                         <button
                           className="bg-gray-400 hover:bg-gray-500 text-white px-3 py-1 rounded flex items-center w-fit"
