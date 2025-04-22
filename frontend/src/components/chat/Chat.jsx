@@ -143,7 +143,7 @@ export default function SmartSearchAssistant() {
 
     const content = (firstHumanMessage.content || firstHumanMessage.Content || "").toLowerCase()
     if (content.includes("public")) return "public"
-    if (content.includes("government")) return "admin"
+    if (content.includes("researcher")) return "researcher"
     return ""
   }
 
@@ -179,7 +179,7 @@ export default function SmartSearchAssistant() {
           id: "initial",
           role: "assistant",
           content: INITIAL_GREETING,
-          options: ["General/Public", "Government employee/Admin"],
+          options: ["General Public", "Researcher"],
           user_role: "",
         },
       ])

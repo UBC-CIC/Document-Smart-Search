@@ -321,7 +321,7 @@ def get_prompt_for_role(conn, user_role: str) -> Optional[str]:
     conn : psycopg2.extensions.connection
         Database connection
     user_role : str
-        User role (public, educator, admin)
+        User role (public, researcher)
         
     Returns:
     --------
@@ -333,8 +333,7 @@ def get_prompt_for_role(conn, user_role: str) -> Optional[str]:
             # Map valid roles to column names
             role_column_mapping = {
                 "public": "public",
-                "educator": "educator",
-                "admin": "admin"
+                "researcher": "researcher"
             }
             
             # Validate user_role and get corresponding column name
