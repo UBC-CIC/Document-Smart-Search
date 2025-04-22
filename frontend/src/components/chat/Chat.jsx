@@ -342,7 +342,7 @@ export default function SmartSearchAssistant() {
 
       // Send to backend for LLM processing
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_ENDPOINT}text_generation?session_id=${encodeURIComponent(
+        `${process.env.NEXT_PUBLIC_API_ENDPOINT}user/text_generation?session_id=${encodeURIComponent(
           session
         )}&user_info=${encodeURIComponent(fingerprint)}`,
         {
