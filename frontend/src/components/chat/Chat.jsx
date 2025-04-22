@@ -29,9 +29,9 @@ export default function SmartSearchAssistant() {
   const [isSendingFeedback, setIsSendingFeedback] = useState(false)
   const [showDisclaimer, setShowDisclaimer] = useState(false)
   
-  // Add state for cached sources
-  const [cachedToolsUsed, setCachedToolsUsed] = useState({})
-  const [activeMessageId, setActiveMessageId] = useState(null)
+  // Track active message for source display
+  const [currentMessageId, setCurrentMessageId] = useState(null)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
 
   // State for the conversation history
   const [messages, setMessages] = useState([
@@ -58,9 +58,6 @@ export default function SmartSearchAssistant() {
   // Ref for scrolling to bottom of conversation
   const messagesEndRef = useRef(null)
   const textareaRef = useRef(null)
-
-  // State for the sidebar
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
 
   // State for mobile navigation
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
@@ -276,7 +273,7 @@ export default function SmartSearchAssistant() {
   }
 
   // Handle when a user selects a role option
-  const handleRoleSelection = (selectedRole) => {
+  const handleRoleSelection = async (selectedRole) => {
     if (!session || !fingerprint) return;
     
     // Convert the role to the proper format for later use
@@ -303,11 +300,17 @@ export default function SmartSearchAssistant() {
       Options: [],
     };
 
-    // Add both messages to the chat history
-    setMessages(prev => [...prev, userMessage, aiResponse]);
+    // Add user messages to the chat history
+    setMessages(prev => [...prev, userMessage]);
+
+    // Sleep for a bit to simulate a delay for user experience
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    // Add the AI response to the chat history
+    setMessages(prev => [...prev, aiResponse]);
   };
 
-  // Modified sendMessage function to update cached tools when new sources are available
+  // Modified sendMessage function to update current message ID for sources display
   const sendMessage = async (content, isOption = false) => {
     if (!session || !fingerprint || (!content.trim() && !isOption)) return
 
@@ -329,11 +332,8 @@ export default function SmartSearchAssistant() {
 
       // Handle role selection directly in the frontend without calling the backend
       if (isRoleSelection) {
-        // Simulate a time delay for a more natural feel
-        await new Promise((resolve) => setTimeout(resolve, 500))
-        
         // Add the user message showing their selection
-        handleRoleSelection(content)
+        await handleRoleSelection(content)
         setIsLoading(false)
         return
       }
@@ -375,10 +375,9 @@ export default function SmartSearchAssistant() {
       const data = await response.json()
       const messageId = Date.now() + 1;
       
-      // Update cached tools and sources if this response has tools_used data
+      // Update current message ID for sources display
       if (data.tools_used && Object.keys(data.tools_used).length > 0) {
-        setCachedToolsUsed(data.tools_used);
-        setActiveMessageId(messageId.toString());
+        setCurrentMessageId(messageId.toString());
       }
 
       // Add the AI response to messages
@@ -589,9 +588,13 @@ export default function SmartSearchAssistant() {
       <CitationsSidebar 
         isOpen={isSidebarOpen} 
         onClose={() => setIsSidebarOpen(false)} 
-        toolsUsed={messages.length > 0 ? messages[messages.length - 1]?.tools_used : {}}
-        cachedTools={cachedToolsUsed}
-        messageId={activeMessageId}
+        toolsUsed={messages.length > 0 ? 
+          (currentMessageId ? 
+            messages.find(m => m.id === currentMessageId)?.tools_used : 
+            messages[messages.length - 1]?.tools_used) 
+          : {}
+        }
+        currentMessageId={currentMessageId}
       />
 
       {/* Main Content */}
@@ -663,7 +666,10 @@ export default function SmartSearchAssistant() {
                       <div className="flex justify-end mt-2">
                         <button
                           className="bg-gray-400 hover:bg-gray-500 text-white px-3 py-1 rounded flex items-center w-fit"
-                          onClick={() => setIsSidebarOpen(true)}
+                          onClick={() => {
+                            setCurrentMessageId(message.id);
+                            setIsSidebarOpen(true);
+                          }}
                         >
                           <Search className="h-4 w-4 mr-1" />
                           Sources

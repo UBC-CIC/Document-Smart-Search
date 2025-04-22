@@ -1,4 +1,4 @@
-import { X, ChevronDown, ChevronUp } from "lucide-react"
+import { X, ChevronDown, ChevronUp, ExternalLink } from "lucide-react"
 import React from "react"
 import { useState, useEffect } from "react"
 
@@ -25,49 +25,65 @@ interface CitationsSidebarProps {
   isOpen: boolean
   onClose: () => void
   toolsUsed?: ToolsUsed
-  cachedTools: ToolsUsed
-  messageId?: string
+  currentMessageId?: string | null
 }
 
-export function CitationsSidebar({ isOpen, onClose, toolsUsed, cachedTools, messageId }: CitationsSidebarProps) {
+export function CitationsSidebar({ isOpen, onClose, toolsUsed, currentMessageId }: CitationsSidebarProps) {
   const [currentTab, setCurrentTab] = useState<"sources" | "tools">("tools")
   const [expandedTools, setExpandedTools] = useState<Record<string, boolean>>({})
-  const [showingCached, setShowingCached] = useState(false)
+  const [messageToolsMap, setMessageToolsMap] = useState<Record<string, ToolsUsed>>({})
   
-  // Use proper data source based on availability
-  const effectiveToolsUsed = toolsUsed && toolsUsed.tools_and_sources && toolsUsed.tools_and_sources.length > 0 
-    ? toolsUsed 
-    : cachedTools;
+  // Keep track of which message's tools are currently being displayed
+  const [activeMessageId, setActiveMessageId] = useState<string | null>(null)
   
-  // Set cached flag if we're showing cached data
+  // Update the message tools map when new tools come in
   useEffect(() => {
-    if (toolsUsed && toolsUsed.tools_and_sources && toolsUsed.tools_and_sources.length > 0) {
-      setShowingCached(false);
-    } else if (cachedTools && cachedTools.tools_and_sources && cachedTools.tools_and_sources.length > 0) {
-      setShowingCached(true);
+    if (currentMessageId && toolsUsed && toolsUsed.tools_and_sources && toolsUsed.tools_and_sources.length > 0) {
+      setMessageToolsMap(prev => ({
+        ...prev,
+        [currentMessageId]: toolsUsed
+      }));
+      
+      // Set active message to the current one
+      setActiveMessageId(currentMessageId);
     }
-  }, [toolsUsed, cachedTools]);
+  }, [currentMessageId, toolsUsed]);
+  
+  // Get the active tools to display
+  const getActiveTools = (): ToolsUsed => {
+    if (!activeMessageId) {
+      // If no active message, try the current message's tools
+      return currentMessageId && messageToolsMap[currentMessageId] 
+        ? messageToolsMap[currentMessageId] 
+        : { tools_and_sources: [] };
+    }
+    
+    // Return the tools for the active message
+    return messageToolsMap[activeMessageId] || { tools_and_sources: [] };
+  };
+  
+  const activeToolsUsed = getActiveTools();
 
   // Get all tools
   const getTools = (): Tool[] => {
-    if (!effectiveToolsUsed || !effectiveToolsUsed.tools_and_sources) {
+    if (!activeToolsUsed || !activeToolsUsed.tools_and_sources) {
       return [];
     }
     
-    return effectiveToolsUsed.tools_and_sources.sort((a, b) => a.order - b.order);
+    return activeToolsUsed.tools_and_sources.sort((a, b) => a.order - b.order);
   }
   
   const tools = getTools();
   
   // Extract all sources from all tools and sort by relevancy
   const getAllSources = (): Source[] => {
-    if (!effectiveToolsUsed || !effectiveToolsUsed.tools_and_sources) {
+    if (!activeToolsUsed || !activeToolsUsed.tools_and_sources) {
       return [];
     }
     
     // Collect all sources
     const allSources: Source[] = [];
-    effectiveToolsUsed.tools_and_sources.forEach(tool => {
+    activeToolsUsed.tools_and_sources.forEach(tool => {
       if (tool.sources && tool.sources.length > 0) {
         tool.sources.forEach(source => {
           if (source) {
@@ -96,11 +112,11 @@ export function CitationsSidebar({ isOpen, onClose, toolsUsed, cachedTools, mess
   
   // Whether any tools have sources
   const hasAnySources = (): boolean => {
-    if (!effectiveToolsUsed || !effectiveToolsUsed.tools_and_sources) {
+    if (!activeToolsUsed || !activeToolsUsed.tools_and_sources) {
       return false;
     }
     
-    return effectiveToolsUsed.tools_and_sources.some(tool => 
+    return activeToolsUsed.tools_and_sources.some(tool => 
       tool.sources && tool.sources.length > 0
     );
   }
@@ -112,6 +128,20 @@ export function CitationsSidebar({ isOpen, onClose, toolsUsed, cachedTools, mess
       [toolName]: !prev[toolName]
     }));
   }
+
+  // Function to handle opening source URLs
+  const openSourceUrl = (url: string) => {
+    if (!url) return;
+    
+    // Handle URLs that might be missing http/https
+    let formattedUrl = url;
+    if (!/^https?:\/\//i.test(url)) {
+      formattedUrl = `https://${url}`;
+    }
+    
+    // Open in new tab
+    window.open(formattedUrl, '_blank', 'noopener,noreferrer');
+  };
 
   // Initialize expanded state for each tool
   useEffect(() => {
@@ -145,9 +175,13 @@ export function CitationsSidebar({ isOpen, onClose, toolsUsed, cachedTools, mess
 
   if (!isOpen) return null
 
+  // Get available message IDs that have sources
+  const availableMessageIds = Object.keys(messageToolsMap);
+  const hasMultipleMessages = availableMessageIds.length > 1;
+
   return (
     <div
-      className="fixed inset-0 z-50 flex"
+      className={`fixed inset-0 z-50 ${isOpen ? 'block md:flex' : 'hidden'}`}
       onClick={(e) => {
         // Only close if clicking the overlay (not the sidebar itself)
         if (e.target === e.currentTarget) {
@@ -155,19 +189,34 @@ export function CitationsSidebar({ isOpen, onClose, toolsUsed, cachedTools, mess
         }
       }}
     >
+      {/* Mobile overlay - only visible on mobile to darken background */}
+      <div className="md:hidden absolute inset-0 bg-black bg-opacity-50"></div>
+      
       <div
         id="citations-sidebar"
-        className="bg-gray-100 dark:bg-gray-800 shadow-lg z-50 w-80 md:w-96 
-                  overflow-auto transition-transform duration-300 h-full"
+        className={`relative md:fixed inset-y-0 left-0 w-80 md:w-96 
+                  bg-gray-100 dark:bg-gray-800 shadow-lg z-50 
+                  overflow-auto transition-transform duration-300 h-full
+                  ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
         <div className="p-4">
           <div className="flex justify-between items-center mb-4">
             <div>
               <h2 className="text-xl font-bold dark:text-white">References</h2>
-              {showingCached && (
-                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                  Showing cached sources from previous response
-                </p>
+              {hasMultipleMessages && (
+                <div className="mt-1">
+                  <select 
+                    value={activeMessageId || ''} 
+                    onChange={(e) => setActiveMessageId(e.target.value)}
+                    className="text-xs bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded px-2 py-1 w-full"
+                  >
+                    {availableMessageIds.map(id => (
+                      <option key={id} value={id}>
+                        {id === currentMessageId ? 'Current message' : `Previous message ${id}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               )}
             </div>
             <button
@@ -213,14 +262,15 @@ export function CitationsSidebar({ isOpen, onClose, toolsUsed, cachedTools, mess
                       {source.name || source.title || "Source"}
                     </h3>
                     {source.url && (
-                      <a
-                        href={source.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 dark:text-blue-400 hover:underline text-xs mt-1 block"
-                      >
-                        {source.url}
-                      </a>
+                      <div className="flex items-center mt-1">
+                        <button
+                          onClick={() => openSourceUrl(source.url)}
+                          className="text-blue-600 dark:text-blue-400 hover:underline text-xs flex items-center"
+                        >
+                          <span className="truncate max-w-[250px]">{source.url}</span>
+                          <ExternalLink className="h-3 w-3 ml-1 flex-shrink-0" />
+                        </button>
+                      </div>
                     )}
                     {source.relevancy_score !== undefined && (
                       <div className="mt-1 flex items-center">
@@ -265,7 +315,10 @@ export function CitationsSidebar({ isOpen, onClose, toolsUsed, cachedTools, mess
                           {tool.tool_name}
                         </h3>
                         {tool.sources && tool.sources.length > 0 && (
-                          <button className="text-gray-500 p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-500">
+                          <button 
+                            className="text-gray-500 p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-500"
+                            aria-label={expandedTools[tool.tool_name] ? "Collapse sources" : "Expand sources"}
+                          >
                             {expandedTools[tool.tool_name] ? 
                               <ChevronUp className="h-4 w-4" /> : 
                               <ChevronDown className="h-4 w-4" />
@@ -305,14 +358,18 @@ export function CitationsSidebar({ isOpen, onClose, toolsUsed, cachedTools, mess
                                 </h4>
                                 
                                 {source.url && (
-                                  <a
-                                    href={source.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-blue-600 dark:text-blue-400 hover:underline text-xs block truncate"
-                                  >
-                                    {source.url}
-                                  </a>
+                                  <div className="flex items-center mt-1">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation(); // Prevent toggle from firing
+                                        openSourceUrl(source.url);
+                                      }}
+                                      className="text-blue-600 dark:text-blue-400 hover:underline text-xs flex items-center"
+                                    >
+                                      <span className="truncate max-w-[220px]">{source.url}</span>
+                                      <ExternalLink className="h-3 w-3 ml-1 flex-shrink-0" />
+                                    </button>
+                                  </div>
                                 )}
                                 
                                 {source.relevancy_score !== undefined && (
@@ -352,8 +409,8 @@ export function CitationsSidebar({ isOpen, onClose, toolsUsed, cachedTools, mess
         </div>
       </div>
       
-      {/* Main content push overlay - only on larger screens */}
-      <div className="hidden md:block flex-grow"></div>
+      {/* This is not an overlay on desktop - it's just a spacer */}
+      <div className="hidden md:block flex-grow" onClick={(e) => e.stopPropagation()}></div>
     </div>
   )
 }
