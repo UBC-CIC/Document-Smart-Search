@@ -25,32 +25,49 @@ interface CitationsSidebarProps {
   isOpen: boolean
   onClose: () => void
   toolsUsed?: ToolsUsed
+  cachedTools: ToolsUsed
+  messageId?: string
 }
 
-export function CitationsSidebar({ isOpen, onClose, toolsUsed }: CitationsSidebarProps) {
+export function CitationsSidebar({ isOpen, onClose, toolsUsed, cachedTools, messageId }: CitationsSidebarProps) {
   const [currentTab, setCurrentTab] = useState<"sources" | "tools">("tools")
   const [expandedTools, setExpandedTools] = useState<Record<string, boolean>>({})
+  const [showingCached, setShowingCached] = useState(false)
+  
+  // Use proper data source based on availability
+  const effectiveToolsUsed = toolsUsed && toolsUsed.tools_and_sources && toolsUsed.tools_and_sources.length > 0 
+    ? toolsUsed 
+    : cachedTools;
+  
+  // Set cached flag if we're showing cached data
+  useEffect(() => {
+    if (toolsUsed && toolsUsed.tools_and_sources && toolsUsed.tools_and_sources.length > 0) {
+      setShowingCached(false);
+    } else if (cachedTools && cachedTools.tools_and_sources && cachedTools.tools_and_sources.length > 0) {
+      setShowingCached(true);
+    }
+  }, [toolsUsed, cachedTools]);
 
   // Get all tools
   const getTools = (): Tool[] => {
-    if (!toolsUsed || !toolsUsed.tools_and_sources) {
+    if (!effectiveToolsUsed || !effectiveToolsUsed.tools_and_sources) {
       return [];
     }
     
-    return toolsUsed.tools_and_sources.sort((a, b) => a.order - b.order);
+    return effectiveToolsUsed.tools_and_sources.sort((a, b) => a.order - b.order);
   }
   
   const tools = getTools();
   
   // Extract all sources from all tools and sort by relevancy
   const getAllSources = (): Source[] => {
-    if (!toolsUsed || !toolsUsed.tools_and_sources) {
+    if (!effectiveToolsUsed || !effectiveToolsUsed.tools_and_sources) {
       return [];
     }
     
     // Collect all sources
     const allSources: Source[] = [];
-    toolsUsed.tools_and_sources.forEach(tool => {
+    effectiveToolsUsed.tools_and_sources.forEach(tool => {
       if (tool.sources && tool.sources.length > 0) {
         tool.sources.forEach(source => {
           if (source) {
@@ -79,11 +96,11 @@ export function CitationsSidebar({ isOpen, onClose, toolsUsed }: CitationsSideba
   
   // Whether any tools have sources
   const hasAnySources = (): boolean => {
-    if (!toolsUsed || !toolsUsed.tools_and_sources) {
+    if (!effectiveToolsUsed || !effectiveToolsUsed.tools_and_sources) {
       return false;
     }
     
-    return toolsUsed.tools_and_sources.some(tool => 
+    return effectiveToolsUsed.tools_and_sources.some(tool => 
       tool.sources && tool.sources.length > 0
     );
   }
@@ -145,7 +162,14 @@ export function CitationsSidebar({ isOpen, onClose, toolsUsed }: CitationsSideba
       >
         <div className="p-4">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold dark:text-white">References</h2>
+            <div>
+              <h2 className="text-xl font-bold dark:text-white">References</h2>
+              {showingCached && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                  Showing cached sources from previous response
+                </p>
+              )}
+            </div>
             <button
               onClick={onClose}
               className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full dark:text-gray-300"

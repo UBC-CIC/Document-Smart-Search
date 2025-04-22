@@ -1,7 +1,5 @@
 "use client"
 
-import mapleLeaf from "../../app/maple_leaf.png"
-
 import { useState, useRef, useEffect, useCallback } from "react"
 import { Search, Send, User, Mic, MicOff, RefreshCw, Download } from "lucide-react"
 import { CitationsSidebar } from "../components/citations-sidebar"
@@ -11,6 +9,8 @@ import { toast, ToastContainer } from "react-toastify"
 import "react-toastify/dist/ReactToastify.css"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
+
+import mapleLeaf from "../../app/maple_leaf.png"
 
 // Define message templates once to avoid duplication
 const INITIAL_GREETING = 
@@ -28,6 +28,10 @@ export default function SmartSearchAssistant() {
   const [feedback, setFeedback] = useState({ rating: 0, description: [] })
   const [isSendingFeedback, setIsSendingFeedback] = useState(false)
   const [showDisclaimer, setShowDisclaimer] = useState(false)
+  
+  // Add state for cached sources
+  const [cachedToolsUsed, setCachedToolsUsed] = useState({})
+  const [activeMessageId, setActiveMessageId] = useState(null)
 
   // State for the conversation history
   const [messages, setMessages] = useState([
@@ -286,33 +290,24 @@ export default function SmartSearchAssistant() {
       Type: "human",
       Content: selectedRole,
     };
-    
-    // Add user selection immediately
-    setMessages(prev => [...prev, userMessage]);
-    
-    // Show loading indicator
-    setIsLoading(true);
-    
-    // Add a slight delay (1 second) to simulate processing
-    setTimeout(() => {
-      // Add the welcome message directly in the frontend
-      const aiResponse = {
-        id: Date.now() + 1,
-        role: "assistant",
-        content: ROLE_SELECTION_RESPONSE,
-        options: [],
-        user_role: roleValue,
-        Type: "ai",
-        Content: ROLE_SELECTION_RESPONSE,
-        Options: [],
-      };
-      
-      // Add AI response to the chat history
-      setMessages(prev => [...prev, aiResponse]);
-      setIsLoading(false);
-    }, 1000);
+
+    // Add the welcome message directly in the frontend
+    const aiResponse = {
+      id: Date.now() + 1,
+      role: "assistant",
+      content: ROLE_SELECTION_RESPONSE,
+      options: [],
+      user_role: roleValue,
+      Type: "ai",
+      Content: ROLE_SELECTION_RESPONSE,
+      Options: [],
+    };
+
+    // Add both messages to the chat history
+    setMessages(prev => [...prev, userMessage, aiResponse]);
   };
 
+  // Modified sendMessage function to update cached tools when new sources are available
   const sendMessage = async (content, isOption = false) => {
     if (!session || !fingerprint || (!content.trim() && !isOption)) return
 
@@ -334,6 +329,10 @@ export default function SmartSearchAssistant() {
 
       // Handle role selection directly in the frontend without calling the backend
       if (isRoleSelection) {
+        // Simulate a time delay for a more natural feel
+        await new Promise((resolve) => setTimeout(resolve, 500))
+        
+        // Add the user message showing their selection
         handleRoleSelection(content)
         setIsLoading(false)
         return
@@ -374,12 +373,19 @@ export default function SmartSearchAssistant() {
       }
 
       const data = await response.json()
+      const messageId = Date.now() + 1;
+      
+      // Update cached tools and sources if this response has tools_used data
+      if (data.tools_used && Object.keys(data.tools_used).length > 0) {
+        setCachedToolsUsed(data.tools_used);
+        setActiveMessageId(messageId.toString());
+      }
 
       // Add the AI response to messages
       setMessages((prev) => [
         ...prev,
         {
-          id: (Date.now() + 1).toString(),
+          id: messageId.toString(),
           role: "assistant",
           content: data.content,
           options: data.options || [],
@@ -584,6 +590,8 @@ export default function SmartSearchAssistant() {
         isOpen={isSidebarOpen} 
         onClose={() => setIsSidebarOpen(false)} 
         toolsUsed={messages.length > 0 ? messages[messages.length - 1]?.tools_used : {}}
+        cachedTools={cachedToolsUsed}
+        messageId={activeMessageId}
       />
 
       {/* Main Content */}

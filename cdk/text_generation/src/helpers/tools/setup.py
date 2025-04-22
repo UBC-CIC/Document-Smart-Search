@@ -112,12 +112,12 @@ def initialize_tools(
         Tool(
             name="Document Categorization Results",
             func=document_tools.document_categorization_results_tool,
-            description="Returns document categorization and metadata for a given document URL."
+            description="Returns document categorization and metadata for a given document URL. Input must be a document URL."
         ),
         Tool(
             name="Document HTML Raw Text",
             func=document_tools.document_html_raw_text_tool,
-            description="Returns the cleaned HTML text content for a given document URL."
+            description="Returns the cleaned HTML text content for a given document URL. Input must be a document URL."
         ),
         Tool(
             name="Semantic HTML Page Search",
