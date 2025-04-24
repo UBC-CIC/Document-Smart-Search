@@ -17,6 +17,7 @@ import * as cognito from "aws-cdk-lib/aws-cognito";
 import { CfnJson } from "aws-cdk-lib";
 import { VpcStack } from "./vpc-stack";
 import { DatabaseStack } from "./database-stack";
+import { OpenSearchStack } from "./opensearch-stack";  
 import { parse, stringify } from "yaml";
 import { Fn } from "aws-cdk-lib";
 import { Asset } from "aws-cdk-lib/aws-s3-assets";
@@ -49,9 +50,28 @@ export class ApiGatewayStack extends cdk.Stack {
     id: string,
     db: DatabaseStack,
     vpcStack: VpcStack,
+    osStack: OpenSearchStack,       
     props?: cdk.StackProps
   ) {
     super(scope, id, props);
+
+
+
+
+    const osEndpoint = ssm.StringParameter.valueForStringParameter(
+      this,
+      `/${osStack.stackName}/opensearch/host`
+    );
+    const osUserSecretArn = ssm.StringParameter.valueForStringParameter(
+      this,
+      `/${osStack.stackName}/opensearch/user/secretArn`
+    );
+
+
+    const dbAdminSecret    = db.secretPathAdminName;
+    const dbUserSecret     = db.secretPathUser.secretName;
+    const dbProxyEndpoint  = db.rdsProxyEndpoint;
+
     this.layerList = {};
     const { embeddingStorageBucket, dataIngestionBucket } = createS3Buckets(
       this,
@@ -1088,5 +1108,43 @@ export class ApiGatewayStack extends cdk.Stack {
       action: "lambda:InvokeFunction",
       sourceArn: `arn:aws:execute-api:${this.region}:${this.account}:${this.api.restApiId}/*/*/admin*`,
     });
+
+    
+    
+    // 1) create the new Lambda
+    const searchFunction = new lambda.Function(this, `${id}-searchFunction`, {
+      runtime: lambda.Runtime.PYTHON_3_11,
+      code:    lambda.Code.fromAsset("lambda/searchFunction"),
+      handler: "index.handler",
+      timeout: Duration.seconds(10),
+      memorySize: 128,
+      vpc: vpcStack.vpc,
+      layers: [ this.layerList["opensearchLayer"] ],
+      environment: {
+        OPENSEARCH_ENDPOINT: osEndpoint,
+        OS_USER_SECRET_ARN: osUserSecretArn,
+        REGION: this.region,
+      },
+      role: lambdaRole,
+    });
+
+    // 2) grant it permissions
+    osStack.domain.grantRead(searchFunction);
+    searchFunction.addToRolePolicy(new iam.PolicyStatement({
+      actions: ["secretsmanager:GetSecretValue"],
+      resources: [ osUserSecretArn ]
+    }));
+
+    // 3) hook it into API Gateway
+    const searchIntegration = new apigateway.LambdaIntegration(searchFunction, { proxy: true });
+    const searchResource    = this.api.root.addResource("search");
+    searchResource.addMethod("GET", searchIntegration, {
+      authorizationType: apigateway.AuthorizationType.NONE,
+      requestParameters: {
+        "method.request.querystring.q": false
+      }
+    });
+
+
   }
 }

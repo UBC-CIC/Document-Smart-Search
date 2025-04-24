@@ -24,9 +24,6 @@ const vpcStack = new VpcStack(app, `${StackPrefix}-VpcStack`, { env });
 // 2) RDS
 const dbStack = new DatabaseStack(app, `${StackPrefix}-Database`, vpcStack, { env });
 
-// 3) API Gateway
-const apiStack = new ApiGatewayStack(app, `${StackPrefix}-Api`, dbStack, vpcStack, { env });
-
 // 4) OpenSearch
 const osStack = new OpenSearchStack(
   app,
@@ -35,7 +32,11 @@ const osStack = new OpenSearchStack(
   { env }
 );
 
-apiStack.addDependency(osStack);
+// 3) API Gateway
+const apiStack = new ApiGatewayStack(app, `${StackPrefix}-Api`, dbStack, vpcStack, osStack, { env });
+
+
+// apiStack.addDependency(osStack);
 
 // 5) DBFlow (wires in the RDS _and_ the OpenSearch initializers)
 const dbFlowStack = new DBFlowStack(
