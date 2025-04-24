@@ -198,7 +198,7 @@ export default function SmartSearchAssistant() {
     if (!sessionId) return
 
     try {
-      setShowDisclaimer(true) // Hide disclaimer while fetching messages
+      setShowDisclaimer(false) // Hide disclaimer when messages are fetched 
 
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_ENDPOINT}user/get_messages?session_id=${encodeURIComponent(sessionId)}`,
