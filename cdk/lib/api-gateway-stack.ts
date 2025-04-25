@@ -68,10 +68,6 @@ export class ApiGatewayStack extends cdk.Stack {
     );
 
 
-    const dbAdminSecret    = db.secretPathAdminName;
-    const dbUserSecret     = db.secretPathUser.secretName;
-    const dbProxyEndpoint  = db.rdsProxyEndpoint;
-
     this.layerList = {};
     const { embeddingStorageBucket, dataIngestionBucket } = createS3Buckets(
       this,
@@ -247,7 +243,7 @@ export class ApiGatewayStack extends cdk.Stack {
       runtime: lambda.Runtime.NODEJS_20_X,
       code: lambda.Code.fromAsset("lambda/lib"),
       handler: "userFunction.handler",
-      timeout: Duration.seconds(300),
+      timeout: Duration.seconds(900),
       vpc: vpcStack.vpc,
       environment: {
         SM_DB_CREDENTIALS: db.secretPathUser.secretName,
@@ -259,6 +255,8 @@ export class ApiGatewayStack extends cdk.Stack {
       layers: [postgres],
       role: lambdaRole,
     });
+
+    lambdaUserFunction.applyRemovalPolicy(cdk.RemovalPolicy.DESTROY);
 
     // Add the permission to the Lambda function's policy to allow API Gateway access
     lambdaUserFunction.addPermission("AllowApiGatewayInvoke", {
@@ -278,7 +276,7 @@ export class ApiGatewayStack extends cdk.Stack {
         runtime: lambda.Runtime.NODEJS_20_X,
         code: lambda.Code.fromAsset("lambda/adminFunction"),
         handler: "adminFunction.handler",
-        timeout: Duration.seconds(300),
+        timeout: Duration.seconds(900),
         vpc: vpcStack.vpc,
         environment: {
           SM_DB_CREDENTIALS: db.secretPathTableCreator.secretName,
@@ -290,6 +288,9 @@ export class ApiGatewayStack extends cdk.Stack {
         role: lambdaRole,
       }
     );
+
+    lambdaAdminFunction.applyRemovalPolicy(cdk.RemovalPolicy.DESTROY);
+
 
     // Add the permission to the Lambda function's policy to allow API Gateway access
     lambdaAdminFunction.addPermission("AllowApiGatewayInvoke", {
