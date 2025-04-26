@@ -5,14 +5,10 @@ from io import BytesIO
 import os
 import sys
 import asyncio
-
-import requests
 import re
 from typing import Union, Dict, Any, Tuple, List, Optional
-from itertools import islice
-from collections import defaultdict
 from pathlib import Path
-import datetime
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
@@ -326,7 +322,7 @@ def process_and_ingest_html_documents(client: OpenSearch, index_name: str, docum
         return 0
 
     # Bulk insert the documents and embeddings into OpenSearch.
-    # op.bulk_insert_html_documents(client, index_name=index_name, documents=valid_docs, vectors=html_embeddings.tolist())
+    op.bulk_insert_html_documents(client, index_name=index_name, documents=valid_docs, vectors=html_embeddings.tolist())
 
     return len(valid_docs)
 
