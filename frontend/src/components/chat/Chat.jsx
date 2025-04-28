@@ -13,14 +13,14 @@ import { useRouter } from "next/navigation"
 import mapleLeaf from "../../app/maple_leaf.png"
 
 // Define message templates once to avoid duplication
-const INITIAL_GREETING = 
+const INITIAL_GREETING =
   "Hello! I am a Smart Agent specialized in Fisheries and Oceans Canada (DFO). " +
   "I can help you with questions related to DFO documents, science advice, and more! " +
   "Please select the best role below that fits you. We can better answer your questions. " +
-  "Don't include personal details such as your name and private content.";
+  "Don't include personal details such as your name and private content."
 
-const ROLE_SELECTION_RESPONSE = 
-  "Thank you for selecting your role. How can I help you with your questions about Fisheries and Oceans Canada today?";
+const ROLE_SELECTION_RESPONSE =
+  "Thank you for selecting your role. How can I help you with your questions about Fisheries and Oceans Canada today?"
 
 export default function SmartSearchAssistant() {
   // Add these state variables to the component
@@ -28,7 +28,7 @@ export default function SmartSearchAssistant() {
   const [feedback, setFeedback] = useState({ rating: 0, description: [] })
   const [isSendingFeedback, setIsSendingFeedback] = useState(false)
   const [showDisclaimer, setShowDisclaimer] = useState(false)
-  
+
   // Track active message for source display
   const [currentMessageId, setCurrentMessageId] = useState(null)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
@@ -198,7 +198,7 @@ export default function SmartSearchAssistant() {
     if (!sessionId) return
 
     try {
-      setShowDisclaimer(false) // Hide disclaimer when messages are fetched 
+      setShowDisclaimer(false) // Hide disclaimer when messages are fetched
 
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_ENDPOINT}user/get_messages?session_id=${encodeURIComponent(sessionId)}`,
@@ -274,11 +274,11 @@ export default function SmartSearchAssistant() {
 
   // Handle when a user selects a role option
   const handleRoleSelection = async (selectedRole) => {
-    if (!session || !fingerprint) return;
-    
+    if (!session || !fingerprint) return
+
     // Convert the role to the proper format for later use
-    const roleValue = selectedRole === "General Public" ? "public" : "researcher";
-    
+    const roleValue = selectedRole === "General Public" ? "public" : "researcher"
+
     // Add the user message showing their selection
     const userMessage = {
       id: Date.now().toString(),
@@ -286,7 +286,7 @@ export default function SmartSearchAssistant() {
       content: selectedRole,
       Type: "human",
       Content: selectedRole,
-    };
+    }
 
     // Add the welcome message directly in the frontend
     const aiResponse = {
@@ -298,17 +298,17 @@ export default function SmartSearchAssistant() {
       Type: "ai",
       Content: ROLE_SELECTION_RESPONSE,
       Options: [],
-    };
+    }
 
     // Add user messages to the chat history
-    setMessages(prev => [...prev, userMessage]);
+    setMessages((prev) => [...prev, userMessage])
 
     // Sleep for a bit to simulate a delay for user experience
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    await new Promise((resolve) => setTimeout(resolve, 1500))
 
     // Add the AI response to the chat history
-    setMessages(prev => [...prev, aiResponse]);
-  };
+    setMessages((prev) => [...prev, aiResponse])
+  }
 
   // Modified sendMessage function to update current message ID for sources display
   const sendMessage = async (content, isOption = false) => {
@@ -327,8 +327,8 @@ export default function SmartSearchAssistant() {
 
     try {
       // Check if this is a role selection message (first message and is one of the role options)
-      const isRoleSelection = currentMessages.length === 1 && isOption && 
-        (content === "General Public" || content === "Researcher")
+      const isRoleSelection =
+        currentMessages.length === 1 && isOption && (content === "General Public" || content === "Researcher")
 
       // Handle role selection directly in the frontend without calling the backend
       if (isRoleSelection) {
@@ -352,7 +352,7 @@ export default function SmartSearchAssistant() {
       // Send to backend for LLM processing
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_ENDPOINT}user/text_generation?session_id=${encodeURIComponent(
-          session
+          session,
         )}&user_info=${encodeURIComponent(fingerprint)}`,
         {
           method: "POST",
@@ -373,11 +373,11 @@ export default function SmartSearchAssistant() {
       }
 
       const data = await response.json()
-      const messageId = Date.now() + 1;
-      
+      const messageId = Date.now() + 1
+
       // Update current message ID for sources display
       if (data.tools_used && Object.keys(data.tools_used).length > 0) {
-        setCurrentMessageId(messageId.toString());
+        setCurrentMessageId(messageId.toString())
       }
 
       // Add the AI response to messages
@@ -400,7 +400,7 @@ export default function SmartSearchAssistant() {
 
       // If tools were used, open sidebar to show sources
       if (data.tools_used && Object.keys(data.tools_used).length > 0) {
-        setIsSidebarOpen(true);
+        setIsSidebarOpen(true)
       }
     } catch (error) {
       console.error("Error sending message:", error.message)
@@ -584,18 +584,38 @@ export default function SmartSearchAssistant() {
   }
 
   return (
-    <div className={`min-h-screen bg-white transition-all duration-300 flex flex-col ${isSidebarOpen ? 'md:ml-96' : ''}`}>
-      <CitationsSidebar 
-        isOpen={isSidebarOpen} 
-        onClose={() => setIsSidebarOpen(false)} 
-        toolsUsed={messages.length > 0 ? 
-          (currentMessageId ? 
-            messages.find(m => m.id === currentMessageId)?.tools_used : 
-            messages[messages.length - 1]?.tools_used) 
-          : {}
-        }
-        currentMessageId={currentMessageId}
-      />
+    <div
+      className={`min-h-screen bg-white transition-all duration-300 flex flex-col ${isSidebarOpen ? "md:ml-96" : ""}`}
+    >
+      {/* This is the key change - add pointer-events-none to the container and pointer-events-auto to the actual sidebar */}
+      <div className={`fixed inset-0 z-40 pointer-events-none ${isSidebarOpen ? "visible" : "invisible"}`}>
+        <div
+          className={`absolute inset-y-0 left-0 w-96 bg-white shadow-lg transform transition-transform duration-300 pointer-events-auto ${
+            isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
+        >
+          <CitationsSidebar
+            isOpen={isSidebarOpen}
+            onClose={() => setIsSidebarOpen(false)}
+            toolsUsed={
+              messages.length > 0
+                ? currentMessageId
+                  ? messages.find((m) => m.id === currentMessageId)?.tools_used
+                  : messages[messages.length - 1]?.tools_used
+                : {}
+            }
+            currentMessageId={currentMessageId}
+          />
+        </div>
+        {/* Add a backdrop that can be clicked to close the sidebar on mobile */}
+        <div
+          className={`absolute inset-0 bg-black bg-opacity-25 md:hidden transition-opacity duration-300 ${
+            isSidebarOpen ? "opacity-100" : "opacity-0"
+          }`}
+          onClick={() => setIsSidebarOpen(false)}
+          style={{ pointerEvents: isSidebarOpen ? "auto" : "none" }}
+        ></div>
+      </div>
 
       {/* Main Content */}
       <main className="max-w-6xl mx-auto px-4 py-6 md:py-8 flex-grow flex flex-col">
@@ -662,20 +682,22 @@ export default function SmartSearchAssistant() {
                       </button>
                     )}
 
-                    {message.role === "assistant" && message.tools_used && Object.keys(message.tools_used).length > 0 && (
-                      <div className="flex justify-end mt-2">
-                        <button
-                          className="bg-gray-400 hover:bg-gray-500 text-white px-3 py-1 rounded flex items-center w-fit"
-                          onClick={() => {
-                            setCurrentMessageId(message.id);
-                            setIsSidebarOpen(true);
-                          }}
-                        >
-                          <Search className="h-4 w-4 mr-1" />
-                          Sources
-                        </button>
-                      </div>
-                    )}
+                    {message.role === "assistant" &&
+                      message.tools_used &&
+                      Object.keys(message.tools_used).length > 0 && (
+                        <div className="flex justify-end mt-2">
+                          <button
+                            className="bg-gray-400 hover:bg-gray-500 text-white px-3 py-1 rounded flex items-center w-fit"
+                            onClick={() => {
+                              setCurrentMessageId(message.id)
+                              setIsSidebarOpen(true)
+                            }}
+                          >
+                            <Search className="h-4 w-4 mr-1" />
+                            Sources
+                          </button>
+                        </div>
+                      )}
                   </div>
                 </div>
               )}
