@@ -357,6 +357,69 @@ paths:
         passthroughBehavior: "when_no_match"
         httpMethod: "POST"
         type: "aws_proxy"
+
+  /user/filters:
+    options:
+      summary: CORS support for filters
+      description: |
+        Enable CORS by returning correct headers
+      responses:
+        200:
+          $ref: "#/components/responses/Success"
+      x-amazon-apigateway-integration:
+        type: mock
+        requestTemplates:
+          application/json: |
+            {
+              "statusCode" : 200
+            }
+        responses:
+          default:
+            statusCode: "200"
+            responseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key'"
+              method.response.header.Access-Control-Allow-Methods: "'*'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            responseTemplates:
+              application/json: |
+                {}
+
+    get:
+      tags:
+        - User
+      summary: Get available filter options (topics, mandates, years)
+      operationId: user_get_filters_GET
+      responses:
+        "200":
+          description: Successfully retrieved available filter options
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  topics:
+                    type: array
+                    items:
+                      type: string
+                    description: List of available topics
+                  mandates:
+                    type: array
+                    items:
+                      type: string
+                    description: List of available mandates
+                  years:
+                    type: array
+                    items:
+                      type: string
+                    description: List of available years
+        "500":
+          description: Internal Server Error
+      x-amazon-apigateway-integration:
+        uri:
+          Fn::Sub: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${getFiltersFunction.Arn}/invocations"
+        passthroughBehavior: "when_no_match"
+        httpMethod: "GET"
+        type: "aws_proxy" 
   
   /admin/analytics:
     options:
