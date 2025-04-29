@@ -22,10 +22,7 @@ INITIAL_GREETING = {
                 "I can help you with questions related to DFO documents, science advice, and more!"
                 "\nPlease select the best role below that fits you. We can better answer your questions."
                 "Don't include personal details such as your name and private content."),
-    "options": [
-        "General Public", 
-        "Researcher"
-    ]
+    "options": ["General Public", "Internal Researcher", "Policy Maker", "External Researcher"]
 }
 
 # Define the welcome message after role selection
@@ -310,7 +307,9 @@ def get_prompt_for_role(conn, user_role: str) -> Optional[str]:
             # Map valid roles to column names
             role_column_mapping = {
                 "public": "public",
-                "researcher": "researcher"
+                "internal_researcher": "internal_researcher",
+                "policy_maker": "policy_maker",
+                "external_researcher": "external_researcher"
             }
             
             # Validate user_role and get corresponding column name

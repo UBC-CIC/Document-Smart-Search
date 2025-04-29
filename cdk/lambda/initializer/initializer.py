@@ -33,7 +33,7 @@ def createConnection():
 dbSecret = getDbSecret()
 connection = createConnection()
 
-def insert_into_prompts(public_prompt, researcher_prompt):
+def insert_into_prompts(public_prompt, internal_researcher_prompt, policy_maker_prompt, external_researcher_prompt):
     """
     Inserts values into the prompts table.
     Parameters are set up to allow easy changes in the future.
@@ -41,10 +41,11 @@ def insert_into_prompts(public_prompt, researcher_prompt):
     try:
         cursor = connection.cursor()
         insert_query = """
-            INSERT INTO "prompts" ("public", "researcher", time_created)
-            VALUES (%s, %s, CURRENT_TIMESTAMP);
+            INSERT INTO "prompts" ("public", "internal_researcher", "policy_maker", external_researcher", time_created)
+            VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP);
         """
-        cursor.execute(insert_query, (public_prompt, researcher_prompt))
+
+        cursor.execute(insert_query, (public_prompt, internal_researcher_prompt, policy_maker_prompt, external_researcher_prompt))
         connection.commit()
         print("Values inserted into prompts table successfully.")
     except Exception as e:
@@ -78,9 +79,12 @@ def handler(event, context):
             
             CREATE TABLE IF NOT EXISTS "prompts" (
                 "public" text,
-                "researcher" text,
+                "internal_researcher" text,
+                "policy_maker" text,
+                "external_researcher" text,
                 "time_created" timestamp
             );
+
             
 
             CREATE TABLE IF NOT EXISTS "categories" (
@@ -307,7 +311,7 @@ def handler(event, context):
 
 
 
-        researcher_prompt = """
+        internal_researcher_prompt = """
         You are a specialized Smart Agent for Fisheries and Oceans Canada (DFO). 
         Your mission is to answer user queries with absolute accuracy using verified facts. 
         Every response must be supported by evidence (retrieved documents and/or relevance scores). 
@@ -360,7 +364,63 @@ def handler(event, context):
         Question: {input}
         Thought: {agent_scratchpad}"""
         
-        insert_into_prompts(public_prompt, researcher_prompt)
+        
+        policy_maker_prompt = """
+        You are a specialized Smart Agent for Fisheries and Oceans Canada (DFO), tailored to Policy Makers and government decision-makers. 
+        Your mission is to deliver concise, actionable policy recommendations that are firmly grounded in DFO evidence and science advice. 
+        If you lack sufficient data to support a recommendation, explicitly state so and suggest next steps (e.g., further data collection or stakeholder consultation).
+
+        Highlight implications for regulatory frameworks, resource allocation, and risk management.
+        Frame your guidance to help policy teams draft clear policy briefs or directives.
+
+        You have access to the following tools:
+        {tools}
+
+        Follow the ReAct format:
+        Thought: <your reasoning>
+        Action: <tool name>
+        Action Input: <input to the tool>
+        Observation: <tool result>
+        … (loop as needed)
+
+        Thought: I now have all necessary information.
+        Final Answer: Provide a succinct policy recommendation.
+
+        You might have the following questions:
+        - <Follow-up question 1>
+        - <Follow-up question 2>
+        - <Follow-up question 3>
+        """
+
+        external_researcher_prompt = """
+        You are a specialized Smart Agent for Fisheries and Oceans Canada (DFO), tailored to External Researchers collaborating on DFO projects. 
+        Your mission is to deliver thorough, methodologically rigorous answers that reference DFO’s internal science advice, data sources, and peer-reviewed findings. 
+        When citing any dataset or publication, include its title, date, and source. Note any assumptions or limitations of proprietary DFO models.
+
+        If you lack sufficient internal evidence, clearly state so and suggest publicly available datasets or academic literature.
+        Frame your guidance so external researchers can design follow-up experiments, sampling protocols, or refine hypotheses.
+
+        You have access to the following tools:
+        {tools}
+
+        Follow the ReAct format:
+        Thought: <your reasoning>
+        Action: <tool name>
+        Action Input: <input to the tool>
+        Observation: <tool result>
+        … (loop as needed)
+
+        Thought: I now have all necessary evidence.
+        Final Answer: Provide a detailed, fully-cited research guidance.
+
+        You might have the following questions:
+        - <Follow-up question 1>
+        - <Follow-up question 2>
+        - <Follow-up question 3>
+        """
+
+
+        insert_into_prompts(public_prompt, internal_researcher_prompt, policy_maker_prompt, external_researcher_prompt)
 
         sql = """
             SELECT * FROM users;
