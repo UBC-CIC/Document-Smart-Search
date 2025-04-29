@@ -14,7 +14,6 @@ import {
   Runtime,
 } from "aws-cdk-lib/aws-lambda";
 import * as cognito from "aws-cdk-lib/aws-cognito";
-import { CfnJson } from "aws-cdk-lib";
 import { VpcStack } from "./vpc-stack";
 import { DatabaseStack } from "./database-stack";
 import { OpenSearchStack } from "./opensearch-stack";  
@@ -22,13 +21,12 @@ import { parse, stringify } from "yaml";
 import { Fn } from "aws-cdk-lib";
 import { Asset } from "aws-cdk-lib/aws-s3-assets";
 import * as s3 from "aws-cdk-lib/aws-s3";
-import * as bedrock from "aws-cdk-lib/aws-bedrock";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
-import { SecretValue } from "aws-cdk-lib";
 import { createCognitoResources } from "./api-gateway-helpers/cognito";
 import { createS3Buckets } from "./api-gateway-helpers/s3";
 import { createLayers } from "./api-gateway-helpers/layers";
 import { createRolesAndPolicies } from "./api-gateway-helpers/roles";
+import { DockerImageAsset, Platform } from 'aws-cdk-lib/aws-ecr-assets';
 
 export class ApiGatewayStack extends cdk.Stack {
   private readonly api: apigateway.SpecRestApi;
@@ -67,10 +65,6 @@ export class ApiGatewayStack extends cdk.Stack {
       `/${osStack.stackName}/opensearch/user/secretArn`
     );
 
-
-    const dbAdminSecret    = db.secretPathAdminName;
-    const dbUserSecret     = db.secretPathUser.secretName;
-    const dbProxyEndpoint  = db.rdsProxyEndpoint;
 
     this.layerList = {};
     const { embeddingStorageBucket, dataIngestionBucket } = createS3Buckets(
@@ -247,7 +241,7 @@ export class ApiGatewayStack extends cdk.Stack {
       runtime: lambda.Runtime.NODEJS_20_X,
       code: lambda.Code.fromAsset("lambda/lib"),
       handler: "userFunction.handler",
-      timeout: Duration.seconds(300),
+      timeout: Duration.seconds(900),
       vpc: vpcStack.vpc,
       environment: {
         SM_DB_CREDENTIALS: db.secretPathUser.secretName,
@@ -259,6 +253,8 @@ export class ApiGatewayStack extends cdk.Stack {
       layers: [postgres],
       role: lambdaRole,
     });
+
+    lambdaUserFunction.applyRemovalPolicy(cdk.RemovalPolicy.DESTROY);
 
     // Add the permission to the Lambda function's policy to allow API Gateway access
     lambdaUserFunction.addPermission("AllowApiGatewayInvoke", {
@@ -278,7 +274,7 @@ export class ApiGatewayStack extends cdk.Stack {
         runtime: lambda.Runtime.NODEJS_20_X,
         code: lambda.Code.fromAsset("lambda/adminFunction"),
         handler: "adminFunction.handler",
-        timeout: Duration.seconds(300),
+        timeout: Duration.seconds(900),
         vpc: vpcStack.vpc,
         environment: {
           SM_DB_CREDENTIALS: db.secretPathTableCreator.secretName,
@@ -290,6 +286,9 @@ export class ApiGatewayStack extends cdk.Stack {
         role: lambdaRole,
       }
     );
+
+    lambdaAdminFunction.applyRemovalPolicy(cdk.RemovalPolicy.DESTROY);
+
 
     // Add the permission to the Lambda function's policy to allow API Gateway access
     lambdaAdminFunction.addPermission("AllowApiGatewayInvoke", {
@@ -588,7 +587,9 @@ export class ApiGatewayStack extends cdk.Stack {
       this,
       `${id}-TextGenFunction`,
       {
-        code: lambda.DockerImageCode.fromImageAsset("./text_generation"),
+        code: lambda.DockerImageCode.fromImageAsset("./text_generation", {
+          platform: Platform.LINUX_AMD64
+        }),
         memorySize: 512,
         timeout: cdk.Duration.seconds(300),
         vpc: vpcStack.vpc, // Pass the VPC
@@ -632,7 +633,25 @@ export class ApiGatewayStack extends cdk.Stack {
 
     // Attach the custom Bedrock policy to Lambda function
     textGenFunc.addToRolePolicy(bedrockPolicyStatement);
-
+    
+    // TODO: Restrict this later!
+    textGenFunc.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ["ssm:*"],
+        resources: ["arn:aws:ssm:*:*:parameter/*"],
+      })
+    );
+    
+    // TODO: Restrict this later!
+    textGenFunc.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ["bedrock:*"],
+        resources: ["*"],
+      })
+    );
+    
     // Grant access to Secret Manager
     textGenFunc.addToRolePolicy(
       new iam.PolicyStatement({
