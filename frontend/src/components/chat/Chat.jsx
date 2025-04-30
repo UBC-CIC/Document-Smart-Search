@@ -39,7 +39,7 @@ export default function SmartSearchAssistant() {
       id: "initial",
       role: "assistant",
       content: INITIAL_GREETING,
-      options: ["General Public", "Researcher"],
+      options: ["General Public", "Internal Researcher", "Policy Maker", "External Researcher"],
       user_role: "",
     },
   ])
@@ -143,7 +143,9 @@ export default function SmartSearchAssistant() {
 
     const content = (firstHumanMessage.content || firstHumanMessage.Content || "").toLowerCase()
     if (content.includes("public")) return "public"
-    if (content.includes("researcher")) return "researcher"
+    if (content.includes("internal researcher")) return "internal_researcher"
+    if (content.includes("policy maker")) return "policy_maker"
+    if (content.includes("external researcher")) return "external_researcher"
     return ""
   }
 
@@ -179,7 +181,7 @@ export default function SmartSearchAssistant() {
           id: "initial",
           role: "assistant",
           content: INITIAL_GREETING,
-          options: ["General Public", "Researcher"],
+          options: ["General Public", "Internal Researcher", "Policy Maker", "External Researcher"],
           user_role: "",
         },
       ])
@@ -216,7 +218,7 @@ export default function SmartSearchAssistant() {
             id: "initial",
             role: "assistant",
             content: INITIAL_GREETING,
-            options: ["General Public", "Researcher"],
+            options: ["General Public", "Internal Researcher", "Policy Maker", "External Researcher"],
             user_role: "",
           },
         ])
@@ -252,7 +254,7 @@ export default function SmartSearchAssistant() {
           id: "initial",
           role: "assistant",
           content: INITIAL_GREETING,
-          options: ["General Public", "Researcher"],
+          options: ["General Public", "Internal Researcher", "Policy Maker", "External Researcher"],
           user_role: "",
         })
       }
@@ -265,7 +267,7 @@ export default function SmartSearchAssistant() {
           id: "initial",
           role: "assistant",
           content: INITIAL_GREETING,
-          options: ["General Public", "Researcher"],
+          options: ["General Public", "Internal Researcher", "Policy Maker", "External Researcher"],
           user_role: "",
         },
       ])
@@ -277,8 +279,25 @@ export default function SmartSearchAssistant() {
     if (!session || !fingerprint) return
 
     // Convert the role to the proper format for later use
-    const roleValue = selectedRole === "General Public" ? "public" : "researcher"
+    // const roleValue = selectedRole === "General Public" ? "public" : "researcher"
 
+    let roleValue
+    switch (selectedRole) {
+      case "General Public":
+        roleValue = "public"
+        break
+      case "Internal Researcher":
+        roleValue = "internal_researcher"
+        break
+      case "Policy Maker":
+        roleValue = "policy_maker"
+        break
+      case "External Researcher":
+        roleValue = "external_researcher"
+        break
+      default:
+        roleValue = "public"
+    }
     // Add the user message showing their selection
     const userMessage = {
       id: Date.now().toString(),
@@ -328,7 +347,7 @@ export default function SmartSearchAssistant() {
     try {
       // Check if this is a role selection message (first message and is one of the role options)
       const isRoleSelection =
-        currentMessages.length === 1 && isOption && (content === "General Public" || content === "Researcher")
+        currentMessages.length === 1 && isOption && (content === "General Public" || content === "Internal Researcher" || content === "Policy Maker" || content === "External Researcher")
 
       // Handle role selection directly in the frontend without calling the backend
       if (isRoleSelection) {
