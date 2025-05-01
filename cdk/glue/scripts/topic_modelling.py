@@ -516,7 +516,7 @@ def bulk_upsert_documents_derived_topic(documents_derived_topic_table, conn_info
             cur.executemany(sql, data)
         conn.commit()
 
-def main():
+def main(dryrun=False):
     # docs_df = fetch_and_prepare_documents().query("csas_html_year == 2017 & html_language == 'English'")
     docs_df = fetch_and_prepare_documents().query("html_language == 'English'")
     topic_model, docs, topic_infos = train_and_label_main_topics(docs_df)
@@ -535,8 +535,9 @@ def main():
         combined_df, topic_infos, outlier_topic_infos
     )
 
-    bulk_upsert_derived_topics(derived_topics_table, conn_info)
-    bulk_upsert_documents_derived_topic(documents_derived_topic_table, conn_info)
+    if not dryrun:
+        bulk_upsert_derived_topics(derived_topics_table, conn_info)
+        bulk_upsert_documents_derived_topic(documents_derived_topic_table, conn_info)
     
     # save the dataset that it was trained on
     # docs_df.csv("../export/bertopic/train_data.csv", index=False)
@@ -562,4 +563,4 @@ def main():
     
 
 if __name__ == "__main__":
-    main()
+    main(dryrun=False)

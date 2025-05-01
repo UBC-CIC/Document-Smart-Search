@@ -313,7 +313,9 @@ def get_embeddings_for_documents(documents: list[Document], embedder, failed_emb
 
 
 # Process and ingest HTML documents with error handling for embedding failures.
-def process_and_ingest_html_documents(client: OpenSearch, index_name: str, documents: list[Document], embedder, failed_embeddings_metadata) -> int:
+def process_and_ingest_html_documents(
+    client: OpenSearch, index_name: str, documents: list[Document], embedder, failed_embeddings_metadata, dryrun
+) -> int:
     # Compute embeddings for the documents, obtaining only the valid ones.
     valid_docs, html_embeddings = get_embeddings_for_documents(documents, embedder, failed_embeddings_metadata)
 
@@ -322,7 +324,8 @@ def process_and_ingest_html_documents(client: OpenSearch, index_name: str, docum
         return 0
 
     # Bulk insert the documents and embeddings into OpenSearch.
-    op.bulk_insert_html_documents(client, index_name=index_name, documents=valid_docs, vectors=html_embeddings.tolist())
+    if not dryrun:
+        op.bulk_insert_html_documents(client, index_name=index_name, documents=valid_docs, vectors=html_embeddings.tolist())
 
     return len(valid_docs)
 
@@ -389,7 +392,7 @@ def existing_document_is_valid(doc, client, index, enable_override):
     # Validate the stored document.
     return is_valid_document(existing_doc)
 
-async def process_html_docs(html_docs, enable_override=False):
+async def process_html_docs(html_docs, enable_override=False, dryrun=False):
     """
     Process a list of HTML documents by filtering (unless override is enabled), downloading,
     extracting information, and ingesting into the index.
@@ -435,7 +438,7 @@ async def process_html_docs(html_docs, enable_override=False):
     
     # Process and ingest the documents (only those with successful embeddings).
     failed_embeddings_metadata = []
-    ingested_count = process_and_ingest_html_documents(client, DFO_HTML_FULL_INDEX_NAME, docs, embedder, failed_embeddings_metadata)
+    ingested_count = process_and_ingest_html_documents(client, DFO_HTML_FULL_INDEX_NAME, docs, embedder, failed_embeddings_metadata, dryrun=dryrun)
     
     # Count failures: extraction failures plus those that failed embedding.
     docs_failed = len(unloaded_docs) + (len(docs) - ingested_count)
@@ -451,7 +454,7 @@ async def process_html_docs(html_docs, enable_override=False):
         "mismatched_years": mismatched_years
     }
 
-async def process_events(html_event_to_html_documents, enable_override=False):
+async def process_events(html_event_to_html_documents, enable_override=False, dryrun=False):
     """
     Process a dictionary of CSAS events where each event has a list of associated HTML documents.
     This function aggregates processing statistics from all events.
@@ -480,7 +483,11 @@ async def process_events(html_event_to_html_documents, enable_override=False):
         print(f"{i}/{total_events} Processing CSAS Event: {csas_event}")
 
         # Process the HTML documents for the current event.
-        stats = await process_html_docs(html_docs, enable_override=enable_override)
+        stats = await process_html_docs(
+            html_docs, 
+            enable_override=enable_override,
+            dryrun=dryrun
+        )
 
         overall_stats["total_docs_processed"] += stats["ingested_count"]
         overall_stats["total_docs_failed"] += stats["docs_failed"]
@@ -494,7 +501,7 @@ async def process_events(html_event_to_html_documents, enable_override=False):
     return overall_stats
 
 
-async def main():
+async def main(dryrun=False):
     
     # Get the url to content
     html_dict_subset = load_html_data_from_excel() # a df of pdf files
@@ -504,7 +511,11 @@ async def main():
 
     html_event_to_html_documents = get_html_event_to_html_documents(html_dict_subset)
 
-    overall_stats = await process_events(html_event_to_html_documents, enable_override=False)
+    overall_stats = await process_events(
+        html_event_to_html_documents, 
+        enable_override=False,
+        dryrun=dryrun
+    )
 
     total_events = overall_stats['total_events']
     ingested_count = overall_stats['total_docs_processed']
@@ -537,4 +548,4 @@ async def main():
     df.to_csv("ingestion_docs/too_long_docs.csv")
     
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(main(dryrun=False))
