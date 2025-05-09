@@ -694,6 +694,45 @@ export class ApiGatewayStack extends cdk.Stack {
       })
     );
 
+        /**
+     *
+     * Create Lambda with container image for text generation workflow in RAG pipeline
+     */
+        const searchFunc = new lambda.DockerImageFunction(
+          this,
+          `${id}-SearchFunction`,
+          {
+            code: lambda.DockerImageCode.fromImageAsset("./lambda/searchFunction", {
+              platform: Platform.LINUX_AMD64
+            }),
+            memorySize: 512,
+            timeout: cdk.Duration.seconds(300),
+            vpc: vpcStack.vpc, // Pass the VPC
+            functionName: `${id}-SearchFunction`,
+            environment: {
+              SM_DB_CREDENTIALS: db.secretPathUser.secretName,
+              RDS_PROXY_ENDPOINT: db.rdsProxyEndpoint,
+              REGION: this.region,
+              BEDROCK_LLM_PARAM: bedrockLLMParameter.parameterName,
+              EMBEDDING_MODEL_PARAM: embeddingModelParameter.parameterName,
+              TABLE_NAME_PARAM: tableNameParameter.parameterName,
+            },
+          }
+        );
+    
+        // Override the Logical ID of the Lambda Function to get ARN in OpenAPI
+        const cfnSearchDockerFunc = searchFunc.node
+          .defaultChild as lambda.CfnFunction;
+        cfnSearchDockerFunc.overrideLogicalId("SearchLambdaDockerFunction");
+    
+        // Add the permission to the Lambda function's policy to allow API Gateway access
+        searchFunc.addPermission("AllowApiGatewayInvoke", {
+          principal: new iam.ServicePrincipal("apigateway.amazonaws.com"),
+          action: "lambda:InvokeFunction",
+          sourceArn: `arn:aws:execute-api:${this.region}:${this.account}:${this.api.restApiId}/*/*/user*`,
+        });
+    
+
     // Create the Lambda function for generating presigned URLs
     const generatePreSignedURL = new lambda.Function(
       this,
