@@ -1,6 +1,17 @@
-pandas
+# Core AWS and OpenSearch
+boto3
 opensearch-py
+
+# Document and embedding processing
+pandas
+torch
+
+# LangChain core and community integrations
 langchain
 langchain-community
 langchain-huggingface
-torch
+jq
+
+# HuggingFace embeddings:
+sentence-transformers
+transformers
