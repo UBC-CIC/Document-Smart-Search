@@ -369,6 +369,8 @@ def extract_doc_information(html_docs, pages):
         metadata['pdf_url'] = info['download_url']
         metadata['html_language'] = info['language']
         metadata['html_page_title'] = info['title']
+        metadata['subject'] = info['subject']
+        metadata['authors'] = info['cleaned_authors']
         metadata['html_year'] = extract_document_year_from_title(info['title'])
         metadata['html_doc_type'] = extract_doc_type(info['title'])
 
