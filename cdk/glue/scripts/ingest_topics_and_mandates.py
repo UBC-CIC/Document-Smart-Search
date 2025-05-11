@@ -1,46 +1,122 @@
+#!/usr/bin/env python
+# coding: utf-8
+
 from io import BytesIO
 import os
 import sys
 import re
+import ast
 from typing import Union, Dict, Any, Tuple, List, Optional
 from pathlib import Path
 from datetime import datetime
 
 import numpy as np
 import pandas as pd
+import boto3
 from opensearchpy import OpenSearch
 from langchain_core.documents import Document
 from langchain_aws.embeddings import BedrockEmbeddings
 from langchain_community.vectorstores import OpenSearchVectorSearch
+from awsglue.utils import getResolvedOptions
 
-sys.path.append("..")
 import src.aws_utils as aws
 import src.opensearch as op
 
-from constants import (
-    OPENSEARCH_SEC,
-    OPENSEARCH_HOST,
-    REGION_NAME,
-    EMBEDDING_MODEL,
-    EMBEDDING_DIM,
-)
-
-
-session = aws.session
-
-# these will be environment variables
-DATETIME = datetime.now().strftime(r"%Y-%m-%d %H:%M:%S") # to be replaced with environment var
+# Constants
+# Index Names
 DFO_HTML_FULL_INDEX_NAME = "dfo-html-full-index"
 DFO_TOPIC_FULL_INDEX_NAME = "dfo-topic-full-index"
 DFO_MANDATE_FULL_INDEX_NAME = "dfo-mandate-full-index"
 
+# Get job parameters
+args = getResolvedOptions(sys.argv, [
+    'JOB_NAME',
+    'topics_path',
+    'mandates_path',
+    'subcategories_path',
+    'batch_id',
+    'region_name',
+    'embedding_model',
+    'opensearch_secret',
+    'opensearch_host'
+])
+
+# Paths
+TOPICS_PATH = args['topics_path']
+MANDATES_PATH = args['mandates_path']
+SUBCATEGORIES_PATH = args['subcategories_path']
+BATCH_ID = args['batch_id']
+
+# AWS Configuration
+REGION_NAME = args['region_name']
+EMBEDDING_MODEL = args['embedding_model']
+
+# OpenSearch Configuration
+OPENSEARCH_SEC = args['opensearch_secret']
+OPENSEARCH_HOST = args['opensearch_host']
+
+# Runtime Variables
+CURRENT_DATETIME = datetime.now().strftime(r"%Y-%m-%d %H:%M:%S")
+
+session = aws.session
+
+def load_csv_from_s3(s3_path: str) -> pd.DataFrame:
+    """
+    Load CSV data from S3.
+    
+    Args:
+        s3_path: S3 path to the CSV file (e.g., 's3://bucket/path/to/file.csv')
+        
+    Returns:
+        pd.DataFrame: DataFrame containing the CSV data
+    """
+    s3 = boto3.client('s3')
+    bucket, key = s3_path.replace('s3://', '').split('/', 1)
+    
+    try:
+        response = s3.get_object(Bucket=bucket, Key=key)
+        csv_data = response['Body'].read()
+        return pd.read_csv(BytesIO(csv_data))
+    except Exception as e:
+        print(f"Error loading CSV data from S3: {e}")
+        raise
+
+def fetch_mandates():
+    """
+    Fetch mandates from S3 CSV.
+    
+    Returns:
+        dict: Dictionary containing mandate data
+    """
+    df = load_csv_from_s3(MANDATES_PATH)
+    return df.to_dict('records')
+
+def fetch_parent_topics():
+    """
+    Fetch parent topics from S3 CSV.
+    
+    Returns:
+        dict: Dictionary containing parent topic data
+    """
+    df = load_csv_from_s3(SUBCATEGORIES_PATH)
+    return df.to_dict('records')
+
+def fetch_child_topics():
+    """
+    Fetch child topics from S3 CSV.
+    
+    Returns:
+        dict: Dictionary containing child topic data
+    """
+    df = load_csv_from_s3(TOPICS_PATH)
+    return df.to_dict('records')
 
 secrets = aws.get_secret(secret_name=OPENSEARCH_SEC,region_name=REGION_NAME)
 opensearch_host = aws.get_parameter_ssm(
     parameter_name=OPENSEARCH_HOST, region_name=REGION_NAME
 )
 # Connect to OpenSearch
-auth = (secrets['username'], secrets['passwords'])
+auth = (secrets['username'], secrets['password'])
 
 client = OpenSearch(
     hosts=[{'host': opensearch_host, 'port': 443}],
@@ -87,16 +163,6 @@ mandates_vector_store = OpenSearchVectorSearch(
 )
 
 
-def fetch_mandates():
-    usecols = ["tag", "name", "description"]
-    dfo_mandates_df = pd.read_csv(
-        Path("..", "export", "new_mandates.csv"), usecols=usecols, dtype=str
-    )
-    
-    dfo_mandates_dict = dfo_mandates_df.to_dict(orient="index")
-
-    return dfo_mandates_dict
-
 def mandates_to_langchain_docs(dfo_mandates_dict: Dict[str, Any]) -> List[Document]:
     """
     Convert the mandates DataFrame to LangChain documents.
@@ -135,16 +201,6 @@ def mandates_to_langchain_docs(dfo_mandates_dict: Dict[str, Any]) -> List[Docume
 
 
 # ### Load Topics and Subcategories
-def fetch_parent_topics():
-    usecols = ["type", "tag", "parent", "name", "description"]
-    dfo_ptopics_df = pd.read_csv(
-        Path("..", "export", "new_subcategories.csv"), usecols=usecols, dtype=str
-    )
-    
-    dfo_ptopics_dict = dfo_ptopics_df.to_dict(orient="index")
-
-    return dfo_ptopics_dict
-
 def parent_topics_to_langchain_docs(dfo_parent_topics_dict: Dict[str, Any]) -> List[Document]:
     """
     Convert the parent topics DataFrame to LangChain documents.
@@ -186,17 +242,6 @@ def parent_topics_to_langchain_docs(dfo_parent_topics_dict: Dict[str, Any]) -> L
             dfo_parent_topics_docs.append(Document(page_content=combined_content, metadata=metadata))
             
     return dfo_parent_topics_docs
-
-def fetch_child_topics():
-    usecols = ["type", "tag", "parent", "name", "description"]
-    dfo_child_topics_df = pd.read_csv(
-        Path("..", "export", "new_topics.csv"), usecols=usecols, dtype=str
-    )
-    
-    dfo_child_topics_dict = dfo_child_topics_df.to_dict(orient="index")
-
-    return dfo_child_topics_dict
-
 
 def child_topics_to_langchain_docs(dfo_child_topics_dict: Dict[str, Any]) -> List[Document]:
     """
@@ -267,28 +312,18 @@ def process_and_ingest(dfo_topics_docs, df_mandates_docs, dryrun: bool = False):
     print("Inserted {} topic documents and {} mandate documents into OpenSearch.".format(len(dfo_topics_docs), len(df_mandates_docs)))
 
 def main(dryrun: bool = False):
-    # Fetch and process mandates
+    # Fetch data
     dfo_mandates_dict = fetch_mandates()
-    df_mandates_docs = mandates_to_langchain_docs(dfo_mandates_dict)
-
-    # Fetch and process parent topics
     dfo_parent_topics_dict = fetch_parent_topics()
-    dfo_parent_topics_docs = parent_topics_to_langchain_docs(dfo_parent_topics_dict)
-
-    # Fetch and process child topics
     dfo_child_topics_dict = fetch_child_topics()
+    
+    # Convert to LangChain documents
+    df_mandates_docs = mandates_to_langchain_docs(dfo_mandates_dict)
+    dfo_parent_topics_docs = parent_topics_to_langchain_docs(dfo_parent_topics_dict)
     dfo_child_topics_docs = child_topics_to_langchain_docs(dfo_child_topics_dict)
-
-    # Combine all topic documents
-    dfo_topics_docs = dfo_parent_topics_docs + dfo_child_topics_docs
-
-    # Process and ingest the data into OpenSearch
-    process_and_ingest(
-        dfo_topics_docs=dfo_topics_docs, 
-        df_mandates_docs=df_mandates_docs, 
-        dryrun=dryrun
-    )
-    print("Data ingestion completed successfully.")
+    
+    # Process and ingest
+    process_and_ingest(dfo_parent_topics_docs + dfo_child_topics_docs, df_mandates_docs, dryrun)
 
 if __name__ == "__main__":
-    main(dryrun=False)
+    main()

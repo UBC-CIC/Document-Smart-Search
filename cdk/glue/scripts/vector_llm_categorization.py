@@ -39,7 +39,7 @@ DFO_MANDATE_FULL_INDEX_NAME = "dfo-mandate-full-index"
 session = aws.session
 secrets = aws.get_secret(secret_name=OPENSEARCH_SEC, region_name=REGION_NAME)
 opensearch_host = aws.get_parameter_ssm(parameter_name=OPENSEARCH_HOST, region_name=REGION_NAME)
-auth = (secrets['username'], secrets['passwords'])
+auth = (secrets['username'], secrets['password'])
 
 op_client = OpenSearch(
     hosts=[{'host': opensearch_host, 'port': 443}],

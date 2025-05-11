@@ -30,7 +30,7 @@ opensearch_host = aws.get_parameter_ssm(
     parameter_name=OPENSEARCH_HOST, region_name=REGION_NAME
 )
 # Connect to OpenSearch
-auth = (secrets['username'], secrets['passwords'])
+auth = (secrets['username'], secrets['password'])
 
 op_client = OpenSearch(
     hosts=[{'host': opensearch_host, 'port': 443}],

@@ -14,7 +14,7 @@ export class DataPipelineStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    // Create S3 bucket for data uploads for admin
+    // Create S3 bucket for data uploads with batch structure
     this.dataUploadBucket = new s3.Bucket(this, 'DataUploadBucket', {
       bucketName: `data-upload-bucket`,
       removalPolicy: cdk.RemovalPolicy.RETAIN,
@@ -47,6 +47,7 @@ export class DataPipelineStack extends cdk.Stack {
       description: 'Role used by AWS Glue for data pipeline processing',
     });
 
+    // Add necessary policies to the Glue role
     glueJobRole.addManagedPolicy(
       iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonBedrockFullAccess')
     );
@@ -71,7 +72,7 @@ export class DataPipelineStack extends cdk.Stack {
     const TIMEOUT = 170;
     const PYTHON_LIBS = "psycopg[binary]==3.2.6,boto3==1.38.1,langchain==0.3.12,langchain-community==0.3.12,langchain-aws==0.2.21,opensearch-py==2.5.0,pandas==2.2.3,numpy==1.26.4,scikit-learn==1.6.1,rank-bm25==0.2.2,aiohttp==3.11.10,beautifulsoup4==4.12.3,bertopic==0.16.2,langdetect==1.0.9"
 
-    // Create all Glue jobs
+    // Create all Glue jobs with parameters
     const jobs = {
       cleanAndIngestHtml: new glue.CfnJob(this, "clean_and_ingest_html", {
         name: "clean_and_ingest_html",
@@ -90,6 +91,8 @@ export class DataPipelineStack extends cdk.Stack {
           "--extra-py-files": `s3://${this.glueBucket.bucketName}/glue/custom_modules/src/dist/src-0.1-py3-none-any.whl`,
           "--additional-python-modules": PYTHON_LIBS,
           "library-set": "analytics",
+          "--html_urls_path": "",  // Will be set at runtime
+          "--batch_id": "",        // Will be set at runtime
         },
       }),
 
@@ -110,6 +113,10 @@ export class DataPipelineStack extends cdk.Stack {
           "--extra-py-files": `s3://${this.glueBucket.bucketName}/glue/custom_modules/src/dist/src-0.1-py3-none-any.whl`,
           "--additional-python-modules": PYTHON_LIBS,
           "library-set": "analytics",
+          "--topics_path": "",     // Will be set at runtime
+          "--mandates_path": "",   // Will be set at runtime
+          "--subcategories_path": "", // Will be set at runtime
+          "--batch_id": "",        // Will be set at runtime
         },
       }),
 
@@ -130,6 +137,7 @@ export class DataPipelineStack extends cdk.Stack {
           "--extra-py-files": `s3://${this.glueBucket.bucketName}/glue/custom_modules/src/dist/src-0.1-py3-none-any.whl`,
           "--additional-python-modules": PYTHON_LIBS,
           "library-set": "analytics",
+          "--batch_id": "",        // Will be set at runtime
         },
       }),
 
@@ -150,6 +158,7 @@ export class DataPipelineStack extends cdk.Stack {
           "--extra-py-files": `s3://${this.glueBucket.bucketName}/glue/custom_modules/src/dist/src-0.1-py3-none-any.whl`,
           "--additional-python-modules": PYTHON_LIBS,
           "library-set": "analytics",
+          "--batch_id": "",        // Will be set at runtime
         },
       }),
 
@@ -170,6 +179,7 @@ export class DataPipelineStack extends cdk.Stack {
           "--extra-py-files": `s3://${this.glueBucket.bucketName}/glue/custom_modules/src/dist/src-0.1-py3-none-any.whl`,
           "--additional-python-modules": PYTHON_LIBS,
           "library-set": "analytics",
+          "--batch_id": "",        // Will be set at runtime
         },
       }),
     };

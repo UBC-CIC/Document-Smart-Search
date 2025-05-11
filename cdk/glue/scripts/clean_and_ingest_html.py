@@ -12,6 +12,7 @@ from datetime import datetime
 
 import numpy as np
 import pandas as pd
+import boto3
 from opensearchpy import OpenSearch
 from opensearchpy.helpers import bulk
 import aiohttp
@@ -19,32 +20,62 @@ from bs4 import BeautifulSoup
 from langchain_core.documents import Document
 from langchain_aws.embeddings import BedrockEmbeddings
 from langchain_community.vectorstores import OpenSearchVectorSearch
-
+# from awsglue.utils import getResolvedOptions
 import src.aws_utils as aws
 import src.opensearch as op
 
-from constants import (
-    OPENSEARCH_SEC,
-    OPENSEARCH_HOST,
-    REGION_NAME,
-    EMBEDDING_MODEL,
-    EMBEDDING_DIM,
-)
-
-session = aws.session
-
-# these will be environment variables
-DATETIME = datetime.now().strftime(r"%Y-%m-%d %H:%M:%S") # to be replaced with environment var
+# Constants
+# Index Names
 DFO_HTML_FULL_INDEX_NAME = "dfo-html-full-index"
 DFO_TOPIC_FULL_INDEX_NAME = "dfo-topic-full-index"
 DFO_MANDATE_FULL_INDEX_NAME = "dfo-mandate-full-index"
+
+# Get job parameters
+# args = getResolvedOptions(sys.argv, [
+#     'JOB_NAME',
+#     'html_urls_path',
+#     'batch_id',
+#     'region_name',
+#     'embedding_model',
+#     'opensearch_secret',
+#     'opensearch_host'
+# ])
+
+# mock args dictionary
+args = {
+    'JOB_NAME': 'clean_and_ingest_html',
+    'html_urls_path': 's3://dfo-test-datapipeline/batches/2025-05-07/html_data/CSASDocuments.xlsx',
+    'bucket_name': 'dfo-test-datapipeline',
+    'batch_id': '2025-05-07',
+    'region_name': 'us-west-2',
+    'embedding_model': 'amazon.titan-embed-text-v2:0',
+    'opensearch_secret': 'opensearch-masteruser-test-glue',
+    'opensearch_host': 'opensearch-host-test-glue'
+}
+
+# Paths
+HTML_URLS_PATH = args['html_urls_path']
+BATCH_ID = args['batch_id']
+BUCKET_NAME = args['bucket_name']
+# AWS Configuration
+REGION_NAME = args['region_name']
+EMBEDDING_MODEL = args['embedding_model']
+
+# OpenSearch Configuration
+OPENSEARCH_SEC = args['opensearch_secret']
+OPENSEARCH_HOST = args['opensearch_host']
+
+# Runtime Variables
+CURRENT_DATETIME = datetime.now().strftime(r"%Y-%m-%d %H:%M:%S")
+
+session = aws.session
 
 secrets = aws.get_secret(secret_name=OPENSEARCH_SEC,region_name=REGION_NAME)
 opensearch_host = aws.get_parameter_ssm(
     parameter_name=OPENSEARCH_HOST, region_name=REGION_NAME
 )
 # Connect to OpenSearch
-auth = (secrets['username'], secrets['passwords'])
+auth = (secrets['username'], secrets['password'])
 
 client = OpenSearch(
     hosts=[{'host': opensearch_host, 'port': 443}],
@@ -71,24 +102,28 @@ bedrock_client = session.client("bedrock-runtime", region_name=REGION_NAME)
 embedder = BedrockEmbeddings(client=bedrock_client, model_id=EMBEDDING_MODEL)
 
 
-def load_html_data_from_excel() -> dict:
-  usecols = ["Year", "Document Title", "Document URL", "CSAS Event"]
-  html_df = pd.read_excel(
-      Path("..", "CSASDocuments.xlsx"), sheet_name="CSAS HTML URLs", usecols=usecols, dtype=str
-  )
-
-  # Trim whitespace from all string entries in the DataFrame
-  html_df = html_df.apply(lambda x: x.str.strip() if x.dtype == "object" else x)
-
-  html_subset = (
-      html_df.drop_duplicates(subset="Document URL")
-      .replace("", np.nan)
-      .dropna()
-  )
-
-  # Convert the subset to dict
-  html_dict_subset = html_subset.to_dict(orient="index")
-  return html_dict_subset
+def load_html_data_from_s3(s3_path: str, sheet_name: str = 0) -> pd.DataFrame:
+    """
+    Load HTML data from an Excel file in S3.
+    
+    Args:
+        s3_path: S3 path to the Excel file (e.g., 's3://bucket/path/to/file.xlsx')
+        sheet_name: Name or index of the sheet to read (default: 0, which is the first sheet)
+        
+    Returns:
+        df: DataFrame containing the HTML data
+    """
+    s3 = session.client('s3')
+    bucket, key = s3_path.replace('s3://', '').split('/', 1)
+    
+    try:
+        response = s3.get_object(Bucket=bucket, Key=key)
+        excel_data = response['Body'].read()
+        df = pd.read_excel(BytesIO(excel_data), sheet_name=sheet_name)
+        return df
+    except Exception as e:
+        print(f"Error loading HTML data from S3: {e}")
+        raise
 
 
 def get_html_event_to_html_documents(html_dict_subset):
@@ -146,6 +181,8 @@ def extract_document_info(page: BeautifulSoup) -> Dict[str, Optional[str]]:
       - The document download URL from an <a> tag with class 'gc-dwnld-lnk'.
       - The document title from the <title> tag.
       - The language of the document using multiple approaches.
+      - The subject from the first h2 header within the main content section.
+      - The authors from the h3 tag that follows the subject h2.
 
     Language detection approaches:
       1. Check the 'lang' attribute on the <html> tag.
@@ -161,6 +198,8 @@ def extract_document_info(page: BeautifulSoup) -> Dict[str, Optional[str]]:
           - "download_url": The document download URL (if found).
           - "title": The document title.
           - "language": The detected language (or languages) as a string.
+          - "subject": The subject from the first h2 header in main content.
+          - "cleaned_authors": List of author names.
     """
     # --- Extract Main Text ---
     sections = page.find_all("section")
@@ -172,9 +211,63 @@ def extract_document_info(page: BeautifulSoup) -> Dict[str, Optional[str]]:
     
     main_text = re.sub(r'(\s\s)+', '\n', main_text)
     # Remove the Accessibility Notice text (case-insensitive)
-    main_text = re.sub(r'((Accessibility Notice)|(Avis d’accessibilité))\s.*', '', main_text, flags=re.IGNORECASE)
+    main_text = re.sub(r'((Accessibility Notice)|(Avis d\'accessibilité))\s.*', '', main_text, flags=re.IGNORECASE)
     # Replace non-breaking spaces with a regular space.
     main_text = main_text.replace(u'\xa0', u' ')
+
+    # --- Extract Subject and Authors ---
+    main_content = page.find('main', {'property': 'mainContentOfPage'})
+    subject = None
+    authors = []
+    if main_content:
+        # Find the section after BEGIN MAIN CONTENT comment
+        main_section = None
+        for comment in main_content.find_all(string=lambda text: isinstance(text, str) and "BEGIN MAIN CONTENT" in text):
+            main_section = comment.find_next('section')
+            if main_section:
+                break
+        
+        if main_section:
+            # Extract subject
+            first_h2 = main_section.find('h2')
+            if first_h2:
+                # Remove em tags and get plain text
+                for em in first_h2.find_all('em'):
+                    em.replace_with(em.get_text())
+                subject = first_h2.get_text().strip()
+                # Clean up the subject text
+                subject = re.sub(r'\s\s+', ' ', subject)
+                subject = subject.replace(u'\xa0', u' ')
+            
+            # Extract authors
+            cleaned_authors = []
+            authors_h3 = main_section.find('h3')
+            if authors_h3 and authors_h3.get_text().strip().startswith('By'):
+                # Get the text and remove 'By' prefix
+                authors_text = authors_h3.get_text().strip()[3:].strip()
+                # Replace &nbsp; with space and clean up
+                authors_text = authors_text.replace(u'\xa0', u' ')
+                # Split by comma and clean up each author name
+                authors = []
+                for author in authors_text.split(','):
+                    author = author.strip()
+                    # Remove 'and' from the beginning of the last author
+                    if author.startswith('and '):
+                        author = author[4:]
+                    authors.append(author)
+                # Remove any empty strings
+                authors = [author for author in authors if author]
+                # Note: The cleaning process above splits names into pairs (e.g., "John Doe" becomes ["John", "Doe"])
+                # Therefore, the list will always have an even length, with each author's first and last name as separate elements
+                # Thus 4 unique authors will produce a list of 8 elements
+                # Now, we need to recombine every two elements into one name
+                cleaned_authors = []
+                for i in range(0, len(authors), 2):
+                    if i + 1 < len(authors):
+                        cleaned_authors.append(f"{authors[i]}, {authors[i+1]}")
+                    else:
+                        cleaned_authors.append(authors[i])
+                
 
     # --- Extract Download URL ---
     download_link = page.find("a", class_="gc-dwnld-lnk")
@@ -223,7 +316,9 @@ def extract_document_info(page: BeautifulSoup) -> Dict[str, Optional[str]]:
         "main_text": main_text,
         "download_url": download_url,
         "title": title,
-        "language": language
+        "language": language,
+        "subject": subject,
+        "authors": cleaned_authors
     }
 
 def extract_doc_type(html_page_title):
@@ -236,9 +331,11 @@ def extract_doc_type(html_page_title):
     elif html_page_title.startswith("Science Advisory Report") or html_page_title.startswith("Avis scientifique"):
         return "Science Advisory Report"
     elif html_page_title.startswith("Science Response") or html_page_title.startswith("Réponse des Sciences"):
-        return "Advice"
+        return "Science Response"
+    elif html_page_title.startswith("Other Publication") or html_page_title.startswith("Autre publication"):
+        return "Other Publication"
 
-    return None
+    return "Unknown"
 
 def extract_document_year_from_title(html_page_title):
     # Extract the year from the title
@@ -429,7 +526,13 @@ async def process_html_docs(html_docs, enable_override=False, dryrun=False):
         }
     
     # Download HTML pages concurrently.
-    urls = [doc["Document URL"] for doc in docs_to_process]
+    urls = []
+    for doc in docs_to_process:
+        # Exclude documents with URLs ending in -inu-eng.html or -inu-fra.html
+        if doc["Document URL"].endswith("-inu-eng.html") or doc["Document URL"].endswith("-inu-fra.html"):
+            continue
+        # Only include English documents
+        urls.append(doc["Document URL"])
     pages = await asyncio.gather(*(download_html(u, error_dump) for u in urls))
     
     # Extract document information from the downloaded HTML.
@@ -501,51 +604,54 @@ async def process_events(html_event_to_html_documents, enable_override=False, dr
     return overall_stats
 
 
+def upload_to_s3(bucket: str, key: str, df: pd.DataFrame):
+    """Upload a DataFrame as CSV to S3."""
+    s3 = session.client('s3')
+    csv_buffer = BytesIO()
+    df.to_csv(csv_buffer, index=False)
+    s3.put_object(Bucket=bucket, Key=key, Body=csv_buffer.getvalue())
+    
+html_url_to_content = {} # not sure why this is needed
 async def main(dryrun=False):
+    # Load HTML data from S3
+    html_data = load_html_data_from_s3(HTML_URLS_PATH, sheet_name="CSAS HTML URLs")
+    # TODO: Remove this once when ready to ingest all data
+    html_data = html_data.query("`Year` == 2017.0")
+    html_data = html_data.to_dict(orient='index')
     
     # Get the url to content
-    html_dict_subset = load_html_data_from_excel() # a df of pdf files
-    html_url_to_content = {}
-    for key, value in html_dict_subset.items():
+    for _, value in html_data.items():
         html_url_to_content[value['Document URL']] = value
-
-    html_event_to_html_documents = get_html_event_to_html_documents(html_dict_subset)
-
-    overall_stats = await process_events(
-        html_event_to_html_documents, 
-        enable_override=False,
-        dryrun=dryrun
-    )
-
-    total_events = overall_stats['total_events']
-    ingested_count = overall_stats['total_docs_processed']
-    docs_failed = overall_stats['total_docs_failed']
-    docs_already_processed = overall_stats['total_docs_already_processed']
-    error_dump = overall_stats['error_dump']
-    failed_html_pages = overall_stats['failed_html_pages']
-    failed_embeddings_metadata = overall_stats['failed_embeddings_metadata']
-    extraction_incompletes = overall_stats['extraction_incompletes']
-    mismatched_years = overall_stats['mismatched_years']
-
+        
+    html_event_to_html_documents = get_html_event_to_html_documents(html_data)
+    
+    # Process events
+    overall_stats = await process_events(html_event_to_html_documents, enable_override=False, dryrun=dryrun)
 
     # Print processing results
-    print("Documents successfully processed:", ingested_count, 
-            f" - {ingested_count}/{ingested_count + docs_failed}")
-    print("Documents failed to be processed:", docs_failed)
-    print("Documents already processed:", docs_already_processed)
-    print("Documents that failed embedding:", len(failed_embeddings_metadata))
+    print("Documents successfully processed:", overall_stats["total_docs_processed"], 
+          f" - {overall_stats['total_docs_processed']}/{overall_stats['total_docs_processed'] + overall_stats['total_docs_failed']}")
+    print("Documents failed to be processed:", overall_stats["total_docs_failed"])
+    print("Documents already processed:", overall_stats["total_docs_already_processed"])
+    print("Documents that failed embedding:", len(overall_stats["failed_embeddings_metadata"]))
 
-    # Export to csv/excel
-    df = pd.DataFrame(error_dump)
-    df.to_csv("ingestion_docs/html_fail_error_dump_docs.csv")
-
-    # Export to csv/excel
-    df = pd.DataFrame(failed_html_pages)
-    df.to_csv("ingestion_docs/html_fail_docs.csv")
-
-    # Export to csv/excel
-    df = pd.DataFrame(failed_embeddings_metadata)
-    df.to_csv("ingestion_docs/too_long_docs.csv")
+    # Upload logs to S3
+    upload_to_s3(BUCKET_NAME, f"batches/{BATCH_ID}/logs/html_fail_error_dump_docs.csv", pd.DataFrame(overall_stats["error_dump"]))
+    upload_to_s3(BUCKET_NAME, f"batches/{BATCH_ID}/logs/html_fail_docs.csv", pd.DataFrame(overall_stats["failed_html_pages"]))
+    upload_to_s3(BUCKET_NAME, f"batches/{BATCH_ID}/logs/too_long_docs.csv", pd.DataFrame(overall_stats["failed_embeddings_metadata"]))
     
+    # Save overall stats as CSV and upload to S3
+    stats_df = pd.DataFrame([{
+        'total_events': overall_stats['total_events'],
+        'total_docs_processed': overall_stats['total_docs_processed'],
+        'total_docs_failed': overall_stats['total_docs_failed'],
+        'total_docs_already_processed': overall_stats['total_docs_already_processed'],
+        'failed_embeddings_count': len(overall_stats['failed_embeddings_metadata']),
+        'extraction_incompletes_count': len(overall_stats['extraction_incompletes']),
+        'mismatched_years_count': len(overall_stats['mismatched_years'])
+    }])
+    print(stats_df.squeeze())
+    upload_to_s3(BUCKET_NAME, f"batches/{BATCH_ID}/logs/overall_stats.csv", stats_df)
+
 if __name__ == "__main__":
-    asyncio.run(main(dryrun=False))
+    asyncio.run(main(dryrun=True))

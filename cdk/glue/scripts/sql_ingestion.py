@@ -402,7 +402,7 @@ def main():
     rds_secret = aws.get_secret(aws.get_parameter_ssm("/dfo/rds/secretname"))
 
     # Connect to OpenSearch
-    auth = (secrets['username'], secrets['passwords'])
+    auth = (secrets['username'], secrets['password'])
     op_client = OpenSearch(
         hosts=[{'host': opensearch_host, 'port': 443}],
         http_compress=True,

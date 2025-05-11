@@ -1,2 +1,5 @@
 **.cursorrules
 **export
+**/glue/scripts/src*
+**/glue/scripts/configs.json
+**/glue/scripts/test*
