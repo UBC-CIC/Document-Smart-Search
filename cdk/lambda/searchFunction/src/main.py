@@ -8,25 +8,17 @@ from opensearchpy import OpenSearch
 from langchain_community.document_loaders import JSONLoader, DirectoryLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.vectorstores import OpenSearchVectorSearch
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_aws.embeddings import BedrockEmbeddings  # ✅ CHANGED
 from langchain import __version__ as langchain_version
+
 import src.aws_utils as aws
 import src.opensearch_utils as op
 
 with open(Path("configs.json"), "r") as f:
     configs = json.load(f)
 
-# SM_DB_CREDENTIALS=os.environ['SM_DB_CREDENTIALS']
-# RDS_PROXY_ENDPOINT= os.environ['RDS_PROXY_ENDPOINT']
-# BEDROCK_LLM_PARAM= os.environ['BEDROCK_LLM_PARAM']
-# EMBEDDING_MODEL_PARAM= os.environ['EMBEDDING_MODEL_PARAM']
-# TABLE_NAME_PARAM= os.environ['TABLE_NAME_PARAM']
-# REGION_NAME = os.environ["REGION"]
 REGION_NAME = configs['aws']['region_name']
 OPENSEARCH_SEC = configs['aws']['secrets']['opensearch']
-
-
-# Constants
 INDEX_NAME = "dfo-langchain-vector-index"
 BUCKET_NAME = "dfo-documents"
 FOLDER_NAME = "documents"
@@ -34,7 +26,7 @@ LOCAL_DIR = "s3_data"
 
 def set_secrets():
     global SECRETS
-    SECRETS = aws.get_secret(secret_name=OPENSEARCH_SEC,region_name=REGION_NAME)
+    SECRETS = aws.get_secret(secret_name=OPENSEARCH_SEC, region_name=REGION_NAME)
 
 def clean_text(text: str) -> str:
     text = re.sub(r'[^\x00-\x7F]+', ' ', text)
@@ -75,21 +67,19 @@ def process_documents():
 def handler(event, context):
     try:
         set_secrets()
+
         # Step 1: Load & clean docs
         docs = process_documents()
         texts = [doc.page_content for doc in docs]
         metadatas = [doc.metadata for doc in docs]
         bulk_size = len(docs)
 
-        # Step 2: Embedding setup
-        device = (
-            'mps' if torch.backends.mps.is_available()
-            else 'cuda' if torch.cuda.is_available()
-            else 'cpu'
-        )
-        embedder = HuggingFaceEmbeddings(
-            model_name=configs['embeddings']['embedding_model'],
-            model_kwargs={'device': device}
+        # Step 2: Embedding setup — ✅ CHANGED TO BEDROCK
+        session = aws.session
+        bedrock_client = session.client("bedrock-runtime", region_name=REGION_NAME)
+        embedder = BedrockEmbeddings(
+            client=bedrock_client,
+            model_id=configs['embeddings']['embedding_model']  # e.g., "amazon.titan-embed-text-v1"
         )
         embeddings = embedder.embed_documents(texts)
 
@@ -105,7 +95,7 @@ def handler(event, context):
             space_type="cosinesimil",
             index_name=INDEX_NAME,
             bulk_size=bulk_size,
-            opensearch_url='search-test-dfo-yevtcwsp7i4vjzy4kdvalwpxgm.aos.ca-central-1.on.aws',
+            opensearch_url='https://search-test-dfo-yevtcwsp7i4vjzy4kdvalwpxgm.aos.ca-central-1.on.aws',
             port=443,
             http_auth=(SECRETS['username'], SECRETS['passwords']),
             use_ssl=True,
@@ -125,7 +115,6 @@ def handler(event, context):
             "statusCode": 200,
             "body": json.dumps({
                 "query_result": results[0].metadata,
-                "torch": torch.__version__,
                 "langchain": langchain_version
             })
         }
