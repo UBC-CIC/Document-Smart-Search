@@ -17,7 +17,7 @@ from opensearchpy import OpenSearch
 from langchain_core.documents import Document
 from langchain_aws.embeddings import BedrockEmbeddings
 from langchain_community.vectorstores import OpenSearchVectorSearch
-from awsglue.utils import getResolvedOptions
+# from awsglue.utils import getResolvedOptions
 
 import src.aws_utils as aws
 import src.opensearch as op
@@ -29,22 +29,30 @@ DFO_TOPIC_FULL_INDEX_NAME = "dfo-topic-full-index"
 DFO_MANDATE_FULL_INDEX_NAME = "dfo-mandate-full-index"
 
 # Get job parameters
-args = getResolvedOptions(sys.argv, [
-    'JOB_NAME',
-    'topics_path',
-    'mandates_path',
-    'subcategories_path',
-    'batch_id',
-    'region_name',
-    'embedding_model',
-    'opensearch_secret',
-    'opensearch_host'
-])
+# args = getResolvedOptions(sys.argv, [
+#     'JOB_NAME',
+#     'topics_mandates_folder_path',
+#     'batch_id',
+#     'region_name',
+#     'embedding_model',
+#     'opensearch_secret',
+#     'opensearch_host'
+# ])
+
+args = {
+    'JOB_NAME': 'clean_and_ingest_html',
+    'html_urls_path': 's3://dfo-test-datapipeline/batches/2025-05-07/html_data/CSASDocuments.xlsx',
+    'topics_mandates_folder_path': 's3://dfo-test-datapipeline/batches/2025-05-07/topics_mandates_data/',
+    'bucket_name': 'dfo-test-datapipeline',
+    'batch_id': '2025-05-07',
+    'region_name': 'us-west-2',
+    'embedding_model': 'amazon.titan-embed-text-v2:0',
+    'opensearch_secret': 'opensearch-masteruser-test-glue',
+    'opensearch_host': 'opensearch-host-test-glue'
+}
 
 # Paths
-TOPICS_PATH = args['topics_path']
-MANDATES_PATH = args['mandates_path']
-SUBCATEGORIES_PATH = args['subcategories_path']
+TOPICS_MANDATES_FOLDER = args['topics_mandates_folder_path']
 BATCH_ID = args['batch_id']
 
 # AWS Configuration
@@ -58,58 +66,8 @@ OPENSEARCH_HOST = args['opensearch_host']
 # Runtime Variables
 CURRENT_DATETIME = datetime.now().strftime(r"%Y-%m-%d %H:%M:%S")
 
-session = aws.session
+session = aws.session # always use this session for boto3
 
-def load_csv_from_s3(s3_path: str) -> pd.DataFrame:
-    """
-    Load CSV data from S3.
-    
-    Args:
-        s3_path: S3 path to the CSV file (e.g., 's3://bucket/path/to/file.csv')
-        
-    Returns:
-        pd.DataFrame: DataFrame containing the CSV data
-    """
-    s3 = boto3.client('s3')
-    bucket, key = s3_path.replace('s3://', '').split('/', 1)
-    
-    try:
-        response = s3.get_object(Bucket=bucket, Key=key)
-        csv_data = response['Body'].read()
-        return pd.read_csv(BytesIO(csv_data))
-    except Exception as e:
-        print(f"Error loading CSV data from S3: {e}")
-        raise
-
-def fetch_mandates():
-    """
-    Fetch mandates from S3 CSV.
-    
-    Returns:
-        dict: Dictionary containing mandate data
-    """
-    df = load_csv_from_s3(MANDATES_PATH)
-    return df.to_dict('records')
-
-def fetch_parent_topics():
-    """
-    Fetch parent topics from S3 CSV.
-    
-    Returns:
-        dict: Dictionary containing parent topic data
-    """
-    df = load_csv_from_s3(SUBCATEGORIES_PATH)
-    return df.to_dict('records')
-
-def fetch_child_topics():
-    """
-    Fetch child topics from S3 CSV.
-    
-    Returns:
-        dict: Dictionary containing child topic data
-    """
-    df = load_csv_from_s3(TOPICS_PATH)
-    return df.to_dict('records')
 
 secrets = aws.get_secret(secret_name=OPENSEARCH_SEC,region_name=REGION_NAME)
 opensearch_host = aws.get_parameter_ssm(
@@ -162,13 +120,117 @@ mandates_vector_store = OpenSearchVectorSearch(
     verify_certs=True,
 )
 
-
-def mandates_to_langchain_docs(dfo_mandates_dict: Dict[str, Any]) -> List[Document]:
+def list_csv_files_in_s3_folder(s3_folder_path: str) -> List[str]:
     """
-    Convert the mandates DataFrame to LangChain documents.
+    List all CSV files in an S3 folder.
     
     Args:
-        dfo_mandates_dict (Dict[str, Any]): Dictionary representation of the mandates DataFrame.
+        s3_folder_path: S3 path to the folder (e.g., 's3://bucket/path/to/folder/')
+        
+    Returns:
+        List[str]: List of S3 paths to CSV files
+    """
+    s3 = session.client('s3')
+    bucket, prefix = s3_folder_path.replace('s3://', '').split('/', 1)
+    if not prefix.endswith('/'):
+        prefix += '/'
+    
+    response = s3.list_objects_v2(
+        Bucket=bucket,
+        Prefix=prefix
+    )
+    
+    csv_files = []
+    for obj in response.get('Contents', []):
+        if obj['Key'].endswith('.csv'):
+            csv_files.append(f"s3://{bucket}/{obj['Key']}")
+    
+    return csv_files
+
+def load_csv_from_s3(s3_path: str) -> pd.DataFrame:
+    """
+    Load CSV data from S3.
+    
+    Args:
+        s3_path: S3 path to the CSV file (e.g., 's3://bucket/path/to/file.csv')
+        
+    Returns:
+        pd.DataFrame: DataFrame containing the CSV data
+    """
+    s3 = session.client('s3')
+    bucket, key = s3_path.replace('s3://', '').split('/', 1)
+    
+    try:
+        response = s3.get_object(Bucket=bucket, Key=key)
+        csv_data = response['Body'].read()
+        return pd.read_csv(BytesIO(csv_data))
+    except Exception as e:
+        print(f"Error loading CSV data from S3: {e}")
+        raise
+
+def fetch_data_from_folder() -> Dict[str, pd.DataFrame]:
+    """
+    Fetch all CSV files from the S3 folder and return them as DataFrames.
+    
+    Returns:
+        Dict[str, pd.DataFrame]: Dictionary mapping file types to DataFrames
+    """
+    csv_files = list_csv_files_in_s3_folder(TOPICS_MANDATES_FOLDER)
+    data_dict = {}
+    
+    for file_path in csv_files:
+        file_name = os.path.basename(file_path)
+        if 'mandates' in file_name.lower():
+            data_dict['mandates'] = load_csv_from_s3(file_path)
+        elif 'topics' in file_name.lower():
+            data_dict['topics'] = load_csv_from_s3(file_path)
+        elif 'subcategories' in file_name.lower():
+            data_dict['subcategories'] = load_csv_from_s3(file_path)
+    
+    return data_dict
+
+def fetch_mandates():
+    """
+    Fetch mandates from S3 CSV.
+    
+    Returns:
+        dict: Dictionary containing mandate data
+    """
+    data_dict = fetch_data_from_folder()
+    if 'mandates' not in data_dict:
+        raise ValueError("No mandates file found in the folder")
+    return data_dict['mandates'].to_dict('records')
+
+def fetch_parent_topics():
+    """
+    Fetch parent topics from S3 CSV.
+    
+    Returns:
+        dict: Dictionary containing parent topic data
+    """
+    data_dict = fetch_data_from_folder()
+    if 'subcategories' not in data_dict:
+        raise ValueError("No subcategories file found in the folder")
+    return data_dict['subcategories'].to_dict('records')
+
+def fetch_child_topics():
+    """
+    Fetch child topics from S3 CSV.
+    
+    Returns:
+        dict: Dictionary containing child topic data
+    """
+    data_dict = fetch_data_from_folder()
+    if 'topics' not in data_dict:
+        raise ValueError("No topics file found in the folder")
+    return data_dict['topics'].to_dict('records')
+
+def mandates_to_langchain_docs(dfo_mandates_dict: List[Dict[str, Any]]) -> List[Document]:
+    """
+    Convert the mandates list of dictionaries to LangChain documents.
+    
+    Args:
+        dfo_mandates_dict (List[Dict[str, Any]]): List of dictionaries containing mandate data.
         
     Returns:
         List[Document]: List of LangChain Document objects.
@@ -176,11 +238,10 @@ def mandates_to_langchain_docs(dfo_mandates_dict: Dict[str, Any]) -> List[Docume
     # Initialize an empty list to hold the documents
     df_mandates_docs = []
 
-    for key, value in dfo_mandates_dict.items():
-        value = value.copy()
-        tag = value['tag']
-        name = value['name']
-        descriptions = value['description']
+    for mandate in dfo_mandates_dict:
+        tag = mandate['tag']
+        name = mandate['name']
+        descriptions = mandate['description']
         
         descriptions = ast.literal_eval(descriptions)
         # Ensure the result is a list; if not, wrap it in a list.
@@ -201,12 +262,12 @@ def mandates_to_langchain_docs(dfo_mandates_dict: Dict[str, Any]) -> List[Docume
 
 
 # ### Load Topics and Subcategories
-def parent_topics_to_langchain_docs(dfo_parent_topics_dict: Dict[str, Any]) -> List[Document]:
+def parent_topics_to_langchain_docs(dfo_parent_topics_dict: List[Dict[str, Any]]) -> List[Document]:
     """
-    Convert the parent topics DataFrame to LangChain documents.
+    Convert the parent topics list of dictionaries to LangChain documents.
     
     Args:
-        dfo_parent_topics_dict (Dict[str, Any]): Dictionary representation of the parent topics DataFrame.
+        dfo_parent_topics_dict (List[Dict[str, Any]]): List of dictionaries containing parent topic data.
         
     Returns:
         List[Document]: List of LangChain Document objects.
@@ -214,14 +275,13 @@ def parent_topics_to_langchain_docs(dfo_parent_topics_dict: Dict[str, Any]) -> L
     # Initialize an empty list to hold the documents
     dfo_parent_topics_docs = []
 
-    for key, value in dfo_parent_topics_dict.items():
-        value = value.copy()
-        doc_type = value['type']
-        tag = value['tag']
-        parent_tag = value['parent']
+    for topic in dfo_parent_topics_dict:
+        doc_type = topic['type']
+        tag = topic['tag']
+        parent_tag = topic['parent']
         mandate_tag = parent_tag
-        name = value['name']
-        descriptions = value['description']
+        name = topic['name']
+        descriptions = topic['description']
         
         descriptions = ast.literal_eval(descriptions)
         # Ensure the result is a list; if not, wrap it in a list.
@@ -243,12 +303,12 @@ def parent_topics_to_langchain_docs(dfo_parent_topics_dict: Dict[str, Any]) -> L
             
     return dfo_parent_topics_docs
 
-def child_topics_to_langchain_docs(dfo_child_topics_dict: Dict[str, Any]) -> List[Document]:
+def child_topics_to_langchain_docs(dfo_child_topics_dict: List[Dict[str, Any]]) -> List[Document]:
     """
-    Convert the child topics DataFrame to LangChain documents.
+    Convert the child topics list of dictionaries to LangChain documents.
     
     Args:
-        dfo_child_topics_dict (Dict[str, Any]): Dictionary representation of the child topics DataFrame.
+        dfo_child_topics_dict (List[Dict[str, Any]]): List of dictionaries containing child topic data.
         
     Returns:
         List[Document]: List of LangChain Document objects.
@@ -256,14 +316,13 @@ def child_topics_to_langchain_docs(dfo_child_topics_dict: Dict[str, Any]) -> Lis
     # Initialize an empty list to hold the documents
     dfo_child_topics_docs = []
 
-    for key, value in dfo_child_topics_dict.items():
-        value = value.copy()
-        doc_type = value['type']
-        tag = value['tag']
-        parent_tag = value['parent']
-        mandate_tag = parent_tag.split('.')[0]
-        name = value['name']
-        descriptions = value['description']
+    for topic in dfo_child_topics_dict:
+        doc_type = topic['type']
+        tag = topic['tag']
+        parent_tag = str(topic['parent']) if topic['parent'] is not None else ''
+        mandate_tag = parent_tag.split('.')[0] if parent_tag else ''
+        name = topic['name']
+        descriptions = topic['description']
         
         descriptions = ast.literal_eval(descriptions)
         # Ensure the result is a list; if not, wrap it in a list.
@@ -312,18 +371,25 @@ def process_and_ingest(dfo_topics_docs, df_mandates_docs, dryrun: bool = False):
     print("Inserted {} topic documents and {} mandate documents into OpenSearch.".format(len(dfo_topics_docs), len(df_mandates_docs)))
 
 def main(dryrun: bool = False):
+    # Create indices if they don't exist
+    op.create_topic_index(client, DFO_TOPIC_FULL_INDEX_NAME)
+    op.create_mandate_index(client, DFO_MANDATE_FULL_INDEX_NAME)
+    
     # Fetch data
     dfo_mandates_dict = fetch_mandates()
     dfo_parent_topics_dict = fetch_parent_topics()
     dfo_child_topics_dict = fetch_child_topics()
-    
+
     # Convert to LangChain documents
+    # if a mandate has multiple, there will be multiple documents 
+    # with the same mandate name but different descriptions
     df_mandates_docs = mandates_to_langchain_docs(dfo_mandates_dict)
     dfo_parent_topics_docs = parent_topics_to_langchain_docs(dfo_parent_topics_dict)
     dfo_child_topics_docs = child_topics_to_langchain_docs(dfo_child_topics_dict)
     
     # Process and ingest
+    # IMPORTANT: parent topics and child topics are in the same index
     process_and_ingest(dfo_parent_topics_docs + dfo_child_topics_docs, df_mandates_docs, dryrun)
 
 if __name__ == "__main__":
-    main()
+    main(dryrun=False)
