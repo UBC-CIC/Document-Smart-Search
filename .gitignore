@@ -3,3 +3,4 @@
 **/glue/scripts/src*
 **/glue/scripts/configs.json
 **/glue/scripts/test*
+**/ingestion_output*

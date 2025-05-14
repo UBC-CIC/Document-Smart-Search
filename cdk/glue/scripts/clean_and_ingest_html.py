@@ -94,7 +94,8 @@ print(op.list_indexes(client))
 indexes = client.cat.indices(format="json")
 print("Indexes and Sizes:")
 for index in indexes:
-    print(f"- {index['index']}: {index['store.size']}")
+    if "index" in index['index'].lower(): # only print indexes that contain "index" in the name
+        print(f"- {index['index']}: {index['store.size']}")
 
 
 # Set up the embedding model via LangChain (example using BedrockEmbeddings)
@@ -140,38 +141,92 @@ def get_html_event_to_html_documents(html_dict_subset):
 
 
 # # ## Ingest All Docs with CSAS Events
-async def download_html(url: str, error_dump: List[dict]) -> Optional[Tuple[str, BeautifulSoup]]:
+async def download_html(url: str, error_dump: List[dict], semaphore: asyncio.Semaphore, debug: bool = False) -> Optional[Tuple[str, BeautifulSoup]]:
     """
     Asynchronously downloads HTML from a given URL and parses it with BeautifulSoup.
+    If a 404 is encountered, retries with allow_redirects=True.
+    On successful download, saves the HTML content to a text file if debug=True.
+    
+    Args:
+        url: The URL to download
+        error_dump: List to store any errors
+        semaphore: Semaphore to control concurrent requests
+        debug: If True, saves HTML content to local files
     """
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.get(url) as response:
-                status = response.status  # Get HTTP status
-                html_content = await response.text()
+    async with semaphore:  # This ensures we don't exceed our rate limit
+        # just in case the server blocks us
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+        }
+        
+        async with aiohttp.ClientSession() as session:
+            try:
+                # First attempt without redirects
+                async with session.get(url, headers=headers) as response:
+                    status = response.status
+                    html_content = await response.text()
 
-                if status == 404 or "error 404" in html_content.lower() or "page not found" in html_content.lower():
-                    error_dump.append({
-                        "error": f"Page not found (HTTP {status})",
-                        "file": url
-                    })
-                    return url, None
+                    if status == 404:
+                        print("Error 404")
+                        # Retry with redirects enabled
+                        async with session.get(url, headers=headers, allow_redirects=True) as retry_response:
+                            retry_status = retry_response.status
+                            retry_content = await retry_response.text()
+                            
+                            if retry_status == 404 or "error 404" in retry_content.lower() or "page not found" in retry_content.lower():
+                                error_dump.append({
+                                    "error": f"Page not found after retry with redirects (HTTP {retry_status}): {retry_content}",
+                                    "file": url
+                                })
+                                return url, None
+                            
+                            doc = BeautifulSoup(retry_content, "html.parser")
+                            # Save successful download if in debug mode
+                            if debug:
+                                save_html_content(url, retry_content)
+                            return url, doc
 
-                doc = BeautifulSoup(html_content, "html.parser")
-                return url, doc
+                    doc = BeautifulSoup(html_content, "html.parser")
+                    # Save successful download if in debug mode
+                    if debug:
+                        save_html_content(url, html_content)
+                    return url, doc
 
-        except aiohttp.ClientError as e:
-            error_dump.append({
-                "error": f"Client error: {str(e)}",
-                "file": url
-            })
-            return url, None
-        except Exception as e:
-            error_dump.append({
-                "error": f"Unexpected error: {str(e)}",
-                "file": url
-            })
-            return url, None
+            except aiohttp.ClientError as e:
+                error_dump.append({
+                    "error": f"Client error: {str(e)}",
+                    "file": url
+                })
+                return url, None
+            except Exception as e:
+                error_dump.append({
+                    "error": f"Unexpected error: {str(e)}",
+                    "file": url
+                })
+                return url, None
+
+def save_html_content(url: str, content: str) -> None:
+    """
+    Save HTML content to a text file.
+    
+    Args:
+        url: The URL of the HTML content
+        content: The HTML content to save
+    """
+    # Create html_output directory if it doesn't exist
+    output_dir = Path("ingestion_output/html_output")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Create a safe filename from the URL
+    # Remove protocol and domain, replace special characters
+    filename = url.replace("https://", "").replace("http://", "")
+    filename = re.sub(r'[^\w\-_\. ]', '_', filename)
+    filename = f"{filename}.txt"
+    
+    # Save the content
+    output_path = output_dir / filename
+    with open(output_path, 'w', encoding='utf-8') as f:
+        f.write(content)
 
 
 def extract_document_info(page: BeautifulSoup) -> Dict[str, Optional[str]]:
@@ -203,12 +258,26 @@ def extract_document_info(page: BeautifulSoup) -> Dict[str, Optional[str]]:
     """
     # --- Extract Main Text ---
     sections = page.find_all("section")
-    if len(sections) < 3:
-        raise ValueError("Not enough <section> elements found in the page to extract main text.")
-
-    main_text = sections[2].get_text()
-    # Replace multiple spaces with a newline for better readability.
+    main_text = ""
+    if len(sections) >= 3:
+        main_text = sections[2].get_text()
+    else:
+        # Try to find the main content section directly
+        main_content = page.find('main', {'property': 'mainContentOfPage'})
+        if main_content:
+            main_section = None
+            for comment in main_content.find_all(string=lambda text: isinstance(text, str) and "BEGIN MAIN CONTENT" in text):
+                main_section = comment.find_next('section')
+                if main_section:
+                    break
+            
+            if main_section:
+                main_text = main_section.get_text()
+            else:
+                # If no section found, get all text from main content
+                main_text = main_content.get_text()
     
+    # Replace multiple spaces with a newline for better readability.
     main_text = re.sub(r'(\s\s)+', '\n', main_text)
     # Remove the Accessibility Notice text (case-insensitive)
     main_text = re.sub(r'((Accessibility Notice)|(Avis d\'accessibilité))\s.*', '', main_text, flags=re.IGNORECASE)
@@ -218,7 +287,7 @@ def extract_document_info(page: BeautifulSoup) -> Dict[str, Optional[str]]:
     # --- Extract Subject and Authors ---
     main_content = page.find('main', {'property': 'mainContentOfPage'})
     subject = None
-    authors = []
+    cleaned_authors = []
     if main_content:
         # Find the section after BEGIN MAIN CONTENT comment
         main_section = None
@@ -240,7 +309,7 @@ def extract_document_info(page: BeautifulSoup) -> Dict[str, Optional[str]]:
                 subject = subject.replace(u'\xa0', u' ')
             
             # Extract authors
-            cleaned_authors = []
+            authors = []
             authors_h3 = main_section.find('h3')
             if authors_h3 and authors_h3.get_text().strip().startswith('By'):
                 # Get the text and remove 'By' prefix
@@ -370,7 +439,7 @@ def extract_doc_information(html_docs, pages):
         metadata['html_language'] = info['language']
         metadata['html_page_title'] = info['title']
         metadata['subject'] = info['subject']
-        metadata['authors'] = info['cleaned_authors']
+        metadata['authors'] = info['authors']
         metadata['html_year'] = extract_document_year_from_title(info['title'])
         metadata['html_doc_type'] = extract_doc_type(info['title'])
 
@@ -491,7 +560,22 @@ def existing_document_is_valid(doc, client, index, enable_override):
     # Validate the stored document.
     return is_valid_document(existing_doc)
 
-async def process_html_docs(html_docs, enable_override=False, dryrun=False):
+def is_english_document(url: str) -> bool:
+    """
+    Check if a document URL is for an English document.
+    This is just a temporary solution to exclude French documents.
+    
+    Args:
+        url: The document URL to check
+        
+    Returns:
+        bool: True if the document is English, False otherwise
+    """
+    # List of French document extensions
+    french_extensions = ['-fra.html', '-fra.htm']
+    return not any(url.endswith(ext) for ext in french_extensions)
+
+async def process_html_docs(html_docs, enable_override=False, dryrun=False, debug=False):
     """
     Process a list of HTML documents by filtering (unless override is enabled), downloading,
     extracting information, and ingesting into the index.
@@ -499,6 +583,8 @@ async def process_html_docs(html_docs, enable_override=False, dryrun=False):
     Parameters:
         html_docs (list): A list of HTML document dictionaries.
         enable_override (bool): If True, all documents are processed even if they already exist.
+        dryrun (bool): If True, don't actually ingest the documents.
+        debug (bool): If True, save HTML content to local files.
 
     Returns:
         dict: Processing statistics and error logs.
@@ -527,15 +613,15 @@ async def process_html_docs(html_docs, enable_override=False, dryrun=False):
             "mismatched_years": []
         }
     
-    # Download HTML pages concurrently.
-    urls = []
-    for doc in docs_to_process:
-        # Exclude documents with URLs ending in -inu-eng.html or -inu-fra.html
-        if doc["Document URL"].endswith("-inu-eng.html") or doc["Document URL"].endswith("-inu-fra.html"):
-            continue
-        # Only include English documents
-        urls.append(doc["Document URL"])
-    pages = await asyncio.gather(*(download_html(u, error_dump) for u in urls))
+    # Download HTML pages concurrently with rate limiting
+    urls = [doc["Document URL"] for doc in docs_to_process if is_english_document(doc["Document URL"])]
+    
+    # Create a semaphore to limit concurrent requests
+    # Adjust this number based on the server's capacity and your needs
+    semaphore = asyncio.Semaphore(5)  # Allow 5 concurrent requests
+    
+    # Use the semaphore in the download tasks
+    pages = await asyncio.gather(*(download_html(u, error_dump, semaphore, debug) for u in urls))
     
     # Extract document information from the downloaded HTML.
     docs, unloaded_docs, extraction_incompletes, mismatched_years = extract_doc_information(docs_to_process, pages)
@@ -559,7 +645,7 @@ async def process_html_docs(html_docs, enable_override=False, dryrun=False):
         "mismatched_years": mismatched_years
     }
 
-async def process_events(html_event_to_html_documents, enable_override=False, dryrun=False):
+async def process_events(html_event_to_html_documents, enable_override=False, dryrun=False, debug=False):
     """
     Process a dictionary of CSAS events where each event has a list of associated HTML documents.
     This function aggregates processing statistics from all events.
@@ -567,6 +653,8 @@ async def process_events(html_event_to_html_documents, enable_override=False, dr
     Parameters:
         html_event_to_html_documents (dict): Mapping of events to lists of HTML document dictionaries.
         enable_override (bool): If True, processes all documents regardless of prior existence.
+        dryrun (bool): If True, don't actually ingest the documents.
+        debug (bool): If True, save HTML content and logs locally.
 
     Returns:
         dict: A summary of overall processing statistics.
@@ -591,7 +679,8 @@ async def process_events(html_event_to_html_documents, enable_override=False, dr
         stats = await process_html_docs(
             html_docs, 
             enable_override=enable_override,
-            dryrun=dryrun
+            dryrun=dryrun,
+            debug=debug
         )
 
         overall_stats["total_docs_processed"] += stats["ingested_count"]
@@ -606,15 +695,37 @@ async def process_events(html_event_to_html_documents, enable_override=False, dr
     return overall_stats
 
 
-def upload_to_s3(bucket: str, key: str, df: pd.DataFrame):
-    """Upload a DataFrame as CSV to S3."""
+def upload_to_s3(bucket: str, key: str, df: pd.DataFrame, debug: bool = False):
+    """Upload a DataFrame as CSV to S3 and optionally save locally if debug=True."""
     s3 = session.client('s3')
     csv_buffer = BytesIO()
     df.to_csv(csv_buffer, index=False)
     s3.put_object(Bucket=bucket, Key=key, Body=csv_buffer.getvalue())
     
+    if debug:
+        # Save locally in logs directory
+        log_dir = Path("ingestion_output/logs")
+        log_dir.mkdir(parents=True, exist_ok=True)
+        local_path = log_dir / key.split('/')[-1]
+        with open(local_path, 'w') as f:
+            f.write(csv_buffer.getvalue().decode('utf-8'))
+
 html_url_to_content = {} # not sure why this is needed
-async def main(dryrun=False):
+async def main(dryrun=False, debug=False):
+    """
+    Main function to process and ingest HTML documents.
+    
+    Args:
+        dryrun (bool): If True, don't actually ingest the documents.
+        debug (bool): If True, save HTML content and logs locally.
+    """
+    # Create HTML index if it doesn't exist
+    if not client.indices.exists(index=DFO_HTML_FULL_INDEX_NAME):
+        print(f"Creating index {DFO_HTML_FULL_INDEX_NAME}...")
+        op.create_html_index(client, DFO_HTML_FULL_INDEX_NAME)
+    else:
+        print(f"Index {DFO_HTML_FULL_INDEX_NAME} already exists")
+
     # Load HTML data from S3
     html_data = load_html_data_from_s3(HTML_URLS_PATH, sheet_name="CSAS HTML URLs")
     # TODO: Remove this once when ready to ingest all data
@@ -628,7 +739,7 @@ async def main(dryrun=False):
     html_event_to_html_documents = get_html_event_to_html_documents(html_data)
     
     # Process events
-    overall_stats = await process_events(html_event_to_html_documents, enable_override=False, dryrun=dryrun)
+    overall_stats = await process_events(html_event_to_html_documents, enable_override=False, dryrun=dryrun, debug=debug)
 
     # Print processing results
     print("Documents successfully processed:", overall_stats["total_docs_processed"], 
@@ -637,10 +748,10 @@ async def main(dryrun=False):
     print("Documents already processed:", overall_stats["total_docs_already_processed"])
     print("Documents that failed embedding:", len(overall_stats["failed_embeddings_metadata"]))
 
-    # Upload logs to S3
-    upload_to_s3(BUCKET_NAME, f"batches/{BATCH_ID}/logs/html_fail_error_dump_docs.csv", pd.DataFrame(overall_stats["error_dump"]))
-    upload_to_s3(BUCKET_NAME, f"batches/{BATCH_ID}/logs/html_fail_docs.csv", pd.DataFrame(overall_stats["failed_html_pages"]))
-    upload_to_s3(BUCKET_NAME, f"batches/{BATCH_ID}/logs/too_long_docs.csv", pd.DataFrame(overall_stats["failed_embeddings_metadata"]))
+    # Upload logs to S3 and optionally save locally
+    upload_to_s3(BUCKET_NAME, f"batches/{BATCH_ID}/logs/html_fail_error_dump_docs.csv", pd.DataFrame(overall_stats["error_dump"]), debug)
+    upload_to_s3(BUCKET_NAME, f"batches/{BATCH_ID}/logs/html_fail_docs.csv", pd.DataFrame(overall_stats["failed_html_pages"]), debug)
+    upload_to_s3(BUCKET_NAME, f"batches/{BATCH_ID}/logs/too_long_docs.csv", pd.DataFrame(overall_stats["failed_embeddings_metadata"]), debug)
     
     # Save overall stats as CSV and upload to S3
     stats_df = pd.DataFrame([{
@@ -653,7 +764,7 @@ async def main(dryrun=False):
         'mismatched_years_count': len(overall_stats['mismatched_years'])
     }])
     print(stats_df.squeeze())
-    upload_to_s3(BUCKET_NAME, f"batches/{BATCH_ID}/logs/overall_stats.csv", stats_df)
+    upload_to_s3(BUCKET_NAME, f"batches/{BATCH_ID}/logs/overall_stats.csv", stats_df, debug)
 
 if __name__ == "__main__":
-    asyncio.run(main(dryrun=True))
+    asyncio.run(main(dryrun=False, debug=False))
