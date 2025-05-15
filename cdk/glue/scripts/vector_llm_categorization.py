@@ -81,13 +81,23 @@ info = op_client.info()
 print(f"Connected to {info['version']['distribution']} {info['version']['number']}!")
 
 # Configuration variables
-SM_METHOD = "numpy"  # Options: "numpy" or "opensearch", opensearch mode is untested
+SM_METHOD = "opensearch"  # Options: "numpy" or "opensearch", opensearch mode is untested
 EXPORT_OUTPUT = True  # Toggle file export
 DESIRED_THRESHOLD = 0.2  # Threshold for similarity/highlighting
 
 # Set up the embedding model via LangChain
 bedrock_client = session.client("bedrock-runtime", region_name=REGION_NAME)
 embedder = BedrockEmbeddings(client=bedrock_client, model_id=EMBEDDING_MODEL)
+
+mandates_vector_store = OpenSearchVectorSearch(
+    index_name=DFO_MANDATE_FULL_INDEX_NAME,
+    embedding_function=embedder,
+    opensearch_url=f"https://{opensearch_host}",
+    http_compress=True,
+    http_auth = auth,
+    use_ssl = True,
+    verify_certs=True,
+)
 
 topics_vector_store = OpenSearchVectorSearch(
     index_name=DFO_TOPIC_FULL_INDEX_NAME,
@@ -276,7 +286,7 @@ def parse_json_with_retries(json_string: str, max_attempts=3, verbose = True):
         return None
 
 
-def store_output_dfs(output_dict: dict, bucket_name: str, batch_id: str, debug: bool = False):
+def store_output_dfs(output_dict: dict, bucket_name: str, batch_id: str, method: str, debug: bool = False):
     """
     Store the final output DataFrames as CSV files in S3 under temp_outputs folder.
     If debug=True, also save locally in vector_llm_cat_output/.
@@ -300,63 +310,63 @@ def store_output_dfs(output_dict: dict, bucket_name: str, batch_id: str, debug: 
         csv_buffer = df.to_csv(index=False)
         
         # Upload to S3
-        s3_key = f"{output_dir}/{name}.csv"
+        s3_key = f"{output_dir}/{method}_{name}.csv"
         s3_client.put_object(
             Bucket=bucket_name,
             Key=s3_key,
             Body=csv_buffer
         )
-        print(f"Uploaded {name}.csv to s3://{bucket_name}/{s3_key}")
+        print(f"Uploaded {method}_{name}.csv to s3://{bucket_name}/{s3_key}")
         
         # Save locally if in debug mode
         if debug:
-            local_path = os.path.join(local_dir, f"{name}.csv")
+            local_path = os.path.join(local_dir, f"{method}_{name}.csv")
             df.to_csv(local_path, index=False)
-            print(f"Saved {name}.csv locally to {local_path}")
+            print(f"Saved {method}_{name}.csv locally to {local_path}")
 
 
-def opensearch_semantic_search_top_topics(document: Document, n: int = 10) -> dict:
+def opensearch_semantic_search_top_targets(document: Document, n: int = 7, vector_store=None) -> dict:
     """
-    Use OpenSearch vector search to retrieve topics relevant to a given document.
+    Use OpenSearch vector search to retrieve topics or mandates relevant to a given document.
 
-    Since a single topic may have multiple descriptions, we first retrieve a larger set of candidates,
-    group results by topic name (using the maximum relevance score among descriptions), and then return the top n topics.
+    Since a single topic/mandate may have multiple descriptions, we first retrieve a larger set of candidates,
+    group results by topic/mandate name (using the maximum relevance score among descriptions), and then return the top n topics/mandates.
 
     Parameters:
         document (Document): The document for which to search related topics.
         n (int): The number of top topics to return.
 
     Returns:
-        dict: A dictionary where keys are topic names and values are the maximum relevance scores.
+        dict: A dictionary where keys are topic/mandate names and values are the maximum relevance scores.
     """
     # Extract document text
     document_text = document.page_content
 
     # Retrieve topic similarity search results from OpenSearch vector search
-    topics_results = topics_vector_store.similarity_search_with_relevance_scores(
+    targets_results = vector_store.similarity_search_with_relevance_scores(
         document_text,
         k=n,                # pull more documents to cover all descriptions
         vector_field="chunk_embedding",
         text_field="name_and_description",
     )
-
-    # Group results by topic name and select the maximum relevance score per topic
-    grouped_topics = {}
-    for result in topics_results:
+    
+    # Group results by topic/mandate name and select the maximum relevance score per topic/mandate
+    grouped_targets = {}
+    for result in targets_results:
         candidate_doc, relevance_score = result
-        topic_name = candidate_doc.metadata.get('name', 'N/A')
+        target_name = candidate_doc.metadata.get('name', 'N/A')
         # If a topic has multiple descriptions, keep the highest score
-        if topic_name in grouped_topics:
-            grouped_topics[topic_name] = max(grouped_topics[topic_name], relevance_score)
+        if target_name in grouped_targets:
+            grouped_targets[target_name] = max(grouped_targets[target_name], relevance_score)
         else:
-            grouped_topics[topic_name] = relevance_score
+            grouped_targets[target_name] = relevance_score
 
-    # Sort topics by relevance score in descending order and take the top n topics.
-    top_topics = dict(sorted(grouped_topics.items(), key=lambda item: item[1], reverse=True)[:n])
+    # Sort topics/mandates by relevance score in descending order and take the top n topics/mandates.
+    # {topic_name1: relevance_score1, topic_name2: relevance_score2, ...}
+    top_targets = dict(sorted(grouped_targets.items(), key=lambda item: item[1], reverse=True)[:n])
+    return top_targets
 
-    return top_topics
-
-def semantic_similarity_categorization(
+def numpy_semantic_similarity_categorization(
     targets: List[Document],
     target_embeddings: np.array,
     documents: List[Document],
@@ -389,7 +399,7 @@ def semantic_similarity_categorization(
     # Build full DataFrame
     key = "name"
     target_names = [(t.metadata.get(key, "Unknown"), t.metadata.get('description_number', "")) for t in targets]
-    doc_names = [d.metadata.get('html_page_title', f"Doc_{i}") for i, d in enumerate(documents)]
+    doc_names = [d.metadata.get('html_url', f"Doc_{i}") for i, d in enumerate(documents)]
     full_df = pd.DataFrame(scaled_scores, index=doc_names, columns=target_names)
 
     # Aggregate by unique target names
@@ -403,12 +413,12 @@ def semantic_similarity_categorization(
     return full_df, max_df
 
 
-def semantic_similarity(targets, target_embeddings, documents, document_embeddings, method="numpy", n=10):
+def semantic_similarity(targets, target_embeddings, documents, document_embeddings, method="numpy", n=10, vector_store=None) -> pd.DataFrame | dict:
     """
     Perform semantic similarity using either numpy or OpenSearch.
     """
     if method == "numpy":
-        return semantic_similarity_categorization(
+        return numpy_semantic_similarity_categorization(
             targets=targets,
             target_embeddings=target_embeddings,
             documents=documents,
@@ -419,14 +429,14 @@ def semantic_similarity(targets, target_embeddings, documents, document_embeddin
     elif method == "opensearch":
         results = {}
         for doc in documents:
-            key = (doc.metadata.get('html_page_title', 'Unknown'), doc.metadata.get('doc_url', ''))
-            results[key] = opensearch_semantic_search_top_topics(doc, n=n)
+            key =  doc.metadata.get('html_url', '')
+            results[key] = opensearch_semantic_search_top_targets(doc, n=n, vector_store=vector_store)
         return results
     else:
         raise ValueError("Invalid semantic similarity method. Choose 'numpy' or 'opensearch'.")
 
 
-def get_top_n_topics(max_df: pd.DataFrame, n: int = 10) -> dict:
+def get_top_n_topics(max_df: pd.DataFrame, n: int = 7) -> dict:
     """
     Get top N topics for each document based on semantic similarity scores.
     
@@ -438,11 +448,12 @@ def get_top_n_topics(max_df: pd.DataFrame, n: int = 10) -> dict:
         dict: Dictionary mapping document titles to their top N topics
     """
     top_topics = {}
-    for doc_idx in max_df.index:
-        # Get scores for this document and sort
-        doc_scores = max_df.loc[doc_idx].sort_values(ascending=False)
+    for i, doc_idx in enumerate(max_df.index):
+        # Get scores for this document using iloc to ensure we get a Series
+        doc_scores = max_df.iloc[i]
         # Get top N topics
-        top_topics[doc_idx] = doc_scores.head(n).index.tolist()
+        top_topics[doc_idx] = doc_scores.nlargest(n).index.tolist()
+        # print(top_topics[doc_idx])
     return top_topics
 
 
@@ -500,7 +511,7 @@ def validate_llm_response(target_result: dict) -> Tuple[bool, Optional[dict], Op
     }, None
 
 
-async def categorize_documents(documents, document_embeddings, targets, target_embeddings, target_type, items_by_name, method="numpy", prompt_template=None, top_n: int = 10, debug: bool = False):
+async def categorize_documents(documents, document_embeddings, targets, target_embeddings, target_type, items_by_name, method="numpy", prompt_template=None, vector_store=None, top_n: int = 10, debug: bool = False):
     """
     Categorize documents based on either topics or mandates using semantic similarity and LLM.
     First uses semantic similarity to get top N topics, then uses LLM for final categorization.
@@ -508,28 +519,36 @@ async def categorize_documents(documents, document_embeddings, targets, target_e
     Parameters:
         debug (bool): If True, save prompts to file for inspection
     """
+    print(f"Starting {target_type} categorization with method: {method}")
     if method == "numpy":
-        full_df, max_df = semantic_similarity(
+        # max_df is a DataFrame with the semantic scores for all documents and all targets
+        # row index is the html_url, column index is the target name e.g Topic_1, Topic_2, ...
+        _, max_df = semantic_similarity(
             documents=documents,
             document_embeddings=document_embeddings,
             targets=targets,
             target_embeddings=target_embeddings,
             method="numpy"
         )
-        
-        # Get top N topics for each document
+
+        # top_topics is a dictionary with the top N topics for each document
+        # key is the html_url value is a list of topic names
         top_topics = get_top_n_topics(max_df, n=top_n)
-            
     else:
-        max_df = semantic_similarity(
+        # {(html_url1): {topic_name1: relevance_score1, topic_name2: relevance_score2, ...}, (html_url2): {...}, ...}
+        doc_topic_scores_dict = semantic_similarity(
             documents=documents,
-            document_embeddings=None,
+            document_embeddings=document_embeddings,
             targets=targets,
-            target_embeddings=None,
-            method="opensearch"
+            target_embeddings=target_embeddings,
+            method="opensearch",
+            vector_store=vector_store
         )
         # For opensearch method, use all topics
-        top_topics = {doc.metadata.get('html_page_title', 'Unknown'): max_df.columns.tolist() for doc in documents}
+        ks =  list(doc_topic_scores_dict.keys()) # list of html_url
+        vs = [list(v.keys()) for v in doc_topic_scores_dict.values()] # list of lists of topic names
+        # dictionary with html_url as keys and lists of topic names as values
+        top_topics = dict(zip(ks, vs))
 
     # Set up file writing if in debug mode
     f = None
@@ -543,14 +562,13 @@ async def categorize_documents(documents, document_embeddings, targets, target_e
         # Use LLM for final categorization
         categorization_results = {}
         for doc in documents:
-            doc_key = (doc.metadata.get('html_page_title', 'Unknown'), doc.metadata.get('doc_url', ''))
-            if method == "numpy":
-                semantic_scores = max_df.loc[doc_key[0]]
-            else:
-                semantic_scores = max_df.get(doc_key, {})
+            doc_key = doc.metadata.get('html_url', '')
 
             # Only get combined text for top N topics
-            combined_text = get_combined_topics(items_by_name, top_topics[doc_key[0]])
+            if method == "numpy":
+                combined_text = get_combined_topics(items_by_name, top_topics[doc_key])
+            else:
+                combined_text = get_combined_topics(items_by_name, top_topics[doc_key])
             formatted_prompt = prompt_template.invoke({
                 target_type: combined_text,
                 "document": doc.page_content
@@ -559,7 +577,7 @@ async def categorize_documents(documents, document_embeddings, targets, target_e
             # Save the formatted prompt to file if in debug mode
             if debug and f is not None:
                 f.write("\n" + "="*80 + "\n")
-                f.write(f"Processing document: {doc_key[0]}\n")
+                f.write(f"Processing document: {doc_key}\n")
                 f.write("="*80 + "\n")
                 f.write("Formatted prompt being sent to LLM:\n")
                 f.write("-"*80 + "\n")
@@ -576,9 +594,14 @@ async def categorize_documents(documents, document_embeddings, targets, target_e
             f.close()
 
     combined_rows = []
+    doc_url_to_title_mapping = {}
+    for doc in documents:
+        doc_url_to_title_mapping[doc.metadata.get('html_url', '')] = doc.metadata.get('html_page_title', 'Unknown')
     for doc_key, llm_results in categorization_results.items():
-        doc_title, doc_url = doc_key
-        semantic_scores = max_df.loc[doc_key[0]]
+        if method == "numpy":
+            semantic_scores = max_df.loc[doc_key]
+        else:
+            semantic_scores = doc_topic_scores_dict[doc_key]
         
         # Create a mapping of topic names to their semantic scores
         topic_scores = {topic: score for topic, score in semantic_scores.items()}
@@ -592,8 +615,8 @@ async def categorize_documents(documents, document_embeddings, targets, target_e
             
             if target_type == "mandates":
                 combined_rows.append({
-                    "Document Title": doc_title,
-                    "URL": doc_url,
+                    "Document Title": doc_url_to_title_mapping[doc_key],
+                    "Document URL": doc_key,
                     "Mandate": validated_result["name"],
                     "Semantic Score": topic_scores.get(validated_result["name"], 0.0),
                     "LLM Belongs": validated_result["belongs"],
@@ -602,8 +625,8 @@ async def categorize_documents(documents, document_embeddings, targets, target_e
                 })
             elif target_type == "topics":
                 combined_rows.append({
-                    "Document Title": doc_title,
-                    "URL": doc_url,
+                    "Document Title": doc_url_to_title_mapping[doc_key],
+                    "Document URL": doc_key,
                     "Topic": validated_result["name"],
                     "Semantic Score": topic_scores.get(validated_result["name"], 0.0),
                     "LLM Belongs": validated_result["belongs"],
@@ -658,8 +681,8 @@ async def main(debug=False):
             all_downloaded_docs.append(doc_obj)
             all_doc_embeddings.append(vector)
 
-    all_downloaded_docs = all_downloaded_docs[:2] # first 2 documents
-    all_doc_embeddings = np.array(all_doc_embeddings)[:2, :] # first 2 document embeddings
+    all_downloaded_docs = all_downloaded_docs[:5] # first 2 documents
+    all_doc_embeddings = np.array(all_doc_embeddings)[:5, :] # first 2 document embeddings
     print(f"Processed {len(all_downloaded_docs)} documents with embeddings")
 
     # Get mandates and topics
@@ -704,6 +727,7 @@ async def main(debug=False):
         items_by_name=mandates_by_name,
         method=SM_METHOD,
         prompt_template=mandate_prompt_template,
+        vector_store=mandates_vector_store,
         top_n=7,  # Get top 7 topics
         debug=debug
     )
@@ -746,6 +770,7 @@ async def main(debug=False):
         items_by_name=topics_by_name,
         method=SM_METHOD,
         prompt_template=topic_prompt_template,
+        vector_store=topics_vector_store,
         top_n=7,  # Get top 7 topics
         debug=debug
     )
@@ -754,7 +779,7 @@ async def main(debug=False):
     store_output_dfs({
         "combined_mandates_results": df_mandates_combined,
         "combined_topics_results": df_topics_combined
-    }, args['bucket_name'], args['batch_id'], debug=debug)
+    }, args['bucket_name'], args['batch_id'], method=SM_METHOD, debug=debug)
 
 
 if __name__ == "__main__":
