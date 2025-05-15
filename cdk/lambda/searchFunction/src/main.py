@@ -1,6 +1,7 @@
 import os
 import re
 import json
+import boto3
 import torch
 from pathlib import Path
 from pprint import pprint
@@ -68,42 +69,41 @@ def handler(event, context):
     try:
         set_secrets()
 
-        # Step 1: Load & clean docs
-        docs = process_documents()
-        texts = [doc.page_content for doc in docs]
-        metadatas = [doc.metadata for doc in docs]
-        bulk_size = len(docs)
+        # Step 1: Parse input query
+        body = json.loads(event.get("body", "{}"))
+        query = body.get("query", "")
+        if not query:
+            return {
+                "statusCode": 400,
+                "body": json.dumps({"error": "Missing 'query' in request body"})
+            }
 
-        # Step 2: Embedding setup — ✅ CHANGED TO BEDROCK
-        session = aws.session
-        bedrock_client = session.client("bedrock-runtime", region_name=REGION_NAME)
+        # Step 2: Initialize embedding client
+        bedrock_client = boto3.client("bedrock-runtime", region_name=REGION_NAME)
         embedder = BedrockEmbeddings(
             client=bedrock_client,
-            model_id=configs['embeddings']['embedding_model']  # e.g., "amazon.titan-embed-text-v1"
+            model_id=configs['embeddings']['embedding_model']
         )
-        embeddings = embedder.embed_documents(texts)
 
-        # Step 3: VectorStore setup
-        vector_store = OpenSearchVectorSearch.from_embeddings(
-            embeddings=embeddings,
-            texts=texts,
-            embedding=embedder,
-            metadatas=metadatas,
-            vector_field='vector_embeddings',
-            text_field="text",
-            engine="nmslib",
-            space_type="cosinesimil",
+        # Step 3: Embed the input query
+        embedded_query = embedder.embed_query(query)
+
+        # Step 4: Connect to existing vectorstore (previously indexed)
+        opensearch = get_opensearch_client()
+        vector_store = OpenSearchVectorSearch(
             index_name=INDEX_NAME,
-            bulk_size=bulk_size,
             opensearch_url='https://search-test-dfo-yevtcwsp7i4vjzy4kdvalwpxgm.aos.ca-central-1.on.aws',
             port=443,
             http_auth=(SECRETS['username'], SECRETS['passwords']),
             use_ssl=True,
-            verify_certs=True
+            verify_certs=True,
+            vector_field="vector_embeddings",
+            text_field="text",
+            engine="nmslib",
+            space_type="cosinesimil"
         )
 
-        # Step 4: Example query
-        embedded_query = embedder.embed_query("Salmon population")
+        # Step 5: Perform similarity search
         results = vector_store.similarity_search_by_vector(
             embedding=embedded_query,
             k=3,
@@ -114,13 +114,22 @@ def handler(event, context):
         return {
             "statusCode": 200,
             "body": json.dumps({
-                "query_result": results[0].metadata,
+                "query": query,
+                "results": [
+                    {"text": r.page_content, "metadata": r.metadata}
+                    for r in results
+                ],
                 "langchain": langchain_version
             })
         }
 
     except Exception as e:
+        import traceback
         return {
             "statusCode": 500,
-            "body": json.dumps({"error": str(e)})
+            "body": json.dumps({
+                "error": str(e),
+                "trace": traceback.format_exc()
+            })
         }
+
