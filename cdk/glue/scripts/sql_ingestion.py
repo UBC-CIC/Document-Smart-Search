@@ -1,5 +1,6 @@
 import sys
 import os
+import io
 from typing import Dict, List, Iterable, Literal, Optional, Tuple
 import pandas as pd
 import numpy as np
@@ -13,10 +14,25 @@ import src.opensearch as op
 import src.pgsql as pgsql
 
 # Constants that will be replaced with Glue context args, SSM params, or Secrets Manager
-OPENSEARCH_SEC = "opensearch"
-OPENSEARCH_HOST = "/dfo/opensearch/host"
-REGION_NAME = "ca-central-1"
+REGION_NAME = "us-west-2"
 DFO_HTML_FULL_INDEX_NAME = "dfo-html-full-index"
+
+glue_args = {
+    'JOB_NAME': 'vector_llm_categorization',
+    'bucket_name': 'dfo-test-datapipeline',
+    'batch_id': '2025-05-07',
+    'topics_mandates_data_path': 'batches/2025-05-07/topics_mandates_data',
+    'temp_outputs_path': 'batches/2025-05-07/temp_outputs',
+    'region_name': 'us-west-2',
+    'opensearch_secret': 'opensearch-masteruser-test-glue',
+    'opensearch_host': 'opensearch-host-test-glue',
+    'rds_secret': 'rds/dfo-db-glue-test',
+    'sm_method': 'opensearch'
+}
+
+CURRENT_DATETIME = datetime.now().strftime(r"%Y-%m-%d %H:%M:%S")
+
+session = aws.session # always use this session for boto3 operations
 
 def fetch_specific_fields(client, index_name: str, fields: List[str], scroll: str = "2m", batch_size: int = 5000) -> List[Dict]:
     """
@@ -90,28 +106,19 @@ def prepare_documents_table(document_df: pd.DataFrame, now: str) -> pd.DataFrame
     documents_table = (document_df.loc[:, [
         'html_url', 'html_year', 'html_page_title', 'html_doc_type', 'pdf_url', 
         'html_language', 'csas_html_year', 'csas_event'
-    ]].rename(columns={
+    ]].copy().rename(columns={
         'html_year': 'year',
         'html_page_title': 'title',
         'html_doc_type': 'doc_type',
         'html_language': 'doc_language',
         'csas_html_year': 'event_year',
         'csas_event': 'event_subject'
-    }).astype({
-        "html_url": "string",
-        "year": "string",
-        "title": "string",
-        "doc_type": "string",
-        "pdf_url": "string",
-        "doc_language": "string",
-        "event_year": "string",
-        "event_subject": "string"
-    }).map(lambda x: None if pd.isna(x) else x))
+    }))
 
-    documents_table['year'] = pd.to_numeric(documents_table['year'], errors='coerce').replace({np.nan: None})
-    documents_table['event_year'] = pd.to_numeric(documents_table['event_year'], errors='coerce').replace({np.nan: None})
+    documents_table.loc[:, 'year'] = pd.to_numeric(documents_table['year'], errors='coerce').replace({np.nan: None})
+    documents_table.loc[:, 'event_year'] = pd.to_numeric(documents_table['event_year'], errors='coerce').replace({np.nan: None})
     documents_table = documents_table.replace(np.nan, None)
-    documents_table['last_updated'] = now
+    documents_table.loc[:, 'last_updated'] = now
 
     return documents_table
 
@@ -131,8 +138,8 @@ def prepare_mandates_table(mandate_df: pd.DataFrame, now: str) -> pd.DataFrame:
     pd.DataFrame
         Processed mandates table dataframe
     """
-    mandates_table = mandate_df[["mandate_name"]]
-    mandates_table['last_updated'] = now
+    mandates_table = mandate_df[["mandate_name"]].copy()
+    mandates_table.loc[:, 'last_updated'] = now
     return mandates_table
 
 def prepare_subcategories_table(subcategory_df: pd.DataFrame, mandate_df: pd.DataFrame, now: str) -> pd.DataFrame:
@@ -158,8 +165,8 @@ def prepare_subcategories_table(subcategory_df: pd.DataFrame, mandate_df: pd.Dat
         how="left",
         left_on="parent",
         right_on="tag"
-    ).loc[:, ['subcategory_name', 'mandate_name']]
-    subcategories_table['last_updated'] = now
+    ).loc[:, ['subcategory_name', 'mandate_name']].copy()
+    subcategories_table.loc[:, 'last_updated'] = now
     return subcategories_table
 
 def prepare_topics_table(topic_df: pd.DataFrame, subcategory_df: pd.DataFrame, mandate_df: pd.DataFrame, now: str) -> pd.DataFrame:
@@ -182,9 +189,9 @@ def prepare_topics_table(topic_df: pd.DataFrame, subcategory_df: pd.DataFrame, m
     pd.DataFrame
         Processed topics table dataframe
     """
-    topics_table = topic_df.loc[:, ['tag', 'topic_name', 'parent']]
-    topics_table["mandate_tag"] = topics_table["parent"].str.extract(r"^(\d+)")
-    topics_table["subcategory_tag"] = topics_table["parent"].where(topics_table["parent"].str.contains(r"\d+\.\d+"), None)
+    topics_table = topic_df.loc[:, ['tag', 'topic_name', 'parent']].copy()
+    topics_table.loc[:, "mandate_tag"] = topics_table["parent"].str.extract(r"^(\d+)")
+    topics_table.loc[:, "subcategory_tag"] = topics_table["parent"].where(topics_table["parent"].str.contains(r"\d+\.\d+"), None)
     topics_table = topics_table.merge(
         subcategory_df.loc[:, ['tag', 'subcategory_name']],
         how="left",
@@ -195,9 +202,10 @@ def prepare_topics_table(topic_df: pd.DataFrame, subcategory_df: pd.DataFrame, m
         how='left',
         left_on='mandate_tag',
         right_on='tag'
-    ).loc[:, ['topic_name', 'subcategory_name', 'mandate_name']].replace(np.nan, None)
-    topics_table['isDFO'] = True
-    topics_table['last_updated'] = now
+    ).loc[:, ['topic_name', 'subcategory_name', 'mandate_name']].copy()
+    topics_table = topics_table.replace(np.nan, None)
+    topics_table.loc[:, 'isDFO'] = True
+    topics_table.loc[:, 'last_updated'] = now
     return topics_table
 
 def prepare_csas_events_table(documents_table: pd.DataFrame, now: str) -> pd.DataFrame:
@@ -216,8 +224,8 @@ def prepare_csas_events_table(documents_table: pd.DataFrame, now: str) -> pd.Dat
     pd.DataFrame
         Processed CSAS events table dataframe
     """
-    csas_events_table = documents_table[['event_year', 'event_subject']].drop_duplicates()
-    csas_events_table['last_updated'] = now
+    csas_events_table = documents_table[['event_year', 'event_subject']].drop_duplicates().copy()
+    csas_events_table.loc[:, 'last_updated'] = now
     return csas_events_table
 
 def prepare_documents_mandates_table(
@@ -247,7 +255,7 @@ def prepare_documents_mandates_table(
     """
     documents_mandates_table = mandate_results_df.merge(
         right=documents_table,
-        left_on="URL",
+        left_on="Document URL",
         right_on="html_url",
         how="inner"
     ).merge(
@@ -306,7 +314,7 @@ def prepare_documents_topics_table(
         "Topic not in @excluded_topics"
     ).merge(
         right=documents_table,
-        left_on="URL",
+        left_on="Document URL",
         right_on="html_url",
         how="inner"
     ).merge(
@@ -344,7 +352,7 @@ def prepare_dataframes(
     subcategory_df: pd.DataFrame,
     topic_df: pd.DataFrame,
     mandate_results_df: pd.DataFrame,
-    topic_results_df: pd.DataFrame
+    topic_results_df: pd.DataFrame,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     Prepare dataframes for database ingestion.
@@ -369,19 +377,18 @@ def prepare_dataframes(
     tuple
         Tuple of prepared dataframes for database ingestion
     """
-    now = datetime.now().strftime(r"%Y-%m-%d %H:%M:%S")
 
     # Prepare each table
-    documents_table = prepare_documents_table(document_df, now)
-    mandates_table = prepare_mandates_table(mandate_df, now)
-    subcategories_table = prepare_subcategories_table(subcategory_df, mandate_df, now)
-    topics_table = prepare_topics_table(topic_df, subcategory_df, mandate_df, now)
-    csas_events_table = prepare_csas_events_table(documents_table, now)
+    documents_table = prepare_documents_table(document_df, CURRENT_DATETIME)
+    mandates_table = prepare_mandates_table(mandate_df, CURRENT_DATETIME)
+    subcategories_table = prepare_subcategories_table(subcategory_df, mandate_df, CURRENT_DATETIME)
+    topics_table = prepare_topics_table(topic_df, subcategory_df, mandate_df, CURRENT_DATETIME)
+    csas_events_table = prepare_csas_events_table(documents_table, CURRENT_DATETIME)
     documents_mandates_table = prepare_documents_mandates_table(
-        mandate_results_df, documents_table, mandates_table, now
+        mandate_results_df, documents_table, mandates_table, CURRENT_DATETIME
     )
     documents_topics_table = prepare_documents_topics_table(
-        topic_results_df, documents_table, topics_table, subcategory_df, now
+        topic_results_df, documents_table, topics_table, subcategory_df, CURRENT_DATETIME
     )
 
     return (
@@ -394,12 +401,12 @@ def prepare_dataframes(
         documents_topics_table
     )
 
-def main():
+def main(dryrun: bool = False, debug: bool = False):
     # Get AWS credentials and parameters
-    secrets = aws.get_secret(secret_name=OPENSEARCH_SEC, region_name=REGION_NAME)
-    opensearch_host = aws.get_parameter_ssm(parameter_name=OPENSEARCH_HOST, region_name=REGION_NAME)
-    rds_hosturl = aws.get_parameter_ssm('/dfo/rds/host_url')
-    rds_secret = aws.get_secret(aws.get_parameter_ssm("/dfo/rds/secretname"))
+    secrets = aws.get_secret(secret_name=glue_args['opensearch_secret'], region_name=glue_args['region_name'])
+    opensearch_host = aws.get_parameter_ssm(parameter_name=glue_args['opensearch_host'], region_name=glue_args['region_name'])
+    # rds_hosturl = aws.get_parameter_ssm('/dfo/rds/host_url')
+    rds_secret = aws.get_secret(glue_args['rds_secret'])
 
     # Connect to OpenSearch
     auth = (secrets['username'], secrets['password'])
@@ -413,12 +420,26 @@ def main():
 
     # Connect to PostgreSQL
     conn_info = {
-        "host": rds_hosturl,
-        "port": 5432,
-        "dbname": "postgres",
+        "host": rds_secret['host'],
+        "port": rds_secret['port'],
+        "dbname": 'postgres',
         "user": rds_secret['username'],
         "password": rds_secret['password']
     }
+
+    # Test connection
+    if not pgsql.test_connection(conn_info):
+        print("Failed to connect to PostgreSQL")
+        return
+    print("Connected to PostgreSQL")
+
+    # Create tables if they don't exist
+    if not dryrun:
+        try:
+            pgsql.create_tables_if_not_exists(conn_info)
+        except Exception as e:
+            print(f"Error creating tables: {str(e)}")
+            return
 
     # Define fields to fetch from OpenSearch
     document_fields = [
@@ -432,11 +453,54 @@ def main():
     
     # Convert to DataFrames
     document_df = pd.DataFrame(fetched_documents).drop_duplicates()
-    mandate_df = pd.read_csv("../export/new_mandates.csv", dtype=str)
-    subcategory_df = pd.read_csv("../export/new_subcategories.csv", dtype=str)
-    topic_df = pd.read_csv("../export/new_topics.csv", dtype=str)
-    mandate_results_df = pd.read_csv("../export/categorization/combined_mandates_results.csv")
-    topic_results_df = pd.read_csv("../export/categorization/combined_topics_results.csv")
+    
+    # Read CSV files from S3
+    s3_client = session.client('s3')
+    bucket = glue_args['bucket_name']
+    
+    # Read topics and mandates data
+    try:
+        # Read mandates
+        response = s3_client.get_object(
+            Bucket=bucket,
+            Key=f"{glue_args['topics_mandates_data_path']}/new_mandates.csv"
+        )
+        mandate_df = pd.read_csv(io.StringIO(response['Body'].read().decode('utf-8')), dtype=str)
+        mandate_df = mandate_df.rename(columns={'name': 'mandate_name'})
+        
+        # Read subcategories
+        response = s3_client.get_object(
+            Bucket=bucket,
+            Key=f"{glue_args['topics_mandates_data_path']}/new_subcategories.csv"
+        )
+        subcategory_df = pd.read_csv(io.StringIO(response['Body'].read().decode('utf-8')), dtype=str)
+        subcategory_df = subcategory_df.rename(columns={'name': 'subcategory_name'})
+        
+        # Read topics
+        response = s3_client.get_object(
+            Bucket=bucket,
+            Key=f"{glue_args['topics_mandates_data_path']}/new_topics.csv"
+        )
+        topic_df = pd.read_csv(io.StringIO(response['Body'].read().decode('utf-8')), dtype=str)
+        topic_df = topic_df.rename(columns={'name': 'topic_name'})
+        
+        # Read mandate results
+        response = s3_client.get_object(
+            Bucket=bucket,
+            Key=f"{glue_args['temp_outputs_path']}/{glue_args['sm_method']}_combined_mandates_results.csv"
+        )
+        mandate_results_df = pd.read_csv(io.StringIO(response['Body'].read().decode('utf-8')))
+        
+        # Read topic results
+        response = s3_client.get_object(
+            Bucket=bucket,
+            Key=f"{glue_args['temp_outputs_path']}/{glue_args['sm_method']}_combined_topics_results.csv"
+        )
+        topic_results_df = pd.read_csv(io.StringIO(response['Body'].read().decode('utf-8')))
+
+    except Exception as e:
+        print(f"Error reading CSV files from S3: {str(e)}")
+        raise
 
     # Prepare dataframes for database ingestion
     (
@@ -453,17 +517,26 @@ def main():
         subcategory_df,
         topic_df,
         mandate_results_df,
-        topic_results_df
+        topic_results_df,
     )
 
     # Bulk insert into PostgreSQL
-    pgsql.bulk_upsert_csas_events(csas_events_table.values.tolist(), conn_info)
-    pgsql.bulk_upsert_documents(documents_table.values.tolist(), conn_info)
-    pgsql.bulk_upsert_mandates(mandates_table.values.tolist(), conn_info)
-    pgsql.bulk_upsert_subcategories(subcategories_table.values.tolist(), conn_info)
-    pgsql.bulk_upsert_topics(topics_table.values.tolist(), conn_info)
-    pgsql.bulk_upsert_documents_mandates(documents_mandates_table.values.tolist(), conn_info)
-    pgsql.bulk_upsert_documents_topics(documents_topics_table.values.tolist(), conn_info)
+    if debug:
+        os.makedirs("temp_outputs/sql_ingestion_output", exist_ok=True)
+        documents_table.to_csv("temp_outputs/sql_ingestion_output/documents_table.csv", index=False)
+        mandates_table.to_csv("temp_outputs/sql_ingestion_output/mandates_table.csv", index=False)
+        subcategories_table.to_csv("temp_outputs/sql_ingestion_output/subcategories_table.csv", index=False)
+        topics_table.to_csv("temp_outputs/sql_ingestion_output/topics_table.csv", index=False)
+        documents_mandates_table.to_csv("temp_outputs/sql_ingestion_output/documents_mandates_table.csv", index=False)
+        documents_topics_table.to_csv("temp_outputs/sql_ingestion_output/documents_topics_table.csv", index=False)
+    if not dryrun:
+        pgsql.bulk_upsert_csas_events(csas_events_table.values.tolist(), conn_info)
+        pgsql.bulk_upsert_documents(documents_table.values.tolist(), conn_info)
+        pgsql.bulk_upsert_mandates(mandates_table.values.tolist(), conn_info)
+        pgsql.bulk_upsert_subcategories(subcategories_table.values.tolist(), conn_info)
+        pgsql.bulk_upsert_topics(topics_table.values.tolist(), conn_info)
+        pgsql.bulk_upsert_documents_mandates(documents_mandates_table.values.tolist(), conn_info)
+        pgsql.bulk_upsert_documents_topics(documents_topics_table.values.tolist(), conn_info)
 
 if __name__ == "__main__":
-    main() 
+    main(dryrun=False, debug=True) 

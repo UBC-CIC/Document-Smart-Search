@@ -214,7 +214,7 @@ def save_html_content(url: str, content: str) -> None:
         content: The HTML content to save
     """
     # Create html_output directory if it doesn't exist
-    output_dir = Path("ingestion_output/html_output")
+    output_dir = Path("temp_outputs/ingestion_output/html_output")
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Create a safe filename from the URL
@@ -704,7 +704,7 @@ def upload_to_s3(bucket: str, key: str, df: pd.DataFrame, debug: bool = False):
     
     if debug:
         # Save locally in logs directory
-        log_dir = Path("ingestion_output/logs")
+        log_dir = Path("temp_outputs/ingestion_output/logs")
         log_dir.mkdir(parents=True, exist_ok=True)
         local_path = log_dir / key.split('/')[-1]
         with open(local_path, 'w') as f:

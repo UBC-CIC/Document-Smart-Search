@@ -302,7 +302,7 @@ def store_output_dfs(output_dict: dict, bucket_name: str, batch_id: str, method:
     
     # Create local directory if debug mode
     if debug:
-        local_dir = "vector_llm_cat_output"
+        local_dir = "temp_outputs/vector_llm_cat_output"
         os.makedirs(local_dir, exist_ok=True)
     
     for name, df in output_dict.items():
@@ -553,7 +553,7 @@ async def categorize_documents(documents, document_embeddings, targets, target_e
     # Set up file writing if in debug mode
     f = None
     if debug:
-        output_dir = "vector_llm_cat_output"
+        output_dir = "temp_outputs/vector_llm_cat_output"
         os.makedirs(output_dir, exist_ok=True)
         prompt_file = os.path.join(output_dir, f"{target_type}_prompts.txt")
         f = open(prompt_file, 'w', encoding='utf-8')
