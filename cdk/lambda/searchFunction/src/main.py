@@ -173,9 +173,5 @@ def handler(event, context):
                 "error": str(e),
                 "trace": traceback.format_exc()
             })
-            "body": json.dumps({
-                "error": str(e),
-                "trace": traceback.format_exc()
-            })
         }
 
