@@ -736,9 +736,17 @@ export class ApiGatewayStack extends cdk.Stack {
           actions: [
             "bedrock:InvokeModel",
             "bedrock:InvokeModelWithResponseStream",
-            "secretsmanager:GetSecretValue"
+            "secretsmanager:GetSecretValue",
+            "ssm:GetParameter",
+            "es:ESHttpGet",
+            "es:ESHttpPost",
+            "es:ESHttpPut",
+            "es:ESHttpDelete"
           ],
-          resources: ["*"] // restrict to specific model ARN later
+          resources: [
+            "*"
+            // Ideally: restrict to specific ARNs later
+          ]
         }));
     
 
