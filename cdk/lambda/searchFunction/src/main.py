@@ -1,6 +1,7 @@
 import os
 import re
 import json
+import boto3
 import torch
 import boto3
 from opensearchpy import OpenSearch, RequestsHttpConnection, AWSV4SignerAuth
@@ -165,10 +166,16 @@ def handler(event, context):
 
     except Exception as e:
         import traceback
+        import traceback
         return {
             "statusCode": 500,
             "body": json.dumps({
                 "error": str(e),
                 "trace": traceback.format_exc()
             })
+            "body": json.dumps({
+                "error": str(e),
+                "trace": traceback.format_exc()
+            })
         }
+
