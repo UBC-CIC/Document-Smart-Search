@@ -2,6 +2,8 @@ import os
 import re
 import json
 import torch
+import boto3
+from opensearchpy import OpenSearch, RequestsHttpConnection, AWSV4SignerAuth
 from pathlib import Path
 from pprint import pprint
 from opensearchpy import OpenSearch
@@ -62,65 +64,111 @@ def process_documents():
     for doc in docs:
         doc.page_content = clean_text(doc.page_content)
         doc.metadata.pop("source", None)
+
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000,
+        chunk_overlap=200,
+        length_function=len
+    )
+    docs = text_splitter.split_documents(docs)
     return docs
 
 def handler(event, context):
     try:
+        
+        with open(Path("ingestion_configs.json"), "r") as file:
+            app_configs = json.load(file)
+
+        OPENSEARCH_SEC = app_configs['aws']['secrets']['opensearch']
+        OPENSEARCH_HOST = '/dfo/opensearch/host'
+        REGION_NAME = app_configs['aws']['region_name']
+
+        INDEX_NAME = "dfo-langchain-vector-index"
+
         set_secrets()
 
-        # Step 1: Load & clean docs
-        docs = process_documents()
-        texts = [doc.page_content for doc in docs]
-        metadatas = [doc.metadata for doc in docs]
-        bulk_size = len(docs)
+        inference_profile_id = "us.meta.llama3-3-70b-instruct-v1:0"
+        aws_region = "us-west-2"
+        current_session_id = "test-session-1"
 
-        # Step 2: Embedding setup — ✅ CHANGED TO BEDROCK
-        session = aws.session
-        bedrock_client = session.client("bedrock-runtime", region_name=REGION_NAME)
+        session = boto3.Session()
+        credentials = session.get_credentials()
+        awsauth = AWSV4SignerAuth(credentials, aws_region)
+        secrets = aws.get_secret(secret_name=OPENSEARCH_SEC, region_name=REGION_NAME)
+        opensearch_host = "vpc-opensearchdomai-0r7i2aikcuqk-fuzzpdmexnrpq66hoze57vhqcq.us-west-2.es.amazonaws.com"
+        auth = (secrets['username'], secrets['passwords'])
+        
+        # Create OpenSearch client
+
+
+        op_client = OpenSearch(
+            hosts=[{'host': opensearch_host, 'port': 443}],
+            http_auth=awsauth,
+            use_ssl=True,
+            verify_certs=True,
+            connection_class=RequestsHttpConnection,
+            http_compress=True
+        )
+
+        # 👇 CREATE THE PIPELINE ONCE
+        op.create_hybrid_search_pipeline(
+            client=op_client,
+            pipeline_name="html_hybrid_search",
+            keyword_weight=0.3,
+            vector_weight=0.7
+        )
+
+        # Step 1: Parse input query
+        body = json.loads(event.get("body", "{}"))
+        query = body.get("query", "")
+        if not query:
+            return {
+                "statusCode": 400,
+                "body": json.dumps({"error": "Missing 'query'"})
+            }
+
+        # Step 2: Embed the query using Bedrock
+        bedrock_client = boto3.client("bedrock-runtime", region_name=REGION_NAME)
         embedder = BedrockEmbeddings(
             client=bedrock_client,
-            model_id=configs['embeddings']['embedding_model']  # e.g., "amazon.titan-embed-text-v1"
+            model_id=configs['embeddings']['embedding_model']
         )
-        embeddings = embedder.embed_documents(texts)
 
-        # Step 3: VectorStore setup
-        vector_store = OpenSearchVectorSearch.from_embeddings(
-            embeddings=embeddings,
-            texts=texts,
-            embedding=embedder,
-            metadatas=metadatas,
-            vector_field='vector_embeddings',
-            text_field="text",
-            engine="nmslib",
-            space_type="cosinesimil",
+        # Step 3: Call OpenSearch hybrid similarity search
+        opensearch_client = op_client # get_opensearch_client()
+
+        results = op.hybrid_similarity_search_with_score(
+            query=query,
+            embedding_function=embedder,
+            client=opensearch_client,
             index_name=INDEX_NAME,
-            bulk_size=bulk_size,
-            opensearch_url='https://search-test-dfo-yevtcwsp7i4vjzy4kdvalwpxgm.aos.ca-central-1.on.aws',
-            port=443,
-            http_auth=(SECRETS['username'], SECRETS['passwords']),
-            use_ssl=True,
-            verify_certs=True
-        )
-
-        # Step 4: Example query
-        embedded_query = embedder.embed_query("Salmon population")
-        results = vector_store.similarity_search_by_vector(
-            embedding=embedded_query,
             k=3,
-            vector_field="vector_embeddings",
-            text_field="text"
+            search_pipeline="html_hybrid_search",  # <- confirm this matches your pipeline name
+            text_field="page_content",
+            vector_field="chunk_embedding"
         )
 
         return {
             "statusCode": 200,
             "body": json.dumps({
-                "query_result": results[0].metadata,
+                "query": query,
+                "results": [
+                    {
+                        "score": score,
+                        "metadata": doc
+                    }
+                    for doc, score in results
+                ],
                 "langchain": langchain_version
             })
         }
 
     except Exception as e:
+        import traceback
         return {
             "statusCode": 500,
-            "body": json.dumps({"error": str(e)})
+            "body": json.dumps({
+                "error": str(e),
+                "trace": traceback.format_exc()
+            })
         }
