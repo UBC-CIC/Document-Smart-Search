@@ -725,15 +725,32 @@ export class ApiGatewayStack extends cdk.Stack {
           .defaultChild as lambda.CfnFunction;
         cfnSearchDockerFunc.overrideLogicalId("SearchLambdaDockerFunction");
     
-        // Add the permission to the Lambda function's policy to allow API Gateway access
+        // Allows API Gateway access
         searchFunc.addPermission("AllowApiGatewayInvoke", {
           principal: new iam.ServicePrincipal("apigateway.amazonaws.com"),
           action: "lambda:InvokeFunction",
           sourceArn: `arn:aws:execute-api:${this.region}:${this.account}:${this.api.restApiId}/*/*/user*`,
         });
+
+        searchFunc.role?.addToPrincipalPolicy(new iam.PolicyStatement({
+          actions: [
+            "bedrock:InvokeModel",
+            "bedrock:InvokeModelWithResponseStream",
+            "secretsmanager:GetSecretValue",
+            "ssm:GetParameter",
+            "es:ESHttpGet",
+            "es:ESHttpPost",
+            "es:ESHttpPut",
+            "es:ESHttpDelete"
+          ],
+          resources: [
+            "*"
+            // Ideally: restrict to specific ARNs later
+          ]
+        }));
     
 
-    // Create the Lambda function for generating presigned URLs
+    // Lambda function for generating presigned URLs
     const generatePreSignedURL = new lambda.Function(
       this,
       `${id}-GeneratePreSignedURLFunc`,

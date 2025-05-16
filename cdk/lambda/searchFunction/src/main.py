@@ -1,32 +1,27 @@
 import os
 import re
 import json
+import boto3
 import torch
+import boto3
+from opensearchpy import OpenSearch, RequestsHttpConnection, AWSV4SignerAuth
 from pathlib import Path
 from pprint import pprint
 from opensearchpy import OpenSearch
 from langchain_community.document_loaders import JSONLoader, DirectoryLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.vectorstores import OpenSearchVectorSearch
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_aws.embeddings import BedrockEmbeddings  # ✅ CHANGED
 from langchain import __version__ as langchain_version
+
 import src.aws_utils as aws
 import src.opensearch_utils as op
 
 with open(Path("configs.json"), "r") as f:
     configs = json.load(f)
 
-# SM_DB_CREDENTIALS=os.environ['SM_DB_CREDENTIALS']
-# RDS_PROXY_ENDPOINT= os.environ['RDS_PROXY_ENDPOINT']
-# BEDROCK_LLM_PARAM= os.environ['BEDROCK_LLM_PARAM']
-# EMBEDDING_MODEL_PARAM= os.environ['EMBEDDING_MODEL_PARAM']
-# TABLE_NAME_PARAM= os.environ['TABLE_NAME_PARAM']
-# REGION_NAME = os.environ["REGION"]
 REGION_NAME = configs['aws']['region_name']
 OPENSEARCH_SEC = configs['aws']['secrets']['opensearch']
-
-
-# Constants
 INDEX_NAME = "dfo-langchain-vector-index"
 BUCKET_NAME = "dfo-documents"
 FOLDER_NAME = "documents"
@@ -34,7 +29,7 @@ LOCAL_DIR = "s3_data"
 
 def set_secrets():
     global SECRETS
-    SECRETS = aws.get_secret(secret_name=OPENSEARCH_SEC,region_name=REGION_NAME)
+    SECRETS = aws.get_secret(secret_name=OPENSEARCH_SEC, region_name=REGION_NAME)
 
 def clean_text(text: str) -> str:
     text = re.sub(r'[^\x00-\x7F]+', ' ', text)
@@ -70,68 +65,118 @@ def process_documents():
     for doc in docs:
         doc.page_content = clean_text(doc.page_content)
         doc.metadata.pop("source", None)
+
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000,
+        chunk_overlap=200,
+        length_function=len
+    )
+    docs = text_splitter.split_documents(docs)
     return docs
 
 def handler(event, context):
     try:
+        
+        with open(Path("ingestion_configs.json"), "r") as file:
+            app_configs = json.load(file)
+
+
+
+        REGION_NAME = app_configs['aws']['region_name']
+
+        INDEX_NAME = "dfo-langchain-vector-index"
+
         set_secrets()
-        # Step 1: Load & clean docs
-        docs = process_documents()
-        texts = [doc.page_content for doc in docs]
-        metadatas = [doc.metadata for doc in docs]
-        bulk_size = len(docs)
 
-        # Step 2: Embedding setup
-        device = (
-            'mps' if torch.backends.mps.is_available()
-            else 'cuda' if torch.cuda.is_available()
-            else 'cpu'
-        )
-        embedder = HuggingFaceEmbeddings(
-            model_name=configs['embeddings']['embedding_model'],
-            model_kwargs={'device': device}
-        )
-        embeddings = embedder.embed_documents(texts)
 
-        # Step 3: VectorStore setup
-        vector_store = OpenSearchVectorSearch.from_embeddings(
-            embeddings=embeddings,
-            texts=texts,
-            embedding=embedder,
-            metadatas=metadatas,
-            vector_field='vector_embeddings',
-            text_field="text",
-            engine="nmslib",
-            space_type="cosinesimil",
-            index_name=INDEX_NAME,
-            bulk_size=bulk_size,
-            opensearch_url='search-test-dfo-yevtcwsp7i4vjzy4kdvalwpxgm.aos.ca-central-1.on.aws',
-            port=443,
-            http_auth=(SECRETS['username'], SECRETS['passwords']),
+        aws_region = "us-west-2"
+     
+
+        session = boto3.Session()
+        credentials = session.get_credentials()
+        awsauth = AWSV4SignerAuth(credentials, aws_region)
+
+        opensearch_host = "vpc-opensearchdomai-0r7i2aikcuqk-fuzzpdmexnrpq66hoze57vhqcq.us-west-2.es.amazonaws.com"
+
+
+
+        op_client = OpenSearch(
+            hosts=[{'host': opensearch_host, 'port': 443}],
+            http_auth=awsauth,
             use_ssl=True,
-            verify_certs=True
+            verify_certs=True,
+            connection_class=RequestsHttpConnection,
+            http_compress=True
         )
 
-        # Step 4: Example query
-        embedded_query = embedder.embed_query("Salmon population")
-        results = vector_store.similarity_search_by_vector(
-            embedding=embedded_query,
+
+        op.create_knn_index(
+            client=op_client,
+            index_name=INDEX_NAME,
+            dimension=1024  # depending on embedding size
+        )
+        
+
+        op.create_hybrid_search_pipeline(
+            client=op_client,
+            pipeline_name="html_hybrid_search",
+            keyword_weight=0.3,
+            vector_weight=0.7
+        )
+
+        # Step 1: Parse input query
+        body = json.loads(event.get("body", "{}"))
+        query = body.get("query", "")
+        if not query:
+            return {
+                "statusCode": 400,
+                "body": json.dumps({"error": "Missing 'query'"})
+            }
+
+        # Step 2: Embed the query using Bedrock
+        bedrock_client = boto3.client("bedrock-runtime", region_name=REGION_NAME)
+        embedder = BedrockEmbeddings(
+            client=bedrock_client,
+            model_id=configs['embeddings']['embedding_model']
+        )
+
+        # Step 3: Call OpenSearch hybrid similarity search
+        opensearch_client = op_client # get_opensearch_client()
+
+        results = op.hybrid_similarity_search_with_score(
+            query=query,
+            embedding_function=embedder,
+            client=opensearch_client,
+            index_name=INDEX_NAME,
             k=3,
-            vector_field="vector_embeddings",
-            text_field="text"
+            search_pipeline="html_hybrid_search",  # <- confirm this matches your pipeline name
+            text_field="page_content",
+            vector_field="chunk_embedding"
         )
 
         return {
             "statusCode": 200,
             "body": json.dumps({
-                "query_result": results[0].metadata,
-                "torch": torch.__version__,
+                "query": query,
+                "results": [
+                    {
+                        "score": score,
+                        "metadata": doc
+                    }
+                    for doc, score in results
+                ],
                 "langchain": langchain_version
             })
         }
 
     except Exception as e:
+        import traceback
+        import traceback
         return {
             "statusCode": 500,
-            "body": json.dumps({"error": str(e)})
+            "body": json.dumps({
+                "error": str(e),
+                "trace": traceback.format_exc()
+            })
         }
+
