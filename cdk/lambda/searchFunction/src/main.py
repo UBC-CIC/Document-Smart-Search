@@ -80,26 +80,24 @@ def handler(event, context):
         with open(Path("ingestion_configs.json"), "r") as file:
             app_configs = json.load(file)
 
-        OPENSEARCH_SEC = app_configs['aws']['secrets']['opensearch']
-        OPENSEARCH_HOST = '/dfo/opensearch/host'
+
+
         REGION_NAME = app_configs['aws']['region_name']
 
         INDEX_NAME = "dfo-langchain-vector-index"
 
         set_secrets()
 
-        inference_profile_id = "us.meta.llama3-3-70b-instruct-v1:0"
+
         aws_region = "us-west-2"
-        current_session_id = "test-session-1"
+     
 
         session = boto3.Session()
         credentials = session.get_credentials()
         awsauth = AWSV4SignerAuth(credentials, aws_region)
-        secrets = aws.get_secret(secret_name=OPENSEARCH_SEC, region_name=REGION_NAME)
+
         opensearch_host = "vpc-opensearchdomai-0r7i2aikcuqk-fuzzpdmexnrpq66hoze57vhqcq.us-west-2.es.amazonaws.com"
-        auth = (secrets['username'], secrets['passwords'])
-        
-        # Create OpenSearch client
+
 
 
         op_client = OpenSearch(
@@ -115,10 +113,10 @@ def handler(event, context):
         op.create_knn_index(
             client=op_client,
             index_name=INDEX_NAME,
-            dimension=1024  # or 768, depending on your embedding size
+            dimension=1024  # depending on embedding size
         )
         
-        # 👇 CREATE THE PIPELINE ONCE
+
         op.create_hybrid_search_pipeline(
             client=op_client,
             pipeline_name="html_hybrid_search",
