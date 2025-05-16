@@ -111,6 +111,13 @@ def handler(event, context):
             http_compress=True
         )
 
+
+        op.create_knn_index(
+            client=op_client,
+            index_name=INDEX_NAME,
+            dimension=1024  # or 768, depending on your embedding size
+        )
+        
         # 👇 CREATE THE PIPELINE ONCE
         op.create_hybrid_search_pipeline(
             client=op_client,
