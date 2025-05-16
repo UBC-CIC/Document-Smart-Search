@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 # Initialize the S3 client
 s3 = boto3.client('s3')
-# BUCKET_NAME = "DSA-data-ingestion-bucket"
+# BUCKET_NAME = "DFO-data-ingestion-bucket"
 EMBEDDING_BUCKET_NAME = os.environ["EMBEDDING_BUCKET_NAME"]
 
 def extract_txt(

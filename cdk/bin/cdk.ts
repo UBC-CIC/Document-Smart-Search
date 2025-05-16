@@ -52,4 +52,4 @@ const dbFlowStack = new DBFlowStack(
 // 6) Amplify
 const amplifyStack = new AmplifyStack(app, `${StackPrefix}-Amplify`, apiStack, { env });
 
-Tags.of(app).add("app", "Digital-Strategy-Assistant");
+Tags.of(app).add("app", "DFO-Smart-Search");

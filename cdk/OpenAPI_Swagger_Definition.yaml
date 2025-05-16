@@ -1,7 +1,7 @@
 openapi: 3.0.0
 servers: []
 info:
-  title: Digital Strategy Assistant API
+  title: DFO Smart Search API
   description: This API intended to deploy on aws API Gateway
   version: "1.0.0"
 tags:

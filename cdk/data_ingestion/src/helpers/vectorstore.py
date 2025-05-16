@@ -20,7 +20,7 @@ def update_vectorstore(
     Returns:
     None
     """
-    # bucket = "DSA-data-ingestion-bucket"
+    # bucket = "DFO-data-ingestion-bucket"
     store_category_data(
         bucket=bucket,
         category_id=category_id,

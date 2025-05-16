@@ -52,7 +52,7 @@ Finally, enable the relevant models, click next and on the next page click submi
 The relevant models are now enabled in Bedrock.
 ## Deployment
 ### Step 1: Fork & Clone The Repository
-First, you need to fork the repository. To create a fork, navigate to the [main branch](https://github.com/UBC-CIC/Digital-Strategy-Assistant) of this repository. Then, in the top-right corner, click `Fork`.
+First, you need to fork the repository. To create a fork, navigate to the [main branch](https://github.com/UBC-CIC/DFO-Smart-Search) of this repository. Then, in the top-right corner, click `Fork`.
 
 ![](./images/fork.jpeg)
 
@@ -63,11 +63,11 @@ Now let's clone the GitHub repository onto your machine. To do this:
 2. For an Apple computer, open Terminal. If on a Windows machine, open Command Prompt or Windows Terminal. Enter into the folder you made using the command `cd path/to/folder`. To find the path to a folder on a Mac, right click on the folder and press `Get Info`, then select the whole text found under `Where:` and copy with ⌘C. On Windows (not WSL), enter into the folder on File Explorer and click on the path box (located to the left of the sch bar), then copy the whole text that shows up.
 3. Clone the GitHub repository by entering the following command. Be sure to replace `<YOUR-GITHUB-USERNAME>` with your own username.
 ```
-git clone https://github.com/<YOUR-GITHUB-USERNAME>/Digital-Strategy-Assistant.git
+git clone https://github.com/<YOUR-GITHUB-USERNAME>/DFO-Smart-Search.git
 ```
 The code should now be in the folder you created. Navigate into the root folder containing the entire codebase by running the command:
 ```
-cd Digital-Strategy-Assistant
+cd DFO-Smart-Search
 ```
 
 ### Step 2: Upload Secrets
@@ -83,7 +83,7 @@ Moreover, you will need to upload your github username to Amazon SSM Parameter S
 
 ```
 aws ssm put-parameter \
-    --name "DSA-owner-name" \
+    --name "DFO-owner-name" \
     --value "<YOUR-GITHUB-USERNAME>" \
     --type String \
     --profile <YOUR-PROFILE-NAME>
@@ -93,13 +93,13 @@ You would have to supply a custom database username when deploying the solution 
 
 ```
 aws secretsmanager create-secret \
-    --name DSASecrets \
+    --name DFOSecrets \
     --secret-string '{\"DB_Username\":\"<YOUR-DB-USERNAME>\"}'\
     --profile <your-profile-name>
   
 Note: If you using an Apple Computer, use the following command instead:
 aws secretsmanager create-secret \
-    --name DSASecrets \
+    --name DFOSecrets \
     --secret-string "{\"DB_Username\":\"<YOUR-DB-USERNAME>\"}"\
     --profile <your-profile-name>
 ```
@@ -108,8 +108,8 @@ For example,
 
 ```
 aws secretsmanager create-secret \
-    --name DSASecrets \
-    --secret-string '{\"DB_Username\":\"DSASecrets\"}'\
+    --name DFOSecrets \
+    --secret-string '{\"DB_Username\":\"DFOSecrets\"}'\
     --profile <your-profile-name>
 Note: No special characters are allowed in the secret value.
 
@@ -120,7 +120,7 @@ Finally, in order to restrict user sign up to specific email domains, you will n
 
 ```
 aws ssm put-parameter \
-    --name "/DSA/AllowedEmailDomains" \
+    --name "/DFO/AllowedEmailDomains" \
     --value "<YOUR-ALLOWED-EMAIL-DOMAIN-LIST>" \
     --type SecureString \
     --profile <YOUR-PROFILE-NAME>
@@ -130,7 +130,7 @@ For example,
 
 ```
 aws ssm put-parameter \
-    --name "/DSA/AllowedEmailDomains" \
+    --name "/DFO/AllowedEmailDomains" \
     --value "gmail.com,ubc.ca" \
     --type SecureString \
     --profile <YOUR-PROFILE-NAME>
@@ -157,7 +157,7 @@ The stack prefix will be prefixed onto the physical names of the resources creat
 If you have trouble running the above command, try removing all the \ and run it in one line.
 ```
 cdk deploy --all \
- --parameters <your-stack-prefix>-Amplify:githubRepoName=Digital-Strategy-Assistant \
+ --parameters <your-stack-prefix>-Amplify:githubRepoName=DFO-Smart-Search \
  --context StackPrefix=<your-stack-prefix> \
  --profile <your-profile-name>
 ```
@@ -165,7 +165,7 @@ cdk deploy --all \
 For example: 
 
 ```
-cdk deploy --all --parameters DigitalStrategyAssistant-Amplify:githubRepoName=Digital-Strategy-Assistant --context StackPrefix=DigitalStrategyAssistant --profile <your-profile-name>
+cdk deploy --all --parameters DFOSmartSearch-Amplify:githubRepoName=DFO-Smart-Search --context StackPrefix=DFOSmartSearch --profile <your-profile-name>
 ```
 
 ## Post-Deployment
@@ -177,9 +177,9 @@ cdk deploy --all --parameters DigitalStrategyAssistant-Amplify:githubRepoName=Di
 4. Click `run job` and wait for the build to complete.
 5. You now have access to the `Amplify App ID` and the public domain name to use the web app.
 6. From `All apps`, click `<stack-prefix>-Amplify-public` and repeat steps 3-5.
-![](./images/DSA-Amplify-admin.png)
-![](./images/DSA-Amplify-admin-run-job.png)
-![](./images/DSA-Amplify-no-deploy.png)
+![](./images/DFO-Amplify-admin.png)
+![](./images/DFO-Amplify-admin-run-job.png)
+![](./images/DFO-Amplify-no-deploy.png)
 ### Step 2: Visit Web App
 You can now navigate to the web app URL to see your application in action.
 

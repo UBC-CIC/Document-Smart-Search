@@ -29,7 +29,7 @@ After clicking their email, add the 'admin' user group:
 After inputting the confirmation code sent to their email, administrators can log in.
 ![image](./images/confirmation.png)
 
-Upon logging in, the administrator will see the analytics of the public view of the Digital Strategy Assistant. This includes the number of users by month, the number of messages sent by each role by month, and the average feedback score for each role.
+Upon logging in, the administrator will see the analytics of the public view of DFO Smart Search. This includes the number of users by month, the number of messages sent by each role by month, and the average feedback score for each role.
 ![image](./images/admin-analytics.png)
 
 Clicking on the "Categories" button on the side bar will allow administrators to see the created categories. The entries can be reordered by dragging and dropping the move cell. Pressing save order will save the order of the categories.
@@ -56,7 +56,7 @@ Clicking the "Feedback" button on the sidebar will allow the administrator to vi
 
 
 ## Public View
-Upon opening the public view of the app, users are greeted with a home page. Clicking on "About" or "T&C" will open a modal which either describes the DSA or shows the terms and conditions of using the assistant.
+Upon opening the public view of the app, users are greeted with a home page. Clicking on "About" or "T&C" will open a modal which either describes the DFO project or shows the terms and conditions of using the assistant.
 ![image](./images/home.png)
 
 After clicking Get Started, the assistant will initiate the conversation by prompting the user to select their role. Users can click one of the 3 options to select their role.

@@ -72,7 +72,7 @@ def store_category_data(
     vectorstore_config_dict (Dict[str, str]): The configuration dictionary for the vectorstore.
     embeddings (BedrockEmbeddings): The embeddings instance.
     """
-    # bucket = "DSA-data-ingestion-bucket-1"
+    # bucket = "DFO-data-ingestion-bucket-1"
     vectorstore, connection_string = get_vectorstore(
         collection_name=vectorstore_config_dict['collection_name'],
         embeddings=embeddings,
