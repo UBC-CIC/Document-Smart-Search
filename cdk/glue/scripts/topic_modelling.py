@@ -12,6 +12,7 @@ from bertopic import BERTopic
 from bertopic.representation import MaximalMarginalRelevance
 from bertopic.vectorizers import ClassTfidfTransformer
 import psycopg
+import io
 
 import sys
 import os
@@ -23,11 +24,28 @@ import src.aws_utils as aws
 import src.opensearch as op
 import src.pgsql as pgsql
 
-session = aws.session
+session = aws.session # always use this session for all AWS calls
 
-secrets = aws.get_secret(secret_name=OPENSEARCH_SEC,region_name=REGION_NAME)
+# Constants that will be replaced with Glue context args, SSM params, or Secrets Manager
+REGION_NAME = "us-west-2"
+DFO_HTML_FULL_INDEX_NAME = "dfo-html-full-index"
+
+glue_args = {
+    'JOB_NAME': 'vector_llm_categorization',
+    'bucket_name': 'dfo-test-datapipeline',
+    'batch_id': '2025-05-07',
+    'region_name': 'us-west-2',
+    'opensearch_secret': 'opensearch-masteruser-test-glue',
+    'opensearch_host': 'opensearch-host-test-glue',
+    'rds_secret': 'rds/dfo-db-glue-test',
+    'topic_modelling_mode': 'retrain' # or 'predict'
+}
+
+CURRENT_DATETIME = datetime.now().strftime(r"%Y-%m-%d %H:%M:%S")
+
+secrets = aws.get_secret(secret_name=glue_args['opensearch_secret'],region_name=glue_args['region_name'])
 opensearch_host = aws.get_parameter_ssm(
-    parameter_name=OPENSEARCH_HOST, region_name=REGION_NAME
+    parameter_name=glue_args['opensearch_host'], region_name=glue_args['region_name']
 )
 # Connect to OpenSearch
 auth = (secrets['username'], secrets['password'])
@@ -43,13 +61,12 @@ op_client = OpenSearch(
     retry_on_timeout=True
 )
 
-rds_hosturl = aws.get_parameter_ssm('/dfo/rds/host_url')
-rds_secret = aws.get_secret(aws.get_parameter_ssm("/dfo/rds/secretname"))
+rds_secret = aws.get_secret(secret_name=glue_args['rds_secret'],region_name=glue_args['region_name'])
 
 conn_info = {
-    "host": rds_hosturl,
-    "port": 5432,
-    "dbname": "postgres",
+    "host": rds_secret['host'],
+    "port": rds_secret['port'],
+    # "dbname": 'postgres',
     "user": rds_secret['username'],
     "password": rds_secret['password']
 }
@@ -228,7 +245,7 @@ def generate_topic_labels(
         <|begin_of_text|><|start_header_id|>system<|end_header_id|>
         You are generating topic labels for research documents related to Fisheries and Oceans Canada. 
         Given top words and representative documents from a BERTopic topic, generate a short, coherent, and descriptive label.
-        Ignore superficial phrasing like “stock assessment” or “status report” in the representative documents - focus on species, issues, and themes discussed in the content.
+        Ignore superficial phrasing like "stock assessment" or "status report" in the representative documents - focus on species, issues, and themes discussed in the content.
         Top words may be noisy — use best judgment.
 
         - Top words: {', '.join(top_words)}
@@ -299,7 +316,7 @@ def train_and_label_main_topics(docs_df):
     
     print("Starting initial topic modelling...")
     
-    topic_model, topic_probs = train_custom_topic_model(
+    topic_model, topic_distributions = train_custom_topic_model(
         documents=contents,
         embeddings=embeddings,
         seed=17,
@@ -312,12 +329,25 @@ def train_and_label_main_topics(docs_df):
         min_dist=0.0
     )
 
+    # Handle documents with zero-sum distributions
+    zero_sum_mask = topic_distributions.sum(axis=1) == 0
+    if zero_sum_mask.any():
+        print(f"\nFound {zero_sum_mask.sum()} documents with zero-sum topic distributions")
+        # Set these documents to topic -1 (outlier)
+        topics_array = np.array(topic_model.topics_)
+        topics_array[zero_sum_mask] = -1
+        topic_model.topics_ = topics_array.tolist()
+
+
     topic_infos = topic_model.get_topic_info()
     llm_topics = generate_topic_labels(topic_infos, topic_model)
     topic_infos['llm_enhanced_topic'] = ["Miscellaneous"] + list(llm_topics.values())
     docs['topic_id'] = topic_model.topics_
-    # highest_probabilities = topic_probs.max(axis=1) ## UNCOMMENT THIS LINE TO USE THE PROBABILITIES
-    # docs['topic_prob'] = highest_probabilities
+    
+    # For documents with zero-sum distributions, set probability to 0
+    docs['topic_prob'] = topic_distributions.max(axis=1)
+    docs.loc[zero_sum_mask, 'topic_prob'] = 0.0
+    
     docs = docs.merge(
         topic_infos, how="left", left_on="topic_id", right_on="Topic"
     )
@@ -349,7 +379,7 @@ def handle_outliers(docs, topic_model):
     print("Starting topic detection for outliers from previous batch")
     print("Number of outliers (topic with id -1): ", len(outliers))
 
-    outlier_model, outlier_topic_probs = train_custom_topic_model(
+    outlier_model, outlier_distributions = train_custom_topic_model(
         documents=outlier_contents,
         embeddings=outlier_embeddings,
         seed=17,
@@ -359,14 +389,14 @@ def handle_outliers(docs, topic_model):
         n_components=7,
         min_dist=0.0
     )
-    # highest_probabilities = outlier_topic_probs.max(axis=1)
+    highest_probabilities = outlier_distributions.max(axis=1)
     llm_topics_outlier = generate_topic_labels(
         outlier_model.get_topic_info(), outlier_model
     )
     outlier_topic_infos = outlier_model.get_topic_info()
     outlier_topic_infos['llm_enhanced_topic'] = ["Miscellaneous"] + list(llm_topics_outlier.values())
-    # outtlier_topic_infos['topic_prob] = highest_probabilities
     outliers['topic_id'] = outlier_model.topics_
+    outliers['topic_prob'] = highest_probabilities
     outliers = outliers.merge(
         outlier_topic_infos, how="left", left_on="topic_id", right_on="Topic"
     )
@@ -379,7 +409,6 @@ def handle_outliers(docs, topic_model):
 
 
 def label_proceedings(docs_df, topic_model, outlier_model, topic_infos, outlier_topic_infos):
-
     print("Starting topics assignment to Proceedings documents")
     proceedings = docs_df.query('html_doc_type == "Proceedings"')
     proc_contents = proceedings['page_content'].tolist()
@@ -387,8 +416,9 @@ def label_proceedings(docs_df, topic_model, outlier_model, topic_infos, outlier_
     print("# of Proceedings documents: ", len(proceedings))
 
     # First pass to the topic_model
-    topic_ids = topic_model.transform(proc_contents, embeddings=proc_embeddings)[0]
+    topic_ids, topic_distributions = topic_model.transform(proc_contents, embeddings=proc_embeddings)
     proceedings['topic_id'] = topic_ids
+    proceedings['topic_prob'] = topic_distributions.max(axis=1)
     proceedings = proceedings.merge(
         topic_infos, how="left", left_on="topic_id", right_on="Topic"
     )
@@ -400,15 +430,16 @@ def label_proceedings(docs_df, topic_model, outlier_model, topic_infos, outlier_
 
     cols = [
         'html_language', 'html_doc_type', 'html_page_title', 'html_url', 
-        'chunk_embedding', 'page_content', 'csas_html_year', 'topic_id'
+        'chunk_embedding', 'page_content', 'csas_html_year', 'topic_id', 'topic_prob'
     ]
     proceeding_outliers = proceedings.loc[:, cols].query("topic_id == -1")
     proc_outlier_contents = proceeding_outliers['page_content'].tolist()
     proc_outlier_embeddings = np.array(proceeding_outliers['chunk_embedding'].tolist())
-    proc_outlier_label = outlier_model.transform(
+    proc_outlier_ids, proc_outlier_distributions = outlier_model.transform(
         proc_outlier_contents, embeddings=proc_outlier_embeddings
-    )[0]
-    proceeding_outliers['topic_id'] = proc_outlier_label
+    )
+    proceeding_outliers['topic_id'] = proc_outlier_ids
+    proceeding_outliers['topic_prob'] = proc_outlier_distributions.max(axis=1)
     proceeding_outliers = proceeding_outliers.merge(
         outlier_topic_infos, how="left", left_on="topic_id", right_on="Topic"
     )
@@ -420,37 +451,84 @@ def label_proceedings(docs_df, topic_model, outlier_model, topic_infos, outlier_
     return pd.concat([proceedings.query("topic_id != -1"), proceeding_outliers], ignore_index=True)
 
 
-def prepare_data_to_insert(combined_df, topic_infos, outlier_topic_infos):
+def fetch_topics_from_db(conn_info: dict) -> pd.DataFrame:
+    """
+    Fetch topics from the derived_topics table in the database.
+    
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame containing topic_name, representation, and representative_docs
+    """
+    with psycopg.connect(**conn_info) as conn:
+        query = """
+        SELECT topic_name, representation, representative_docs
+        FROM derived_topics
+        """
+        return pd.read_sql(query, conn)
+
+def prepare_data_to_insert(combined_df, topic_infos, outlier_topic_infos, mode='retrain'):
     """
     Make dataframes looks exactly like the corresponding SQL table schemas
+    
+    Parameters
+    ----------
+    combined_df : pd.DataFrame
+        Combined dataframe of all documents with their topics
+    topic_infos : pd.DataFrame
+        Topic information from the main model
+    outlier_topic_infos : pd.DataFrame
+        Topic information from the outlier model
+    mode : str
+        Either 'retrain' or 'predict'. In predict mode, only prepare documents_derived_topic table.
     """
+    if mode == 'retrain':
+        derived_topics_table = pd.concat(
+            [topic_infos.query("Topic != -1"), outlier_topic_infos], ignore_index=True
+        )
+        if outlier_topic_infos is None:
+            derived_topics_table = topic_infos.copy()
+        derived_topics_table = derived_topics_table.loc[
+            :, ["llm_enhanced_topic", "Representation", "Representative_Docs"]
+        ].rename(
+            columns={
+                "llm_enhanced_topic": "topic_name",
+                "Representation": "representation",
+                "Representative_Docs": "representative_docs"
+            }
+        )
+        derived_topics_table['last_updated'] = DATETIME
+        
+        # documents_derived_topic table
+        documents_derived_topic_table  = combined_df.loc[
+            :, ["html_url", "llm_enhanced_topic", "topic_prob"]
+        ].rename(
+            columns={
+                "llm_enhanced_topic": "topic_name",
+                "topic_prob": "confidence_score"
+            }
+        )
+    else:
+        derived_topics_table = None
+        # documents_derived_topic table
+        documents_derived_topic_table  = combined_df.loc[
+            :, ["html_url", "topic_name", "topic_prob"]
+        ].rename(
+            columns={
+                "topic_prob": "confidence_score"
+            }
+        )
 
-    derived_topics_table = pd.concat(
-        [topic_infos.query("Topic != -1"), outlier_topic_infos], ignore_index=True
-    )
-    if outlier_topic_infos is None:
-        derived_topics_table = topic_infos.copy()
-    derived_topics_table = derived_topics_table.loc[
-        :, ["llm_enhanced_topic", "Representation", "Representative_Docs"]
-    ].rename(
-        columns={
-            "llm_enhanced_topic": "topic_name",
-            "Representation": "representation",
-            "Representative_Docs": "representative_docs"
-        }
-    )
+    # Set confidence score to 0.0 for Miscellaneous topic
+    documents_derived_topic_table.loc[
+        documents_derived_topic_table['topic_name'] == "Miscellaneous",
+        'confidence_score'
+    ] = 0.0
 
-    # documents_derived_topic table
-    documents_derived_topic_table  = combined_df.loc[
-        :, ["html_url", "llm_enhanced_topic"]
-    ].rename(
-        columns={
-            "llm_enhanced_topic": "topic_name"
-        }
-    )
+    # Ensure all confidence scores are between 0 and 1
+    documents_derived_topic_table['confidence_score'] = documents_derived_topic_table['confidence_score'].clip(0, 1)
 
     # add datetime now
-    derived_topics_table['last_updated'] = DATETIME
     documents_derived_topic_table['last_updated'] = DATETIME
 
     return derived_topics_table, documents_derived_topic_table
@@ -497,8 +575,8 @@ def bulk_upsert_documents_derived_topic(documents_derived_topic_table, conn_info
     """
 
     sql = """
-    INSERT INTO documents_derived_topic (html_url, topic_name, last_updated)
-    VALUES (%s, %s, %s)
+    INSERT INTO documents_derived_topic (html_url, topic_name, confidence_score, last_updated)
+    VALUES (%s, %s, %s, %s)
     ON CONFLICT (html_url, topic_name)
     """
     if upsert:
@@ -507,7 +585,7 @@ def bulk_upsert_documents_derived_topic(documents_derived_topic_table, conn_info
         sql += "DO NOTHING;"  # keeping logic consistent for now
 
     data = [
-        (row["html_url"], row["topic_name"], row["last_updated"])
+        (row["html_url"], row["topic_name"], row["confidence_score"], row["last_updated"])
         for _, row in documents_derived_topic_table.iterrows()
     ]
 
@@ -516,9 +594,218 @@ def bulk_upsert_documents_derived_topic(documents_derived_topic_table, conn_info
             cur.executemany(sql, data)
         conn.commit()
 
-def main(dryrun=False):
-    # docs_df = fetch_and_prepare_documents().query("csas_html_year == 2017 & html_language == 'English'")
-    docs_df = fetch_and_prepare_documents().query("html_language == 'English'")
+def fetch_specific_documents_by_urls(client, index_name, urls, fields):
+    """
+    Fetch specific documents from OpenSearch by their URLs (which are the _id fields).
+    Uses mget API for faster retrieval.
+    
+    Parameters
+    ----------
+    client : OpenSearch
+        The OpenSearch client instance.
+    index_name : str
+        The name of the index to fetch data from.
+    urls : list
+        List of document URLs to fetch (these are the _id fields).
+    fields : list
+        List of field names to retrieve from the documents.
+        
+    Returns
+    -------
+    list
+        A list of dictionaries containing the specified fields for each document.
+    """
+    if not client.indices.exists(index=index_name):
+        raise ValueError(f"Index '{index_name}' does not exist.")
+
+    # Prepare the mget request body
+    body = {
+        "docs": [
+            {
+                "_index": index_name,
+                "_id": url,
+                "_source": fields
+            }
+            for url in urls
+        ]
+    }
+    
+    # Execute mget
+    response = client.mget(body=body)
+    
+    # Extract results, filtering out any docs that weren't found
+    return [
+        doc["_source"] 
+        for doc in response["docs"] 
+        if doc["found"]
+    ]
+
+def fetch_new_documents():
+    """Fetch only new documents that haven't been processed by topic modeling yet"""
+    # Read tracking file
+    tracking_path = f"batches/{glue_args['batch_id']}/logs/processed_and_ingested_html_docs.csv"
+    s3_client = session.client('s3')
+    
+    try:
+        # Download CSV from S3
+        response = s3_client.get_object(
+            Bucket=glue_args['bucket_name'],
+            Key=tracking_path
+        )
+        csv_content = response['Body'].read()
+        tracking_df = pd.read_csv(io.BytesIO(csv_content))
+    except Exception as e:
+        print(f"No tracking file found or error reading file: {e}")
+        return pd.DataFrame()
+    
+    urls_to_fetch = tracking_df['html_url'].tolist()
+    
+    if len(urls_to_fetch) == 0:
+        print("No new documents to process")
+        return pd.DataFrame()
+    
+    # Fetch these specific documents from OpenSearch
+    fields = [
+        'csas_html_year', 'html_doc_type', 'html_page_title', 'html_url',
+        'html_language', 'page_content', 'chunk_embedding'
+    ]
+    fetched = fetch_specific_documents_by_urls(
+        op_client, 
+        DFO_HTML_FULL_INDEX_NAME, 
+        urls_to_fetch,
+        fields
+    )
+    
+    return pd.DataFrame(fetched)
+
+def main(dryrun=False, debug=False):
+    if glue_args['topic_modelling_mode'] == 'retrain':
+        print("BERTopic modelling mode: retrain")
+        # Purge existing data
+        with psycopg.connect(**conn_info) as conn:
+            with conn.cursor() as cur:
+                cur.execute("TRUNCATE TABLE documents_derived_topic CASCADE")
+                cur.execute("TRUNCATE TABLE derived_topics CASCADE")
+            conn.commit()
+            print("Purged existing derived topics and documents derived topics data")
+        
+        # Fetch all documents and train new model
+        docs_df = fetch_and_prepare_documents()
+    else:  # predict mode
+        print("BERTopic modelling mode: predict")
+        # Fetch only new documents
+        docs_df = fetch_new_documents()
+        if len(docs_df) == 0:
+            print("No new documents to process")
+            return
+        
+        # Load existing models from S3
+        s3_client = session.client('s3')
+        bucket = glue_args['bucket_name']
+        s3_model_path = f"bertopic_model"
+        
+        # Create temporary directory
+        temp_dir = "temp_outputs/bertopic"
+        os.makedirs(temp_dir, exist_ok=True)
+        
+        # Download models
+        s3_client.download_file(bucket, f"{s3_model_path}/topic_model.pkl", f"{temp_dir}/topic_model.pkl")
+        topic_model = BERTopic.load(f"{temp_dir}/topic_model.pkl")
+        
+        try:
+            s3_client.download_file(bucket, f"{s3_model_path}/outlier_model.pkl", f"{temp_dir}/outlier_model.pkl")
+            outlier_model = BERTopic.load(f"{temp_dir}/outlier_model.pkl")
+        except:
+            outlier_model = None
+        
+        # Clean up
+        os.remove(f"{temp_dir}/topic_model.pkl")
+        if outlier_model is not None:
+            os.remove(f"{temp_dir}/outlier_model.pkl")
+        os.rmdir(temp_dir)
+        
+        # Process new documents
+        docs = docs_df.query("html_doc_type != 'Proceedings'")
+        contents = docs['page_content'].tolist()
+        embeddings = np.array(docs['chunk_embedding'].tolist())
+        
+        # Predict topics
+        topic_ids, topic_probs = topic_model.transform(contents, embeddings=embeddings)
+        docs['topic_id'] = topic_ids
+        docs['topic_prob'] = topic_probs.max(axis=1)
+        
+        # Get topic info
+        topic_infos = topic_model.get_topic_info()
+        docs = docs.merge(topic_infos, how="left", left_on="topic_id", right_on="Topic")
+        docs = docs.drop(columns=['Topic'])
+
+        # Fetch existing topics from database
+        existing_topics = fetch_topics_from_db(conn_info)
+        # Convert representation lists to strings for comparison
+        topic_infos['representation_str'] = topic_infos['Representation'].apply(lambda x: '_'.join(x))
+        existing_topics['representation_str'] = existing_topics['representation'].apply(lambda x: '_'.join(x))
+        
+        # Merge based on representation
+        topic_infos = topic_infos.merge(
+            existing_topics[['representation_str', 'topic_name']], 
+            how='left',
+            on='representation_str'
+        )
+
+        docs = docs.merge(topic_infos[['Topic', 'topic_name']], how="left", left_on="topic_id", right_on="Topic")
+
+        # Handle outliers if outlier model exists
+        if outlier_model is not None:
+            outliers = docs.query("topic_id == -1")
+            if len(outliers) >= 0:
+                outlier_contents = outliers['page_content'].tolist()
+                outlier_embeddings = np.array(outliers['chunk_embedding'].tolist())
+                outlier_ids, outlier_probs = outlier_model.transform(outlier_contents, embeddings=outlier_embeddings)
+                outliers['topic_id'] = outlier_ids
+                outliers['topic_prob'] = outlier_probs.max(axis=1)
+                
+                # Handle zero probability cases
+                zero_sum_mask = outlier_probs.sum(axis=1) == 0
+                if zero_sum_mask.any():
+                    outliers.loc[zero_sum_mask, 'topic_prob'] = 0.0
+                
+                outlier_topic_infos = outlier_model.get_topic_info()
+                outliers = outliers.merge(outlier_topic_infos, how="left", left_on="topic_id", right_on="Topic")
+                outliers = outliers.drop(columns=['Topic'])
+                
+                # Convert representation lists to strings for comparison
+                outlier_topic_infos['representation_str'] = outlier_topic_infos['Representation'].apply(lambda x: '_'.join(x))
+                
+                # Merge based on representation
+                outlier_topic_infos = outlier_topic_infos.merge(
+                    existing_topics[['representation_str', 'topic_name']], 
+                    how='left',
+                    on='representation_str'
+                )
+                outliers = outliers.merge(outlier_topic_infos[['Topic', 'topic_name']], how="left", left_on="topic_id", right_on="Topic")
+                outliers = outliers.drop(columns=['Topic'])
+                docs = pd.concat([docs.query("topic_id != -1"), outliers], ignore_index=True)
+        else:
+            outlier_topic_infos = None
+        
+        # Process proceedings
+        proceedings_df = label_proceedings(docs_df, topic_model, outlier_model, topic_infos, outlier_topic_infos)
+        combined_df = pd.concat([docs, proceedings_df], ignore_index=True)
+        
+        # Prepare and insert data
+        derived_topics_table, documents_derived_topic_table = prepare_data_to_insert(
+            combined_df, topic_infos, outlier_topic_infos, mode='predict'
+        )
+        temp_dir = "temp_outputs/topic_modelling"
+        if debug:
+            os.makedirs(temp_dir, exist_ok=True)
+            documents_derived_topic_table.to_csv(f"{temp_dir}/documents_derived_topic_table.csv", index=False)
+        if not dryrun:
+            bulk_upsert_documents_derived_topic(documents_derived_topic_table, conn_info)
+        
+        return
+    
+    # Continue with retrain mode logic...
     topic_model, docs, topic_infos = train_and_label_main_topics(docs_df)
     outlier_model, outliers, outlier_topic_infos = handle_outliers(docs, topic_model)
     proceedings_df = label_proceedings(
@@ -532,35 +819,63 @@ def main(dryrun=False):
     assert len(docs_df) == len(combined_df), "Total count does not match"
 
     derived_topics_table, documents_derived_topic_table = prepare_data_to_insert(
-        combined_df, topic_infos, outlier_topic_infos
+        combined_df, topic_infos, outlier_topic_infos, mode='retrain'
     )
-
+    temp_dir = "temp_outputs/topic_modelling"
+    if debug:
+        os.makedirs(temp_dir, exist_ok=True)
+        derived_topics_table.to_csv(f"{temp_dir}/derived_topics_table.csv", index=False)
+        documents_derived_topic_table.to_csv(f"{temp_dir}/documents_derived_topic_table.csv", index=False)
     if not dryrun:
         bulk_upsert_derived_topics(derived_topics_table, conn_info)
         bulk_upsert_documents_derived_topic(documents_derived_topic_table, conn_info)
     
-    # save the dataset that it was trained on
-    # docs_df.csv("../export/bertopic/train_data.csv", index=False)
-    aws.save_to_s3(
-        "bertopic_model/train_data.csv",
-        bucket_name=BUCKET_NAME,
-        object_name="bertopic/train_data.csv"
-    )
-    # save the topic models to s3
-    # topic_model.save("../export/bertopic/topic_model.pkl", serialization="pickle")
-    # outlier_model.save("../export/bertopic/outlier_model.pkl", serialization="pickle")
-    aws.save_to_s3(
-        "../bertopic_model/topic_model.pkl",
-        bucket_name=BUCKET_NAME,
-        object_name="bertopic/topic_model.pkl"
-    )
-    if outlier_model is not None:
-        aws.save_to_s3(
-            "../bertopic_model/outlier_model.pkl",
-            bucket_name=BUCKET_NAME,
-            object_name="bertopic/outlier_model.pkl"
-        )
+    # Save models and data to S3
+    s3_client = session.client('s3')
+    bucket = glue_args['bucket_name']
+    s3_output_path = f"bertopic_model"
     
+    # Create temporary directory for model files
+    os.makedirs(temp_dir, exist_ok=True)
+    
+    # Save files locally first
+    bertopic_dir = "bertopic"
+    os.makedirs(f"{temp_dir}/{bertopic_dir}", exist_ok=True)
+    docs_df.to_csv(f"{temp_dir}/{bertopic_dir}/train_data.csv", index=False)
+    topic_model.save(f"{temp_dir}/{bertopic_dir}/topic_model.pkl", serialization="pickle")
+    if outlier_model is not None:
+        outlier_model.save(f"{temp_dir}/{bertopic_dir}/outlier_model.pkl", serialization="pickle")
+    
+    # Upload files to S3
+    s3_client.upload_file(
+        f"{temp_dir}/{bertopic_dir}/train_data.csv",
+        bucket,
+        f"{s3_output_path}/train_data.csv"
+    )
+    print(f"Saved train_data.csv to s3://{bucket}/{s3_output_path}/train_data.csv")
+    
+    s3_client.upload_file(
+        f"{temp_dir}/{bertopic_dir}/topic_model.pkl",
+        bucket,
+        f"{s3_output_path}/topic_model.pkl"
+    )
+    print(f"Saved topic_model.pkl to s3://{bucket}/{s3_output_path}/topic_model.pkl")
+    
+    if outlier_model is not None:
+        s3_client.upload_file(
+            f"{temp_dir}/{bertopic_dir}/outlier_model.pkl",
+            bucket,
+            f"{s3_output_path}/outlier_model.pkl"
+        )
+        print(f"Saved outlier_model.pkl to s3://{bucket}/{s3_output_path}/outlier_model.pkl")
+    
+    # Clean up temporary files if not in debug mode
+    if not debug:
+        os.remove(f"{temp_dir}/{bertopic_dir}/train_data.csv")
+        os.remove(f"{temp_dir}/{bertopic_dir}/topic_model.pkl")
+        if outlier_model is not None:
+            os.remove(f"{temp_dir}/{bertopic_dir}/outlier_model.pkl")
+        os.rmdir(temp_dir)
 
 if __name__ == "__main__":
-    main(dryrun=False)
+    main(dryrun=False, debug=True)

@@ -141,7 +141,7 @@ def get_html_event_to_html_documents(html_dict_subset):
 
 
 # # ## Ingest All Docs with CSAS Events
-async def download_html(url: str, error_dump: List[dict], semaphore: asyncio.Semaphore, debug: bool = False) -> Optional[Tuple[str, BeautifulSoup]]:
+async def download_html(url: str, error_dump: List[dict], redirects: List[dict], semaphore: asyncio.Semaphore, debug: bool = False) -> Optional[Tuple[str, BeautifulSoup]]:
     """
     Asynchronously downloads HTML from a given URL and parses it with BeautifulSoup.
     If a 404 is encountered, retries with allow_redirects=True.
@@ -166,10 +166,17 @@ async def download_html(url: str, error_dump: List[dict], semaphore: asyncio.Sem
                     status = response.status
                     html_content = await response.text()
 
-                    if status == 404:
-                        print("Error 404")
+                    if status == 302 or 'moved temporarily' in html_content.lower():
+                        redirect_url = response.headers.get('Location')
+                        print(f"The page has been moved temporarily to a new location. Redirecting to: {redirect_url}")
+                        # Log the redirect
+                        redirects.append({
+                            'original_url': url,
+                            'redirected_url': redirect_url,
+                            'status_code': status
+                        })
                         # Retry with redirects enabled
-                        async with session.get(url, headers=headers, allow_redirects=True) as retry_response:
+                        async with session.get(redirect_url, headers=headers) as retry_response:
                             retry_status = retry_response.status
                             retry_content = await retry_response.text()
                             
@@ -183,8 +190,8 @@ async def download_html(url: str, error_dump: List[dict], semaphore: asyncio.Sem
                             doc = BeautifulSoup(retry_content, "html.parser")
                             # Save successful download if in debug mode
                             if debug:
-                                save_html_content(url, retry_content)
-                            return url, doc
+                                save_html_content(redirect_url, retry_content)
+                            return redirect_url, doc
 
                     doc = BeautifulSoup(html_content, "html.parser")
                     # Save successful download if in debug mode
@@ -463,7 +470,7 @@ def extract_doc_information(html_docs, pages):
 
 # Function to compute embeddings synchronously for each document's page_content,
 # while catching and logging errors and tracking metadata of failed documents.
-def get_embeddings_for_documents(documents: list[Document], embedder, failed_embeddings_metadata) -> tuple:
+def get_embeddings_for_documents(documents: list[Document], embedder, failed_embeddings_metadata) -> tuple[list[Document], np.ndarray]:
     valid_docs = []
     valid_embeddings = []
 
@@ -483,22 +490,22 @@ def get_embeddings_for_documents(documents: list[Document], embedder, failed_emb
 # Process and ingest HTML documents with error handling for embedding failures.
 def process_and_ingest_html_documents(
     client: OpenSearch, index_name: str, documents: list[Document], embedder, failed_embeddings_metadata, dryrun
-) -> int:
+) -> tuple[int, list[Document]]:
     # Compute embeddings for the documents, obtaining only the valid ones.
     valid_docs, html_embeddings = get_embeddings_for_documents(documents, embedder, failed_embeddings_metadata)
 
     if not valid_docs:
         # print("No documents to ingest after embedding failures.")
-        return 0
+        return 0, []
 
     # Bulk insert the documents and embeddings into OpenSearch.
     if not dryrun:
         op.bulk_insert_html_documents(client, index_name=index_name, documents=valid_docs, vectors=html_embeddings.tolist())
 
-    return len(valid_docs)
+    return len(valid_docs), valid_docs
 
 
-def is_valid_document(doc):
+def is_valid_document(doc, debug=False) -> bool:
     """
     Validates a document based on the following criteria:
     
@@ -510,27 +517,35 @@ def is_valid_document(doc):
     """
     # Ensure the document has the required fields.
     if "html_doc_type" not in doc:
+        if debug:
+            print(f"Document {doc['Document URL']} does not have an 'html_doc_type' field")
         return False
 
     # The document should have a 'pdf_url' unless it's a 'Terms of Reference'.
     if "pdf_url" not in doc and doc.get("html_doc_type") != "Terms of Reference":
+        if debug:
+            print(f"Document {doc['Document URL']} does not have a 'pdf_url' field")
         return False
 
     # The document must have an 'html_language' field.
     if "html_language" not in doc:
+        if debug:
+            print(f"Document {doc['Document URL']} does not have an 'html_language' field")
         return False
 
     # Check for non-English/French documents based on heuristics in URL or title.
     html_url = doc.get("html_url", "").lower()
     csas_title = doc.get("csas_html_title", "").lower()
     if "inu" in html_url or "inukititut" in csas_title:
-        if doc.get("language", "").lower() != "inuktitut":
+        if doc.get("language", "").lower() == "inuktitut":
+            if debug:
+                print(f"Document {doc['Document URL']} is in Inuktitut")
             return False
 
     return True
 
 
-def existing_document_is_valid(doc, client, index, enable_override):
+def existing_document_is_valid(doc, client, index, enable_override=False, debug=False) -> bool:
     """
     Checks if the document already exists in the specified OpenSearch index
     and, if so, verifies that the stored document meets the validity criteria.
@@ -550,6 +565,8 @@ def existing_document_is_valid(doc, client, index, enable_override):
 
     # Check if the document exists in the index.
     if not client.exists(index=index, id=doc_id):
+        if debug:
+            print(f"Document {doc_id} does not exist in index {index}")
         return False
 
     # Fetch the existing document.
@@ -558,12 +575,12 @@ def existing_document_is_valid(doc, client, index, enable_override):
     existing_doc = existing.get("_source", {})
 
     # Validate the stored document.
-    return is_valid_document(existing_doc)
+    return is_valid_document(existing_doc, debug)
 
-def is_english_document(url: str) -> bool:
+def is_english_document(url: str, debug=False) -> bool:
     """
     Check if a document URL is for an English document.
-    This is just a temporary solution to exclude French documents.
+    This is just a temporary solution to exclude non-English documents.
     
     Args:
         url: The document URL to check
@@ -572,8 +589,13 @@ def is_english_document(url: str) -> bool:
         bool: True if the document is English, False otherwise
     """
     # List of French document extensions
-    french_extensions = ['-fra.html', '-fra.htm']
-    return not any(url.endswith(ext) for ext in french_extensions)
+    invalid_extensions = ['-fra.html', '-fra.htm', '-inu.html', '-inu.htm']
+    for ext in invalid_extensions:
+        if url.endswith(ext):
+            if debug:
+                print(f"Document {url} is {ext[1:3]}")
+            return False
+    return True
 
 async def process_html_docs(html_docs, enable_override=False, dryrun=False, debug=False):
     """
@@ -592,21 +614,30 @@ async def process_html_docs(html_docs, enable_override=False, dryrun=False, debu
     docs_to_process = []
     docs_already_processed = 0
     error_dump = []
+    redirects = []
     
     # Filter documents (unless override is enabled)
     for doc in html_docs:
-        if existing_document_is_valid(doc, client, DFO_HTML_FULL_INDEX_NAME, enable_override):
+        check = existing_document_is_valid(doc, client, DFO_HTML_FULL_INDEX_NAME, enable_override, debug)
+        if check:
             docs_already_processed += 1
-        else:
+        elif is_english_document(doc["Document URL"], debug):
+            if debug:
+                print(f"Document {doc['Document URL']} is English")
             docs_to_process.append(doc)
+        else:
+            if debug:
+                print(f"Document {doc['Document URL']} is not valid")
 
     # If there are no new documents to process, return early.
     if not docs_to_process:
         return {
             "ingested_count": 0,
+            "ingested_docs": [],
             "docs_failed": 0,
             "docs_already_processed": docs_already_processed,
             "error_dump": error_dump,
+            "redirects": redirects,
             "failed_html_pages": [],
             "failed_embeddings_metadata": [],
             "extraction_incompletes": [],
@@ -614,14 +645,14 @@ async def process_html_docs(html_docs, enable_override=False, dryrun=False, debu
         }
     
     # Download HTML pages concurrently with rate limiting
-    urls = [doc["Document URL"] for doc in docs_to_process if is_english_document(doc["Document URL"])]
+    urls = [doc["Document URL"] for doc in docs_to_process]
     
     # Create a semaphore to limit concurrent requests
     # Adjust this number based on the server's capacity and your needs
     semaphore = asyncio.Semaphore(5)  # Allow 5 concurrent requests
     
     # Use the semaphore in the download tasks
-    pages = await asyncio.gather(*(download_html(u, error_dump, semaphore, debug) for u in urls))
+    pages = await asyncio.gather(*(download_html(u, error_dump, redirects, semaphore, debug) for u in urls))
     
     # Extract document information from the downloaded HTML.
     docs, unloaded_docs, extraction_incompletes, mismatched_years = extract_doc_information(docs_to_process, pages)
@@ -629,23 +660,25 @@ async def process_html_docs(html_docs, enable_override=False, dryrun=False, debu
     
     # Process and ingest the documents (only those with successful embeddings).
     failed_embeddings_metadata = []
-    ingested_count = process_and_ingest_html_documents(client, DFO_HTML_FULL_INDEX_NAME, docs, embedder, failed_embeddings_metadata, dryrun=dryrun)
+    ingested_count, valid_docs = process_and_ingest_html_documents(client, DFO_HTML_FULL_INDEX_NAME, docs, embedder, failed_embeddings_metadata, dryrun=dryrun)
     
     # Count failures: extraction failures plus those that failed embedding.
     docs_failed = len(unloaded_docs) + (len(docs) - ingested_count)
     
     return {
         "ingested_count": ingested_count,
+        "ingested_docs": valid_docs,
         "docs_failed": docs_failed,
         "docs_already_processed": docs_already_processed,
         "error_dump": error_dump,
+        "redirects": redirects,
         "failed_html_pages": failed_html_pages,
         "failed_embeddings_metadata": failed_embeddings_metadata,
         "extraction_incompletes": extraction_incompletes,
         "mismatched_years": mismatched_years
     }
 
-async def process_events(html_event_to_html_documents, enable_override=False, dryrun=False, debug=False):
+async def process_events(html_event_to_html_documents, enable_override=False, dryrun=False, debug=False) -> tuple[dict, list[Document]]:
     """
     Process a dictionary of CSAS events where each event has a list of associated HTML documents.
     This function aggregates processing statistics from all events.
@@ -666,12 +699,14 @@ async def process_events(html_event_to_html_documents, enable_override=False, dr
         "total_docs_failed": 0,
         "total_docs_already_processed": 0,
         "error_dump": [],
+        "redirects": [],
         "failed_html_pages": [],
         "failed_embeddings_metadata": [],
         "extraction_incompletes": [],
         "mismatched_years": []
     }
 
+    ingested_docs = [] # list of all ingested documents
     for i, (csas_event, html_docs) in enumerate(html_event_to_html_documents.items(), start=1):
         print(f"{i}/{total_events} Processing CSAS Event: {csas_event}")
 
@@ -682,17 +717,18 @@ async def process_events(html_event_to_html_documents, enable_override=False, dr
             dryrun=dryrun,
             debug=debug
         )
-
+        ingested_docs.extend(stats["ingested_docs"])
         overall_stats["total_docs_processed"] += stats["ingested_count"]
         overall_stats["total_docs_failed"] += stats["docs_failed"]
         overall_stats["total_docs_already_processed"] += stats["docs_already_processed"]
         overall_stats["error_dump"].extend(stats["error_dump"])
+        overall_stats["redirects"].extend(stats["redirects"])
         overall_stats["failed_html_pages"].extend(stats["failed_html_pages"])
         overall_stats["failed_embeddings_metadata"].extend(stats["failed_embeddings_metadata"])
         overall_stats["extraction_incompletes"].extend(stats["extraction_incompletes"])
         overall_stats["mismatched_years"].extend(stats["mismatched_years"])
 
-    return overall_stats
+    return overall_stats, ingested_docs
 
 
 def upload_to_s3(bucket: str, key: str, df: pd.DataFrame, debug: bool = False):
@@ -739,7 +775,7 @@ async def main(dryrun=False, debug=False):
     html_event_to_html_documents = get_html_event_to_html_documents(html_data)
     
     # Process events
-    overall_stats = await process_events(html_event_to_html_documents, enable_override=False, dryrun=dryrun, debug=debug)
+    overall_stats, ingested_docs = await process_events(html_event_to_html_documents, enable_override=False, dryrun=dryrun, debug=debug)
 
     # Print processing results
     print("Documents successfully processed:", overall_stats["total_docs_processed"], 
@@ -749,7 +785,24 @@ async def main(dryrun=False, debug=False):
     print("Documents that failed embedding:", len(overall_stats["failed_embeddings_metadata"]))
 
     # Upload logs to S3 and optionally save locally
+    ingested_docs_metadata = []
+    for doc in ingested_docs:
+        ingested_docs_metadata.append({
+            'csas_event': doc.metadata['csas_event'],
+            'csas_html_year': doc.metadata['csas_html_year'],
+            'html_page_title': doc.metadata['html_page_title'],
+            'html_doc_type': doc.metadata['html_doc_type'],
+            'html_url': doc.metadata['html_url'],
+            'html_language': doc.metadata['html_language'],
+            'pdf_url': doc.metadata['pdf_url'],
+            'ingestion_timestamp': CURRENT_DATETIME,
+            'batch_id': BATCH_ID,
+            'status': 'success'
+        })
+    ingested_docs_df = pd.DataFrame(ingested_docs_metadata)
+    upload_to_s3(BUCKET_NAME, f"batches/{BATCH_ID}/logs/processed_and_ingested_html_docs.csv", ingested_docs_df, debug)
     upload_to_s3(BUCKET_NAME, f"batches/{BATCH_ID}/logs/html_fail_error_dump_docs.csv", pd.DataFrame(overall_stats["error_dump"]), debug)
+    upload_to_s3(BUCKET_NAME, f"batches/{BATCH_ID}/logs/url_redirects.csv", pd.DataFrame(overall_stats["redirects"]), debug)
     upload_to_s3(BUCKET_NAME, f"batches/{BATCH_ID}/logs/html_fail_docs.csv", pd.DataFrame(overall_stats["failed_html_pages"]), debug)
     upload_to_s3(BUCKET_NAME, f"batches/{BATCH_ID}/logs/too_long_docs.csv", pd.DataFrame(overall_stats["failed_embeddings_metadata"]), debug)
     
@@ -767,4 +820,4 @@ async def main(dryrun=False, debug=False):
     upload_to_s3(BUCKET_NAME, f"batches/{BATCH_ID}/logs/overall_stats.csv", stats_df, debug)
 
 if __name__ == "__main__":
-    asyncio.run(main(dryrun=False, debug=False))
+    asyncio.run(main(dryrun=False, debug=True))

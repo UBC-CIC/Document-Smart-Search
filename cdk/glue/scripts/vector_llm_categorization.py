@@ -681,8 +681,8 @@ async def main(debug=False):
             all_downloaded_docs.append(doc_obj)
             all_doc_embeddings.append(vector)
 
-    all_downloaded_docs = all_downloaded_docs[:5] # first 2 documents
-    all_doc_embeddings = np.array(all_doc_embeddings)[:5, :] # first 2 document embeddings
+    all_downloaded_docs = all_downloaded_docs # first 2 documents
+    all_doc_embeddings = np.array(all_doc_embeddings) # first 2 document embeddings
     print(f"Processed {len(all_downloaded_docs)} documents with embeddings")
 
     # Get mandates and topics
