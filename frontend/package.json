@@ -30,7 +30,7 @@
     "react-select": "^5.10.1",
     "react-toastify": "^10.0.6",
     "react-use": "^17.6.0",
-    "recharts": "^2.13.0",
+    "recharts": "^2.15.3",
     "tailwind-merge": "^2.5.2",
     "tailwindcss-animate": "^1.0.7"
   },

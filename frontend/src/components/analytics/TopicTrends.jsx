@@ -6,13 +6,40 @@ import { DateRange } from "react-date-range";
 import AsyncSelect from "react-select/async";
 import 'react-date-range/dist/styles.css';
 import 'react-date-range/dist/theme/default.css';
+import { ResponsiveContainer } from "recharts";
 import { useRef } from "react";
 import { useClickAway } from "react-use";
+import { LineChart, Line, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 
 export default function TopicTrends() {
   const [showCalendar, setShowCalendar] = useState(false);
   const calendarRef = useRef(null);
   const [editingField, setEditingField] = useState(null); // 'start' or 'end'
+  const chartData = [
+    { year: 2010, salmon: 26, "climate-change": 45 },
+    { year: 2011, salmon: 34, "climate-change": 37 },
+    { year: 2012, salmon: 49, "climate-change": 31 },
+    { year: 2013, salmon: 48, "climate-change": 9 },
+    { year: 2014, salmon: 46, "climate-change": 19 },
+    { year: 2015, salmon: 5, "climate-change": 25 },
+    { year: 2016, salmon: 9, "climate-change": 23 },
+    { year: 2017, salmon: 9, "climate-change": 16 },
+    { year: 2018, salmon: 41, "climate-change": 33 },
+    { year: 2019, salmon: 10, "climate-change": 15 },
+    { year: 2020, salmon: 29, "climate-change": 7 },
+    { year: 2021, salmon: 47, "climate-change": 28 },
+    { year: 2022, salmon: 25, "climate-change": 15 },
+    { year: 2023, salmon: 20, "climate-change": 11 }
+  ];
+
+  const colorPalette = [
+    "#8884d8",
+    "#82ca9d",
+    "#ff7300",
+    "#ffc658",
+    "#a83279",
+    "#3b8beb",
+  ];
   const [allTopics, setAllTopics] = useState([
     { label: "Salmon", value: "salmon" },
     { label: "Conservation", value: "conservation" },
@@ -133,7 +160,7 @@ export default function TopicTrends() {
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-3 md:p-4 border dark:border-gray-700">
             <div className="flex justify-between items-center mb-3 md:mb-4">
               <h3 className="font-medium dark:text-white text-sm md:text-base">
-                Topic Co-occurrence Network (2010 - 2023)
+                Document Count by Topic
               </h3>
               <div className="flex items-center space-x-2">
                 <span className="text-xs text-gray-500 dark:text-gray-400 hidden sm:inline">
@@ -142,10 +169,24 @@ export default function TopicTrends() {
                 <Info className="h-4 w-4 text-gray-500 dark:text-gray-400" />
               </div>
             </div>
-            <div className="aspect-square bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
-              {/* Placeholder */}
-              <p className="text-sm text-gray-600 dark:text-gray-300">Graph Placeholder</p>
-            </div>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+                <XAxis dataKey="year" label={{ value: "Year", position: "insideBottom", offset: -5 }} />
+                <YAxis label={{ value: "# of Documents", angle: -90, position: "insideLeft" }} />
+                <Tooltip />
+                <Legend />
+                {selectedTopics.map((topic, index) => (
+                  <Line
+                    key={topic.value}
+                    type="monotone"
+                    dataKey={topic.value}
+                    stroke={colorPalette[index % colorPalette.length]}
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
           </div>
 
           {/* Trend Over Time */}
