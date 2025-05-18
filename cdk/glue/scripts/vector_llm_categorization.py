@@ -39,22 +39,28 @@ import src.opensearch as op
 #     'opensearch_host'
 # ])
 
-# Index Names
-DFO_HTML_FULL_INDEX_NAME = "dfo-html-full-index"
-DFO_TOPIC_FULL_INDEX_NAME = "dfo-topic-full-index"
-DFO_MANDATE_FULL_INDEX_NAME = "dfo-mandate-full-index"
-
 args = {
     'JOB_NAME': 'vector_llm_categorization',
+    'html_urls_path': 's3://dfo-test-datapipeline/batches/2025-05-07/html_data/CSASDocuments.xlsx',
     'bucket_name': 'dfo-test-datapipeline',
     'batch_id': '2025-05-07',
     'region_name': 'us-west-2',
     'embedding_model': 'amazon.titan-embed-text-v2:0',
     'opensearch_secret': 'opensearch-masteruser-test-glue',
     'opensearch_host': 'opensearch-host-test-glue',
-    'pipeline_mode': 'html_only', # 'html_only', 'topics_only', 'full_update'
-    'sm_method': 'numpy' # 'numpy', 'opensearch'
+    'rds_secret': 'rds/dfo-db-glue-test',
+    'dfo_html_full_index_name': 'dfo-html-full-index',
+    'dfo_topic_full_index_name': 'dfo-topic-full-index',
+    'dfo_mandate_full_index_name': 'dfo-mandate-full-index',
+    'pipeline_mode': 'full_update', # or 'topics_only', 'html_only'
+    'sm_method': 'numpy', # 'numpy', 'opensearch'
+    'topic_modelling_mode': 'retrain', # or 'predict'
 }
+
+# Index Names
+DFO_HTML_FULL_INDEX_NAME = args['dfo_html_full_index_name']
+DFO_TOPIC_FULL_INDEX_NAME = args['dfo_topic_full_index_name']
+DFO_MANDATE_FULL_INDEX_NAME = args['dfo_mandate_full_index_name']
 
 REGION_NAME = args['region_name']
 EMBEDDING_MODEL = args['embedding_model']
@@ -228,15 +234,15 @@ def parse_json_response(response: str) -> Optional[dict]:
                 return json.loads(response[first_brace:last_brace + 1])
             except json.JSONDecodeError:
                 pass
-    print("Failed to quick parse JSON response.")
+    # print("Failed to quick parse JSON response.")
 
-    print("Atempting to salvage situation with LLM")
+    # print("Atempting to salvage situation with LLM")
 
     responses_dict = parse_json_with_retries(response, 1, False)
-    if responses_dict is None:
-        print("All atempts to fix response failed.")
-    else:
-        print("Salvage successful")
+    # if responses_dict is None:
+    #     print("All atempts to fix response failed.")
+    # else:
+    #     print("Salvage successful")
 
     return responses_dict
 
@@ -770,6 +776,8 @@ async def main(dryrun=False, debug=False):
     Parameters:
         debug: Whether to run in debug mode
     """
+    print(f"Dryrun: {dryrun}, Debug: {debug}")
+    
     # Get pipeline mode from args
     pipeline_mode = args.get('pipeline_mode', 'full_update')
     if pipeline_mode not in ['html_only', 'topics_only', 'full_update']:

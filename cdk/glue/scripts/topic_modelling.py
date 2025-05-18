@@ -27,26 +27,32 @@ import src.pgsql as pgsql
 session = aws.session # always use this session for all AWS calls
 
 # Constants that will be replaced with Glue context args, SSM params, or Secrets Manager
-REGION_NAME = "us-west-2"
-DFO_HTML_FULL_INDEX_NAME = "dfo-html-full-index"
 
-glue_args = {
-    'JOB_NAME': 'vector_llm_categorization',
+args = {
+    'JOB_NAME': 'topic_modelling',
+    'html_urls_path': 's3://dfo-test-datapipeline/batches/2025-05-07/html_data/CSASDocuments.xlsx',
     'bucket_name': 'dfo-test-datapipeline',
     'batch_id': '2025-05-07',
     'region_name': 'us-west-2',
+    'embedding_model': 'amazon.titan-embed-text-v2:0',
     'opensearch_secret': 'opensearch-masteruser-test-glue',
     'opensearch_host': 'opensearch-host-test-glue',
     'rds_secret': 'rds/dfo-db-glue-test',
+    'dfo_html_full_index_name': 'dfo-html-full-index',
+    'dfo_topic_full_index_name': 'dfo-topic-full-index',
+    'dfo_mandate_full_index_name': 'dfo-mandate-full-index',
+    'pipeline_mode': 'full_update', # or 'topics_only', 'html_only'
+    'sm_method': 'numpy', # 'numpy', 'opensearch'
     'topic_modelling_mode': 'retrain', # or 'predict'
-    'pipeline_mode': 'topics_only' # 'html_only', 'topics_only', 'full_update'
 }
 
+REGION_NAME = args['region_name']
+DFO_HTML_FULL_INDEX_NAME = args['dfo_html_full_index_name']
 CURRENT_DATETIME = datetime.now().strftime(r"%Y-%m-%d %H:%M:%S")
 
-secrets = aws.get_secret(secret_name=glue_args['opensearch_secret'],region_name=glue_args['region_name'])
+secrets = aws.get_secret(secret_name=args['opensearch_secret'],region_name=args['region_name'])
 opensearch_host = aws.get_parameter_ssm(
-    parameter_name=glue_args['opensearch_host'], region_name=glue_args['region_name']
+    parameter_name=args['opensearch_host'], region_name=args['region_name']
 )
 # Connect to OpenSearch
 auth = (secrets['username'], secrets['password'])
@@ -62,7 +68,7 @@ op_client = OpenSearch(
     retry_on_timeout=True
 )
 
-rds_secret = aws.get_secret(secret_name=glue_args['rds_secret'],region_name=glue_args['region_name'])
+rds_secret = aws.get_secret(secret_name=args['rds_secret'],region_name=args['region_name'])
 
 conn_info = {
     "host": rds_secret['host'],
@@ -71,10 +77,6 @@ conn_info = {
     "user": rds_secret['username'],
     "password": rds_secret['password']
 }
-
-DFO_HTML_FULL_INDEX_NAME = "dfo-html-full-index" # to be replaced with environment var
-BUCKET_NAME = "dfo-test-datapipeline  Info" # to be replaced with environment var
-DATETIME = datetime.now().strftime(r"%Y-%m-%d %H:%M:%S") # to be replaced with environment var
 
 def train_custom_topic_model(
     documents,
@@ -444,7 +446,7 @@ def prepare_data_to_insert(combined_df, topic_infos, outlier_topic_infos, mode='
                 "Representative_Docs": "representative_docs"
             }
         )
-        derived_topics_table['last_updated'] = DATETIME
+        derived_topics_table['last_updated'] = CURRENT_DATETIME
         
         # documents_derived_topic table
         documents_derived_topic_table  = combined_df.loc[
@@ -476,7 +478,7 @@ def prepare_data_to_insert(combined_df, topic_infos, outlier_topic_infos, mode='
     documents_derived_topic_table['confidence_score'] = documents_derived_topic_table['confidence_score'].clip(0, 1)
 
     # add datetime now
-    documents_derived_topic_table['last_updated'] = DATETIME
+    documents_derived_topic_table['last_updated'] = CURRENT_DATETIME
 
     return derived_topics_table, documents_derived_topic_table
 
@@ -590,13 +592,13 @@ def fetch_specific_documents_by_urls(client, index_name, urls, fields):
 def fetch_new_documents():
     """Fetch only new documents that haven't been processed by topic modeling yet"""
     # Read tracking file
-    tracking_path = f"batches/{glue_args['batch_id']}/logs/html_ingestion/processed_and_ingested_html_docs.csv"
+    tracking_path = f"batches/{args['batch_id']}/logs/html_ingestion/processed_and_ingested_html_docs.csv"
     s3_client = session.client('s3')
     
     try:
         # Download CSV from S3
         response = s3_client.get_object(
-            Bucket=glue_args['bucket_name'],
+            Bucket=args['bucket_name'],
             Key=tracking_path
         )
         csv_content = response['Body'].read()
@@ -626,14 +628,16 @@ def fetch_new_documents():
     return pd.DataFrame(fetched)
 
 def main(dryrun=False, debug=False):
+    
+    print(f"Dryrun: {dryrun}, Debug: {debug}")
     # Check pipeline mode first
-    pipeline_mode = glue_args.get('pipeline_mode', 'full_update')
+    pipeline_mode = args.get('pipeline_mode', 'full_update')
     if pipeline_mode == 'topics_only':
         print("Pipeline mode is 'topics_only'. Skipping topic modeling.")
         return
 
     # Now check topic modeling mode
-    if glue_args['topic_modelling_mode'] == 'retrain':
+    if args['topic_modelling_mode'] == 'retrain':
         print("BERTopic modelling mode: retrain")
         # Purge existing data
         with psycopg.connect(**conn_info) as conn:
@@ -655,7 +659,7 @@ def main(dryrun=False, debug=False):
         
         # Load existing models from S3
         s3_client = session.client('s3')
-        bucket = glue_args['bucket_name']
+        bucket = args['bucket_name']
         s3_model_path = f"bertopic_model"
         
         # Create temporary directory
@@ -819,7 +823,7 @@ def main(dryrun=False, debug=False):
     
     # Save models and data to S3
     s3_client = session.client('s3')
-    bucket = glue_args['bucket_name']
+    bucket = args['bucket_name']
     s3_output_path = f"bertopic_model"
     
     # Create temporary directory for model files

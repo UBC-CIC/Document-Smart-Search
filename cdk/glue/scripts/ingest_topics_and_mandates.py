@@ -23,10 +23,6 @@ import src.aws_utils as aws
 import src.opensearch as op
 
 # Constants
-# Index Names
-DFO_HTML_FULL_INDEX_NAME = "dfo-html-full-index"
-DFO_TOPIC_FULL_INDEX_NAME = "dfo-topic-full-index"
-DFO_MANDATE_FULL_INDEX_NAME = "dfo-mandate-full-index"
 
 # Get job parameters
 # args = getResolvedOptions(sys.argv, [
@@ -40,20 +36,30 @@ DFO_MANDATE_FULL_INDEX_NAME = "dfo-mandate-full-index"
 # ])
 
 args = {
-    'JOB_NAME': 'clean_and_ingest_html',
+    'JOB_NAME': 'ingest_topics_and_mandates',
     'html_urls_path': 's3://dfo-test-datapipeline/batches/2025-05-07/html_data/CSASDocuments.xlsx',
-    'topics_mandates_folder_path': 's3://dfo-test-datapipeline/batches/2025-05-07/topics_mandates_data/',
     'bucket_name': 'dfo-test-datapipeline',
     'batch_id': '2025-05-07',
     'region_name': 'us-west-2',
     'embedding_model': 'amazon.titan-embed-text-v2:0',
     'opensearch_secret': 'opensearch-masteruser-test-glue',
     'opensearch_host': 'opensearch-host-test-glue',
-    'pipeline_mode': 'full_update' # or 'topics_only', 'html_only'
+    'rds_secret': 'rds/dfo-db-glue-test',
+    'dfo_html_full_index_name': 'dfo-html-full-index',
+    'dfo_topic_full_index_name': 'dfo-topic-full-index',
+    'dfo_mandate_full_index_name': 'dfo-mandate-full-index',
+    'pipeline_mode': 'full_update', # or 'topics_only', 'html_only'
+    'sm_method': 'numpy', # 'numpy', 'opensearch'
+    'topic_modelling_mode': 'retrain', # or 'predict'
 }
 
+# Index Names
+DFO_HTML_FULL_INDEX_NAME = args['dfo_html_full_index_name']
+DFO_TOPIC_FULL_INDEX_NAME = args['dfo_topic_full_index_name']
+DFO_MANDATE_FULL_INDEX_NAME = args['dfo_mandate_full_index_name']
+
 # Paths
-TOPICS_MANDATES_FOLDER = args['topics_mandates_folder_path']
+BUCKET_NAME = args['bucket_name']
 BATCH_ID = args['batch_id']
 
 # AWS Configuration
@@ -176,7 +182,8 @@ def fetch_data_from_folder() -> Dict[str, pd.DataFrame]:
     Returns:
         Dict[str, pd.DataFrame]: Dictionary mapping file types to DataFrames
     """
-    csv_files = list_csv_files_in_s3_folder(TOPICS_MANDATES_FOLDER)
+    topics_mandates_folder = f"s3://{BUCKET_NAME}/batches/{BATCH_ID}/topics_mandates_data/"
+    csv_files = list_csv_files_in_s3_folder(topics_mandates_folder)
     data_dict = {}
     
     for file_path in csv_files:
@@ -378,6 +385,7 @@ def main(dryrun: bool = False):
     Args:
         dryrun (bool): If True, don't actually ingest the documents.
     """
+    print(f"Dryrun: {dryrun}")
     # Check pipeline mode and exit early if html_only
     if args.get('pipeline_mode') == 'html_only':
         print("Pipeline mode is 'html_only'. Skipping topics and mandates ingestion.")

@@ -15,19 +15,26 @@ import src.pgsql as pgsql
 
 # Constants that will be replaced with Glue context args, SSM params, or Secrets Manager
 REGION_NAME = "us-west-2"
-DFO_HTML_FULL_INDEX_NAME = "dfo-html-full-index"
 
-glue_args = {
-    'JOB_NAME': 'vector_llm_categorization',
+args = {
+    'JOB_NAME': 'sql_ingestion',
+    'html_urls_path': 's3://dfo-test-datapipeline/batches/2025-05-07/html_data/CSASDocuments.xlsx',
     'bucket_name': 'dfo-test-datapipeline',
     'batch_id': '2025-05-07',
-    'topics_mandates_data_path': 'batches/2025-05-07/topics_mandates_data',
     'region_name': 'us-west-2',
+    'embedding_model': 'amazon.titan-embed-text-v2:0',
     'opensearch_secret': 'opensearch-masteruser-test-glue',
     'opensearch_host': 'opensearch-host-test-glue',
     'rds_secret': 'rds/dfo-db-glue-test',
-    'sm_method': 'opensearch'
+    'dfo_html_full_index_name': 'dfo-html-full-index',
+    'dfo_topic_full_index_name': 'dfo-topic-full-index',
+    'dfo_mandate_full_index_name': 'dfo-mandate-full-index',
+    'pipeline_mode': 'full_update', # or 'topics_only', 'html_only'
+    'sm_method': 'numpy', # 'numpy', 'opensearch'
+    'topic_modelling_mode': 'retrain', # or 'predict'
 }
+
+DFO_HTML_FULL_INDEX_NAME = args['dfo_html_full_index_name']
 
 CURRENT_DATETIME = datetime.now().strftime(r"%Y-%m-%d %H:%M:%S")
 
@@ -401,11 +408,13 @@ def prepare_dataframes(
     )
 
 def main(dryrun: bool = False, debug: bool = False):
+    
+    print(f"Dryrun: {dryrun}, Debug: {debug}")
     # Get AWS credentials and parameters
-    secrets = aws.get_secret(secret_name=glue_args['opensearch_secret'], region_name=glue_args['region_name'])
-    opensearch_host = aws.get_parameter_ssm(parameter_name=glue_args['opensearch_host'], region_name=glue_args['region_name'])
+    secrets = aws.get_secret(secret_name=args['opensearch_secret'], region_name=args['region_name'])
+    opensearch_host = aws.get_parameter_ssm(parameter_name=args['opensearch_host'], region_name=args['region_name'])
     # rds_hosturl = aws.get_parameter_ssm('/dfo/rds/host_url')
-    rds_secret = aws.get_secret(glue_args['rds_secret'])
+    rds_secret = aws.get_secret(args['rds_secret'])
 
     # Connect to OpenSearch
     auth = (secrets['username'], secrets['password'])
@@ -455,14 +464,15 @@ def main(dryrun: bool = False, debug: bool = False):
     
     # Read CSV files from S3
     s3_client = session.client('s3')
-    bucket = glue_args['bucket_name']
+    bucket = args['bucket_name']
     
     # Read topics and mandates data
     try:
         # Read mandates
+        topics_mandates_folder = f"batches/{args['batch_id']}/topics_mandates_data"
         response = s3_client.get_object(
             Bucket=bucket,
-            Key=f"{glue_args['topics_mandates_data_path']}/new_mandates.csv"
+            Key=f"{topics_mandates_folder}/new_mandates.csv"
         )
         mandate_df = pd.read_csv(io.StringIO(response['Body'].read().decode('utf-8')), dtype=str)
         mandate_df = mandate_df.rename(columns={'name': 'mandate_name'})
@@ -470,7 +480,7 @@ def main(dryrun: bool = False, debug: bool = False):
         # Read subcategories
         response = s3_client.get_object(
             Bucket=bucket,
-            Key=f"{glue_args['topics_mandates_data_path']}/new_subcategories.csv"
+            Key=f"{topics_mandates_folder}/new_subcategories.csv"
         )
         subcategory_df = pd.read_csv(io.StringIO(response['Body'].read().decode('utf-8')), dtype=str)
         subcategory_df = subcategory_df.rename(columns={'name': 'subcategory_name'})
@@ -478,7 +488,7 @@ def main(dryrun: bool = False, debug: bool = False):
         # Read topics
         response = s3_client.get_object(
             Bucket=bucket,
-            Key=f"{glue_args['topics_mandates_data_path']}/new_topics.csv"
+            Key=f"{topics_mandates_folder}/new_topics.csv"
         )
         topic_df = pd.read_csv(io.StringIO(response['Body'].read().decode('utf-8')), dtype=str)
         topic_df = topic_df.rename(columns={'name': 'topic_name'})
@@ -487,14 +497,14 @@ def main(dryrun: bool = False, debug: bool = False):
         # vector_llm_categorization results
         response = s3_client.get_object(
             Bucket=bucket,
-            Key=f"{glue_args['batch_id']}/logs/vector_llm_categorization/{glue_args['sm_method']}_combined_mandates_results.csv"
+            Key=f"batches/{args['batch_id']}/logs/vector_llm_categorization/{args['sm_method']}_combined_mandates_results.csv"
         )
         mandate_results_df = pd.read_csv(io.StringIO(response['Body'].read().decode('utf-8')))
         
         # Read topic results
         response = s3_client.get_object(
             Bucket=bucket,
-            Key=f"{glue_args['batch_id']}/logs/vector_llm_categorization/{glue_args['sm_method']}_combined_topics_results.csv"
+            Key=f"batches/{args['batch_id']}/logs/vector_llm_categorization/{args['sm_method']}_combined_topics_results.csv"
         )
         topic_results_df = pd.read_csv(io.StringIO(response['Body'].read().decode('utf-8')))
 

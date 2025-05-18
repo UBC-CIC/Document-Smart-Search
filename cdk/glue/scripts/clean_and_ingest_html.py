@@ -25,10 +25,6 @@ import src.aws_utils as aws
 import src.opensearch as op
 
 # Constants
-# Index Names
-DFO_HTML_FULL_INDEX_NAME = "dfo-html-full-index"
-DFO_TOPIC_FULL_INDEX_NAME = "dfo-topic-full-index"
-DFO_MANDATE_FULL_INDEX_NAME = "dfo-mandate-full-index"
 
 # Get job parameters
 # args = getResolvedOptions(sys.argv, [
@@ -51,8 +47,19 @@ args = {
     'embedding_model': 'amazon.titan-embed-text-v2:0',
     'opensearch_secret': 'opensearch-masteruser-test-glue',
     'opensearch_host': 'opensearch-host-test-glue',
-    'pipeline_mode': 'full_update' # or 'topics_only', 'html_only'
+    'rds_secret': 'rds/dfo-db-glue-test',
+    'dfo_html_full_index_name': 'dfo-html-full-index',
+    'dfo_topic_full_index_name': 'dfo-topic-full-index',
+    'dfo_mandate_full_index_name': 'dfo-mandate-full-index',
+    'pipeline_mode': 'full_update', # or 'topics_only', 'html_only'
+    'sm_method': 'numpy', # 'numpy', 'opensearch'
+    'topic_modelling_mode': 'retrain', # or 'predict'
 }
+
+# Index Names
+DFO_HTML_FULL_INDEX_NAME = args['dfo_html_full_index_name']
+DFO_TOPIC_FULL_INDEX_NAME = args['dfo_topic_full_index_name']
+DFO_MANDATE_FULL_INDEX_NAME = args['dfo_mandate_full_index_name']
 
 # Paths
 HTML_URLS_PATH = args['html_urls_path']
@@ -756,6 +763,7 @@ async def main(dryrun=False, debug=False):
         dryrun (bool): If True, don't actually ingest the documents.
         debug (bool): If True, save HTML content and logs locally.
     """
+    print(f"Dryrun: {dryrun}, Debug: {debug}")
     # Check pipeline mode and exit early if topics_only
     if args.get('pipeline_mode') == 'topics_only':
         print("Pipeline mode is 'topics_only'. Skipping HTML fetching, cleaning, and ingestion.")
