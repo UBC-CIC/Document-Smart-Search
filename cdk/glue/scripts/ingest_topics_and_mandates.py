@@ -48,7 +48,8 @@ args = {
     'region_name': 'us-west-2',
     'embedding_model': 'amazon.titan-embed-text-v2:0',
     'opensearch_secret': 'opensearch-masteruser-test-glue',
-    'opensearch_host': 'opensearch-host-test-glue'
+    'opensearch_host': 'opensearch-host-test-glue',
+    'pipeline_mode': 'full_update' # or 'topics_only', 'html_only'
 }
 
 # Paths
@@ -371,6 +372,17 @@ def process_and_ingest(dfo_topics_docs, df_mandates_docs, dryrun: bool = False):
     print("Inserted {} topic documents and {} mandate documents into OpenSearch.".format(len(dfo_topics_docs), len(df_mandates_docs)))
 
 def main(dryrun: bool = False):
+    """
+    Main function to process and ingest topics and mandates.
+    
+    Args:
+        dryrun (bool): If True, don't actually ingest the documents.
+    """
+    # Check pipeline mode and exit early if html_only
+    if args.get('pipeline_mode') == 'html_only':
+        print("Pipeline mode is 'html_only'. Skipping topics and mandates ingestion.")
+        return
+
     # Create indices if they don't exist
     op.create_topic_index(client, DFO_TOPIC_FULL_INDEX_NAME)
     op.create_mandate_index(client, DFO_MANDATE_FULL_INDEX_NAME)

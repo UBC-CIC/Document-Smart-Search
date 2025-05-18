@@ -51,7 +51,9 @@ args = {
     'region_name': 'us-west-2',
     'embedding_model': 'amazon.titan-embed-text-v2:0',
     'opensearch_secret': 'opensearch-masteruser-test-glue',
-    'opensearch_host': 'opensearch-host-test-glue'
+    'opensearch_host': 'opensearch-host-test-glue',
+    'pipeline_mode': 'html_only', # 'html_only', 'topics_only', 'full_update'
+    'sm_method': 'numpy' # 'numpy', 'opensearch'
 }
 
 REGION_NAME = args['region_name']
@@ -81,9 +83,10 @@ info = op_client.info()
 print(f"Connected to {info['version']['distribution']} {info['version']['number']}!")
 
 # Configuration variables
-SM_METHOD = "opensearch"  # Options: "numpy" or "opensearch", opensearch mode is untested
+SM_METHOD = args['sm_method']  # Options: "numpy" or "opensearch", opensearch mode is untested
 EXPORT_OUTPUT = True  # Toggle file export
 DESIRED_THRESHOLD = 0.2  # Threshold for similarity/highlighting
+TOP_N = 7 # Number of top topics/mandates to return
 
 # Set up the embedding model via LangChain
 bedrock_client = session.client("bedrock-runtime", region_name=REGION_NAME)
@@ -288,42 +291,52 @@ def parse_json_with_retries(json_string: str, max_attempts=3, verbose = True):
 
 def store_output_dfs(output_dict: dict, bucket_name: str, batch_id: str, method: str, debug: bool = False):
     """
-    Store the final output DataFrames as CSV files in S3 under temp_outputs folder.
-    If debug=True, also save locally in vector_llm_cat_output/.
+    Store output DataFrames to S3.
     
     Parameters:
-        output_dict (dict): Dictionary of DataFrames to save
-        bucket_name (str): S3 bucket name
-        batch_id (str): Batch ID for the folder structure
-        debug (bool): If True, also save files locally
+        output_dict: Dictionary containing results DataFrames
+        bucket_name: S3 bucket name
+        batch_id: Current batch ID
+        method: Similarity method used
+        debug: Whether in debug mode
     """
     s3_client = session.client('s3')
-    output_dir = f"batches/{batch_id}/temp_outputs"
     
-    # Create local directory if debug mode
-    if debug:
-        local_dir = "temp_outputs/vector_llm_cat_output"
-        os.makedirs(local_dir, exist_ok=True)
+    # Create output directory structure
+    output_prefix = f"batches/{batch_id}/logs/vector_llm_categorization"
     
-    for name, df in output_dict.items():
-        # Create CSV in memory
-        csv_buffer = df.to_csv(index=False)
-        
-        # Upload to S3
-        s3_key = f"{output_dir}/{method}_{name}.csv"
+    # Store topic results
+    if 'topic_results' in output_dict:
+        topic_df = output_dict['topic_results']
+        topic_output_path = f"{output_prefix}/{SM_METHOD}_combined_topics_results.csv"
+        csv_buffer = topic_df.to_csv(index=False)
         s3_client.put_object(
             Bucket=bucket_name,
-            Key=s3_key,
+            Key=topic_output_path,
             Body=csv_buffer
         )
-        print(f"Uploaded {method}_{name}.csv to s3://{bucket_name}/{s3_key}")
-        
-        # Save locally if in debug mode
         if debug:
-            local_path = os.path.join(local_dir, f"{method}_{name}.csv")
-            df.to_csv(local_path, index=False)
-            print(f"Saved {method}_{name}.csv locally to {local_path}")
-
+            out_dir = f"temp_outputs/vector_llm_cat_output/"
+            os.makedirs(out_dir, exist_ok=True)
+            topic_df.to_csv(os.path.join(out_dir, f"{SM_METHOD}_combined_topics_results.csv"), index=False)
+            print(f"Stored topic results to {out_dir}")
+    
+    # Store mandate results
+    if 'mandate_results' in output_dict:
+        mandate_df = output_dict['mandate_results']
+        mandate_output_path = f"{output_prefix}/{SM_METHOD}_combined_mandates_results.csv"
+        csv_buffer = mandate_df.to_csv(index=False)
+        s3_client.put_object(
+            Bucket=bucket_name,
+            Key=mandate_output_path,
+            Body=csv_buffer
+        )
+        if debug:
+            out_dir = f"temp_outputs/vector_llm_cat_output/"
+            os.makedirs(out_dir, exist_ok=True)
+            mandate_df.to_csv(os.path.join(out_dir, f"{SM_METHOD}_combined_mandates_results.csv"), index=False)
+            print(f"Stored mandate results to {out_dir}")
+    
 
 def opensearch_semantic_search_top_targets(document: Document, n: int = 7, vector_store=None) -> dict:
     """
@@ -657,39 +670,122 @@ async def query_model(prompt):
     return response
 
 
-async def main(debug=False):
+def get_documents_to_process(client, batch_id: str, pipeline_mode: str) -> Tuple[List[Document], np.ndarray]:
     """
-    Main function to execute the categorization pipeline.
+    Get documents to process based on pipeline mode.
+    
+    Parameters:
+        client: OpenSearch client
+        batch_id: Current batch ID (used for tracking file path)
+        pipeline_mode: One of ['html_only', 'topics_only', 'full_update']
+        
+    Returns:
+        Tuple of (documents, document_embeddings)
     """
-    # Fetch all documents from OpenSearch
-    fields = [
-        'csas_html_year', 'html_doc_type', 'html_page_title', 'html_url',
-        'html_language', 'page_content', 'chunk_embedding'
-    ]
-    fetched_docs = op.fetch_specific_fields(op_client, DFO_HTML_FULL_INDEX_NAME, fields=fields)
-    print(f"Found {len(fetched_docs)} documents in total")
+    # Prepare query body
+    all_hits = []
+    if pipeline_mode == 'html_only':
+        # Read the tracking file from the first script
+        tracking_file = f"batches/{batch_id}/logs/html_ingestion/processed_and_ingested_html_docs.csv"
+        s3_client = session.client('s3')
+        print(f"Reading tracking file from s3://{args['bucket_name']}/{tracking_file}")
+        
+        try:
+            response = s3_client.get_object(
+                Bucket=args['bucket_name'],
+                Key=tracking_file
+            )
+            tracking_df = pd.read_csv(response['Body'])
+            doc_urls = tracking_df['html_url'].tolist()
+            print(f"Doc URLs: {len(doc_urls)}")
+            
+            body = {
+                "ids": doc_urls
+            }
+            response = client.mget(index=DFO_HTML_FULL_INDEX_NAME, body=body)
+            all_hits = response['docs'] if response['docs'] else []
+        except Exception as e:
+            print(f"Error reading tracking file: {e}")
+            raise ValueError("Could not read tracking file for html_only mode")
+    else:
+        # For topics_only and full_update, process all documents
+        body = {
+            "query": {
+                "match_all": {}
+            },
+            "size": 1000
+        }
+    
+        # Get all documents using scroll API
+        response = client.search(
+            index=DFO_HTML_FULL_INDEX_NAME,
+            body=body,
+            scroll='5m'
+        )
+        scroll_id = response['_scroll_id']
+        hits = response['hits']['hits']
+        
+        # Process all hits
+        all_hits = hits
+        while hits:
+            response = client.scroll(
+                scroll_id=scroll_id,
+                scroll='5m'
+            )
+            hits = response['hits']['hits']
+            all_hits.extend(hits)
+        
+        # Clear scroll
+        client.clear_scroll(scroll_id=scroll_id)
+    
+    # Process hits into documents and embeddings
+    documents = []
+    document_embeddings_list = []
+    
+    for hit in all_hits:
+        source = hit["_source"]
+        metadata = source.copy()
+        if 'chunk_embedding' in metadata:
+            del metadata['chunk_embedding']
+        text = source.get('page_content', '')
+        doc = Document(page_content=text, metadata=metadata)
+        embedding = np.array(source["chunk_embedding"])
+        if len(embedding) > 0:
+            documents.append(doc)
+            document_embeddings_list.append(embedding)
+    print(f"Documents: {len(documents)}")
+    print(f"Document embeddings: {len(document_embeddings_list)}")
+    
+    if not documents:
+        raise ValueError("No valid documents found in OpenSearch")
+        
+    document_embeddings = np.vstack(document_embeddings_list)
+    return documents, document_embeddings
 
-    # Convert fetched documents to Document objects and prepare embeddings
-    all_downloaded_docs = []
-    all_doc_embeddings = []
-    for doc in fetched_docs:
-        metadata = {field: doc[field] for field in fields if field in doc and field not in ['page_content', 'chunk_embedding']}
-        page_content = doc.get('page_content', '')
-        vector = np.array(doc.get('chunk_embedding', []))
-        if len(vector) > 0:  # Only include documents with embeddings
-            doc_obj = Document(page_content=page_content, metadata=metadata)
-            all_downloaded_docs.append(doc_obj)
-            all_doc_embeddings.append(vector)
 
-    all_downloaded_docs = all_downloaded_docs # first 2 documents
-    all_doc_embeddings = np.array(all_doc_embeddings) # first 2 document embeddings
-    print(f"Processed {len(all_downloaded_docs)} documents with embeddings")
-
-    # Get mandates and topics
-    mandates, mandate_embeddings, mandates_by_name = get_all_mandates(op_client, DFO_MANDATE_FULL_INDEX_NAME)
+async def main(dryrun=False, debug=False):
+    """
+    Main function to run the categorization pipeline.
+    
+    Parameters:
+        debug: Whether to run in debug mode
+    """
+    # Get pipeline mode from args
+    pipeline_mode = args.get('pipeline_mode', 'full_update')
+    if pipeline_mode not in ['html_only', 'topics_only', 'full_update']:
+        raise ValueError(f"Invalid pipeline mode: {pipeline_mode}")
+    print(f"Pipeline mode: {pipeline_mode}")
+    
+    # Get documents to process based on mode
+    documents, document_embeddings = get_documents_to_process(op_client, args['batch_id'], pipeline_mode)
+    # documents = documents[:5]
+    # document_embeddings = document_embeddings[:5]
+    print(f"Processing {len(documents)} documents...")
+    print(f"Embedding shape: {document_embeddings.shape}")
+    # Get topics and mandates
     topics, topic_embeddings, topics_by_name = get_all_topics(op_client, DFO_TOPIC_FULL_INDEX_NAME)
-
-    # Categorize mandates
+    mandates, mandate_embeddings, mandates_by_name = get_all_mandates(op_client, DFO_MANDATE_FULL_INDEX_NAME)
+    
     mandate_prompt_template = PromptTemplate(
         input_variables=['mandates', 'document'],
         template="""
@@ -718,21 +814,22 @@ async def main(debug=False):
         <|eot_id|>
         """
     )
-    df_mandates_combined = await categorize_documents(
-        documents=all_downloaded_docs,
-        document_embeddings=all_doc_embeddings,
+    
+    # Process documents
+    mandate_results = await categorize_documents(
+        documents=documents,
+        document_embeddings=document_embeddings,
         targets=mandates,
         target_embeddings=mandate_embeddings,
         target_type="mandates",
         items_by_name=mandates_by_name,
         method=SM_METHOD,
-        prompt_template=mandate_prompt_template,
         vector_store=mandates_vector_store,
-        top_n=7,  # Get top 7 topics
+        prompt_template=mandate_prompt_template,
+        top_n=TOP_N,
         debug=debug
     )
-
-    # Categorize topics
+    
     topic_prompt_template = PromptTemplate(
         input_variables=['topics', 'document'],
         template="""
@@ -761,26 +858,73 @@ async def main(debug=False):
         <|eot_id|>
         """
     )
-    df_topics_combined = await categorize_documents(
-        documents=all_downloaded_docs,
-        document_embeddings=all_doc_embeddings,
+    
+    # Categorize documents with topics
+    topic_results = await categorize_documents(
+        documents=documents,
+        document_embeddings=document_embeddings,
         targets=topics,
         target_embeddings=topic_embeddings,
         target_type="topics",
         items_by_name=topics_by_name,
         method=SM_METHOD,
-        prompt_template=topic_prompt_template,
         vector_store=topics_vector_store,
-        top_n=7,  # Get top 7 topics
+        prompt_template=topic_prompt_template,
+        top_n=TOP_N,
         debug=debug
     )
+    
+    # Store results
+    if EXPORT_OUTPUT:
+        output_dict = {
+            'topic_results': topic_results,
+            'mandate_results': mandate_results
+        }
+        store_output_dfs(
+            output_dict=output_dict,
+            bucket_name=args['bucket_name'],
+            batch_id=args['batch_id'],
+            method=SM_METHOD,
+            debug=debug
+        )
 
-    # Store results in S3 and locally if debug=True
-    store_output_dfs({
-        "combined_mandates_results": df_mandates_combined,
-        "combined_topics_results": df_topics_combined
-    }, args['bucket_name'], args['batch_id'], method=SM_METHOD, debug=debug)
+    # Update OpenSearch with categorization results
+    # Process mandate categorizations
+    mandate_categorizations = {}
+    for doc_url, group in mandate_results.groupby('Document URL'):
+        # Only include mandates where LLM says it belongs
+        valid_mandates = group[group['LLM Belongs'] == 'Yes']['Mandate'].tolist()
+        if valid_mandates:
+            mandate_categorizations[doc_url] = valid_mandates
+
+    # Process topic categorizations
+    topic_categorizations = {}
+    for doc_url, group in topic_results.groupby('Document URL'):
+        # Only include topics where LLM says it belongs
+        valid_topics = group[group['LLM Belongs'] == 'Yes']['Topic'].tolist()
+        if valid_topics:
+            topic_categorizations[doc_url] = valid_topics
+
+    # Update OpenSearch
+    if not dryrun:
+        if mandate_categorizations:
+            success, failed = op.bulk_update_categorizations(
+                op_client,
+                DFO_HTML_FULL_INDEX_NAME,
+                mandate_categorizations,
+                "mandate"
+            )
+            print(f"Updated mandate categorizations: {success} successful, {failed} failed")
+
+        if topic_categorizations:
+            success, failed = op.bulk_update_categorizations(
+                op_client,
+                DFO_HTML_FULL_INDEX_NAME,
+                topic_categorizations,
+                "topic"
+            )
+            print(f"Updated topic categorizations: {success} successful, {failed} failed")
 
 
 if __name__ == "__main__":
-    asyncio.run(main(debug=True))
+    asyncio.run(main(dryrun=False, debug=True))

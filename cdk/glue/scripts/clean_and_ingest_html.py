@@ -50,7 +50,8 @@ args = {
     'region_name': 'us-west-2',
     'embedding_model': 'amazon.titan-embed-text-v2:0',
     'opensearch_secret': 'opensearch-masteruser-test-glue',
-    'opensearch_host': 'opensearch-host-test-glue'
+    'opensearch_host': 'opensearch-host-test-glue',
+    'pipeline_mode': 'full_update' # or 'topics_only', 'html_only'
 }
 
 # Paths
@@ -755,6 +756,11 @@ async def main(dryrun=False, debug=False):
         dryrun (bool): If True, don't actually ingest the documents.
         debug (bool): If True, save HTML content and logs locally.
     """
+    # Check pipeline mode and exit early if topics_only
+    if args.get('pipeline_mode') == 'topics_only':
+        print("Pipeline mode is 'topics_only'. Skipping HTML fetching, cleaning, and ingestion.")
+        return
+
     # Create HTML index if it doesn't exist
     if not client.indices.exists(index=DFO_HTML_FULL_INDEX_NAME):
         print(f"Creating index {DFO_HTML_FULL_INDEX_NAME}...")
@@ -800,11 +806,12 @@ async def main(dryrun=False, debug=False):
             'status': 'success'
         })
     ingested_docs_df = pd.DataFrame(ingested_docs_metadata)
-    upload_to_s3(BUCKET_NAME, f"batches/{BATCH_ID}/logs/processed_and_ingested_html_docs.csv", ingested_docs_df, debug)
-    upload_to_s3(BUCKET_NAME, f"batches/{BATCH_ID}/logs/html_fail_error_dump_docs.csv", pd.DataFrame(overall_stats["error_dump"]), debug)
-    upload_to_s3(BUCKET_NAME, f"batches/{BATCH_ID}/logs/url_redirects.csv", pd.DataFrame(overall_stats["redirects"]), debug)
-    upload_to_s3(BUCKET_NAME, f"batches/{BATCH_ID}/logs/html_fail_docs.csv", pd.DataFrame(overall_stats["failed_html_pages"]), debug)
-    upload_to_s3(BUCKET_NAME, f"batches/{BATCH_ID}/logs/too_long_docs.csv", pd.DataFrame(overall_stats["failed_embeddings_metadata"]), debug)
+    folder = f"batches/{BATCH_ID}/logs/html_ingestion"
+    upload_to_s3(BUCKET_NAME, f"{folder}/processed_and_ingested_html_docs.csv", ingested_docs_df, debug)
+    upload_to_s3(BUCKET_NAME, f"{folder}/html_fail_error_dump_docs.csv", pd.DataFrame(overall_stats["error_dump"]), debug)
+    upload_to_s3(BUCKET_NAME, f"{folder}/url_redirects.csv", pd.DataFrame(overall_stats["redirects"]), debug)
+    upload_to_s3(BUCKET_NAME, f"{folder}/html_fail_docs.csv", pd.DataFrame(overall_stats["failed_html_pages"]), debug)
+    upload_to_s3(BUCKET_NAME, f"{folder}/too_long_docs.csv", pd.DataFrame(overall_stats["failed_embeddings_metadata"]), debug)
     
     # Save overall stats as CSV and upload to S3
     stats_df = pd.DataFrame([{
@@ -817,7 +824,7 @@ async def main(dryrun=False, debug=False):
         'mismatched_years_count': len(overall_stats['mismatched_years'])
     }])
     print(stats_df.squeeze())
-    upload_to_s3(BUCKET_NAME, f"batches/{BATCH_ID}/logs/overall_stats.csv", stats_df, debug)
+    upload_to_s3(BUCKET_NAME, f"{folder}/overall_stats.csv", stats_df, debug)
 
 if __name__ == "__main__":
     asyncio.run(main(dryrun=False, debug=True))

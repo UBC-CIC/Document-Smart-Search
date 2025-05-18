@@ -75,60 +75,6 @@ DFO_HTML_FULL_INDEX_NAME = "dfo-html-full-index" # to be replaced with environme
 BUCKET_NAME = "dfo-test-datapipeline  Info" # to be replaced with environment var
 DATETIME = datetime.now().strftime(r"%Y-%m-%d %H:%M:%S") # to be replaced with environment var
 
-def fetch_specific_fields(client, index_name, fields, scroll="2m", batch_size=5000):
-    """
-    Fetch all rows (documents) from an OpenSearch index, retrieving only specific fields,
-    using the Scroll API to bypass the 10,000-document limit.
-
-    Parameters
-    ----------
-    client : OpenSearch
-        The OpenSearch client instance.
-    index_name : str
-        The name of the index to fetch data from.
-    fields : list of str
-        List of field names to retrieve from the documents.
-    scroll : str, optional
-        Time the scroll context should be kept alive (default is "2m").
-    batch_size : int, optional
-        Number of documents per scroll request (default is 5000).
-
-    Returns
-    -------
-    list
-        A list of dictionaries containing the specified fields for each document.
-    """
-    if not client.indices.exists(index=index_name):
-        raise ValueError(f"Index '{index_name}' does not exist.")
-
-    all_results = []
-
-    # Initial search request to get the scroll_id
-    response = client.search(
-        index=index_name,
-        _source=fields,
-        scroll=scroll,
-        size=batch_size,
-        timeout=60
-    )
-
-    scroll_id = response.get("_scroll_id")
-    hits = response.get("hits", {}).get("hits", [])
-
-    while hits:
-        all_results.extend(hit["_source"] for hit in hits)
-
-        # Fetch next batch
-        response = client.scroll(scroll_id=scroll_id, scroll=scroll)
-        scroll_id = response.get("_scroll_id")
-        hits = response.get("hits", {}).get("hits", [])
-
-    # Clear the scroll context to free resources
-    client.clear_scroll(scroll_id=scroll_id)
-
-    return all_results
-
-
 def train_custom_topic_model(
     documents,
     embeddings,
@@ -300,7 +246,7 @@ def fetch_and_prepare_documents():
         'csas_html_year', 'html_doc_type', 'html_page_title', 'html_url',
         'html_language', 'page_content', 'chunk_embedding'
     ]
-    fetched = fetch_specific_fields(op_client, DFO_HTML_FULL_INDEX_NAME, fields=fields)
+    fetched = op.fetch_specific_fields(op_client, DFO_HTML_FULL_INDEX_NAME, fields=fields)
     print("Fetched:", len(fetched))
     return pd.DataFrame(fetched)
 
@@ -802,6 +748,22 @@ def main(dryrun=False, debug=False):
             documents_derived_topic_table.to_csv(f"{temp_dir}/documents_derived_topic_table.csv", index=False)
         if not dryrun:
             bulk_upsert_documents_derived_topic(documents_derived_topic_table, conn_info)
+            
+            # Update OpenSearch with derived topic categorizations
+            derived_topic_categorizations = {}
+            for doc_url, group in documents_derived_topic_table.groupby('html_url'):
+                valid_topics = group['topic_name'].tolist()
+                if valid_topics:
+                    derived_topic_categorizations[doc_url] = valid_topics
+
+            if derived_topic_categorizations:
+                success, failed = op.bulk_update_categorizations(
+                    op_client,
+                    DFO_HTML_FULL_INDEX_NAME,
+                    derived_topic_categorizations,
+                    "derived_topic"
+                )
+                print(f"Updated derived topic categorizations: {success} successful, {failed} failed")
         
         return
     
@@ -829,6 +791,23 @@ def main(dryrun=False, debug=False):
     if not dryrun:
         bulk_upsert_derived_topics(derived_topics_table, conn_info)
         bulk_upsert_documents_derived_topic(documents_derived_topic_table, conn_info)
+        
+        # Update OpenSearch with derived topic categorizations
+        derived_topic_categorizations = {}
+        for doc_url, group in documents_derived_topic_table.groupby('html_url'):
+            # Only include topics with confidence score > 0
+            valid_topics = group[group['confidence_score'] > 0]['topic_name'].tolist()
+            if valid_topics:
+                derived_topic_categorizations[doc_url] = valid_topics
+
+        if derived_topic_categorizations:
+            success, failed = op.bulk_update_categorizations(
+                op_client,
+                DFO_HTML_FULL_INDEX_NAME,
+                derived_topic_categorizations,
+                "derived_topic"
+            )
+            print(f"Updated derived topic categorizations: {success} successful, {failed} failed")
     
     # Save models and data to S3
     s3_client = session.client('s3')
