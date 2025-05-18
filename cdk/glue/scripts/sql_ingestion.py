@@ -22,7 +22,6 @@ glue_args = {
     'bucket_name': 'dfo-test-datapipeline',
     'batch_id': '2025-05-07',
     'topics_mandates_data_path': 'batches/2025-05-07/topics_mandates_data',
-    'temp_outputs_path': 'batches/2025-05-07/temp_outputs',
     'region_name': 'us-west-2',
     'opensearch_secret': 'opensearch-masteruser-test-glue',
     'opensearch_host': 'opensearch-host-test-glue',
@@ -485,16 +484,17 @@ def main(dryrun: bool = False, debug: bool = False):
         topic_df = topic_df.rename(columns={'name': 'topic_name'})
         
         # Read mandate results
+        # vector_llm_categorization results
         response = s3_client.get_object(
             Bucket=bucket,
-            Key=f"{glue_args['temp_outputs_path']}/{glue_args['sm_method']}_combined_mandates_results.csv"
+            Key=f"{glue_args['batch_id']}/logs/vector_llm_categorization/{glue_args['sm_method']}_combined_mandates_results.csv"
         )
         mandate_results_df = pd.read_csv(io.StringIO(response['Body'].read().decode('utf-8')))
         
         # Read topic results
         response = s3_client.get_object(
             Bucket=bucket,
-            Key=f"{glue_args['temp_outputs_path']}/{glue_args['sm_method']}_combined_topics_results.csv"
+            Key=f"{glue_args['batch_id']}/logs/vector_llm_categorization/{glue_args['sm_method']}_combined_topics_results.csv"
         )
         topic_results_df = pd.read_csv(io.StringIO(response['Body'].read().decode('utf-8')))
 

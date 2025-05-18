@@ -38,7 +38,8 @@ glue_args = {
     'opensearch_secret': 'opensearch-masteruser-test-glue',
     'opensearch_host': 'opensearch-host-test-glue',
     'rds_secret': 'rds/dfo-db-glue-test',
-    'topic_modelling_mode': 'retrain' # or 'predict'
+    'topic_modelling_mode': 'retrain', # or 'predict'
+    'pipeline_mode': 'topics_only' # 'html_only', 'topics_only', 'full_update'
 }
 
 CURRENT_DATETIME = datetime.now().strftime(r"%Y-%m-%d %H:%M:%S")
@@ -589,7 +590,7 @@ def fetch_specific_documents_by_urls(client, index_name, urls, fields):
 def fetch_new_documents():
     """Fetch only new documents that haven't been processed by topic modeling yet"""
     # Read tracking file
-    tracking_path = f"batches/{glue_args['batch_id']}/logs/processed_and_ingested_html_docs.csv"
+    tracking_path = f"batches/{glue_args['batch_id']}/logs/html_ingestion/processed_and_ingested_html_docs.csv"
     s3_client = session.client('s3')
     
     try:
@@ -625,6 +626,13 @@ def fetch_new_documents():
     return pd.DataFrame(fetched)
 
 def main(dryrun=False, debug=False):
+    # Check pipeline mode first
+    pipeline_mode = glue_args.get('pipeline_mode', 'full_update')
+    if pipeline_mode == 'topics_only':
+        print("Pipeline mode is 'topics_only'. Skipping topic modeling.")
+        return
+
+    # Now check topic modeling mode
     if glue_args['topic_modelling_mode'] == 'retrain':
         print("BERTopic modelling mode: retrain")
         # Purge existing data
