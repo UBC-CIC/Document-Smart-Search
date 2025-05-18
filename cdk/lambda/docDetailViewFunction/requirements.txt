@@ -1,0 +1,20 @@
+# Core AWS and OpenSearch
+boto3
+opensearch-py==2.3.1 # For OpenSearch 2.3.1
+urllib3
+requests
+
+# Document and embedding processing
+pandas
+torch
+
+# LangChain core and community integrations
+langchain
+langchain-aws
+langchain-community
+langchain-huggingface
+jq
+
+# HuggingFace embeddings:
+sentence-transformers
+transformers

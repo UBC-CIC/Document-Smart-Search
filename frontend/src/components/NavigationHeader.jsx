@@ -81,7 +81,7 @@ export default function NavigationHeader() {
                   : `text-gray-500 ${baseDesktopClasses}`
               }
             >
-              Topic Trends
+              Analytics
             </button>
           </nav>
 
@@ -127,7 +127,7 @@ export default function NavigationHeader() {
                   : `text-gray-700 ${baseMobileClasses}`
               }
             >
-              Topic Trends
+              Analytics
             </button>
           </nav>
         </div>

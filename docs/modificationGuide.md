@@ -74,7 +74,7 @@ After making the required changes in the fork created in the [Deployment Guide](
     this,
     "BedrockLLMParameter",
     {
-      parameterName: "/DSA/BedrockLLMId",
+      parameterName: "/DFO/BedrockLLMId",
       description: "Parameter containing the Bedrock LLM ID",
       stringValue: "meta.llama3-8b-instruct-v1:0",
     }

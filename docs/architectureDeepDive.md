@@ -9,10 +9,10 @@
 1. The user sends a request to the application hosted on AWS Amplify.
 2. Amplify integrates with the backend API Gateway.
 3. Admins can upload course materials to the application, which are stored in an S3 bucket using a pre-signed upload URL.
-4. Adding a new DSA file to the S3 bucket triggers the data ingestion workflow. The Lambda function runs a Docker container with Amazon Elastic Container Registry (ECR). 
+4. Adding a new DFO file to the S3 bucket triggers the data ingestion workflow. The Lambda function runs a Docker container with Amazon Elastic Container Registry (ECR). 
 5. The Lambda function embeds the text from uploaded files into vectors using Amazon Bedrock. This project uses the Amazon Titan Text Embeddings V2 model to generate embeddings.
 6. The lambda function stores the vectors in the PostgreSQL database.
-7. Admins can perform DSA management/access actions by sending an API request which invokes a lambda function.
+7. Admins can perform DFO management/access actions by sending an API request which invokes a lambda function.
 8. This lambda function interacts with Amazon RDS.
 9. Users can start chatting with the LLM by sending an API request that invokes the Lambda function to generate a response. The Lambda function runs a Docker container with Amazon ECR.
 10. The lambda function stores the embedded messages in Amazon DynamoDB

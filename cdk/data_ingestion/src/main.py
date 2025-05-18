@@ -15,7 +15,7 @@ logger = logging.getLogger()
 
 DB_SECRET_NAME = os.environ["SM_DB_CREDENTIALS"]
 REGION = os.environ["REGION"]
-DSA_DATA_INGESTION_BUCKET = os.environ["BUCKET"]
+DFO_DATA_INGESTION_BUCKET = os.environ["BUCKET"]
 RDS_PROXY_ENDPOINT = os.environ["RDS_PROXY_ENDPOINT"]
 
 EMBEDDING_BUCKET_NAME = os.environ["EMBEDDING_BUCKET_NAME"]
@@ -164,7 +164,7 @@ def insert_file_into_db(category_id, document_name, document_type, document_s3_f
         raise
 
 def update_vectorstore_from_s3(bucket, category_id):
-    # bucket = "DSA-data-ingestion-bucket"
+    # bucket = "DFO-data-ingestion-bucket"
     bedrock_runtime = boto3.client(
         service_name="bedrock-runtime",
         region_name=REGION
@@ -210,8 +210,8 @@ def handler(event, context):
         event_name = record['eventName']
         bucket_name = record['s3']['bucket']['name']
 
-        # Only process files from the DSA_DATA_INGESTION_BUCKET
-        if bucket_name != DSA_DATA_INGESTION_BUCKET:
+        # Only process files from the DFO_DATA_INGESTION_BUCKET
+        if bucket_name != DFO_DATA_INGESTION_BUCKET:
             print(f"Ignoring event from non-target bucket: {bucket_name}")
             continue  # Ignore this event and move to the next one
         document_key = record['s3']['object']['key']

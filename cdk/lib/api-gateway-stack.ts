@@ -694,7 +694,183 @@ export class ApiGatewayStack extends cdk.Stack {
       })
     );
 
-    // Create the Lambda function for generating presigned URLs
+        /**
+     *
+     * Create Lambda with container image for text generation workflow in RAG pipeline
+     */
+        const docDetailViewFunction = new lambda.DockerImageFunction(
+          this,
+          `${id}-DocDetailViewFunction`,
+          {
+            code: lambda.DockerImageCode.fromImageAsset("./lambda/searchFunction", {
+              platform: Platform.LINUX_AMD64
+            }),
+            memorySize: 512,
+            timeout: cdk.Duration.seconds(300),
+            vpc: vpcStack.vpc,
+            functionName: `${id}-DocDetailViewFunction`,
+            environment: {
+              SM_DB_CREDENTIALS: db.secretPathUser.secretName,
+              RDS_PROXY_ENDPOINT: db.rdsProxyEndpoint,
+              REGION: this.region,
+              BEDROCK_LLM_PARAM: bedrockLLMParameter.parameterName,
+              EMBEDDING_MODEL_PARAM: embeddingModelParameter.parameterName,
+              TABLE_NAME_PARAM: tableNameParameter.parameterName,
+            },
+          }
+        );
+        const cfnDocDetailViewFunc = docDetailViewFunction.node.defaultChild as lambda.CfnFunction;
+        cfnDocDetailViewFunc.overrideLogicalId("DocDetailDockerFunction");
+        docDetailViewFunction.addPermission("AllowApiGatewayInvoke", {
+          principal: new iam.ServicePrincipal("apigateway.amazonaws.com"),
+          action: "lambda:InvokeFunction",
+          sourceArn: `arn:aws:execute-api:${this.region}:${this.account}:${this.api.restApiId}/*/*/user*`,
+        });
+        docDetailViewFunction.role?.addToPrincipalPolicy(new iam.PolicyStatement({
+          actions: [
+            "bedrock:InvokeModel",
+            "bedrock:InvokeModelWithResponseStream",
+            "secretsmanager:GetSecretValue",
+            "ssm:GetParameter",
+            "es:ESHttpGet",
+            "es:ESHttpPost",
+            "es:ESHttpPut",
+            "es:ESHttpDelete"
+          ],
+          resources: ["*"],
+        }));
+
+        const hybridSearchFunction = new lambda.DockerImageFunction(
+          this,
+          `${id}-HybridSearchFunction`,
+          {
+            code: lambda.DockerImageCode.fromImageAsset("./lambda/searchFunction", {
+              platform: Platform.LINUX_AMD64
+            }),
+            memorySize: 512,
+            timeout: cdk.Duration.seconds(300),
+            vpc: vpcStack.vpc,
+            functionName: `${id}-HybridSearchFunction`,
+            environment: {
+              SM_DB_CREDENTIALS: db.secretPathUser.secretName,
+              RDS_PROXY_ENDPOINT: db.rdsProxyEndpoint,
+              REGION: this.region,
+              BEDROCK_LLM_PARAM: bedrockLLMParameter.parameterName,
+              EMBEDDING_MODEL_PARAM: embeddingModelParameter.parameterName,
+              TABLE_NAME_PARAM: tableNameParameter.parameterName,
+            },
+          }
+        );
+        const cfnHybridSearchFunc = hybridSearchFunction.node.defaultChild as lambda.CfnFunction;
+        cfnHybridSearchFunc.overrideLogicalId("HybridSearchLambdaDockerFunction");
+        hybridSearchFunction.addPermission("AllowApiGatewayInvoke", {
+          principal: new iam.ServicePrincipal("apigateway.amazonaws.com"),
+          action: "lambda:InvokeFunction",
+          sourceArn: `arn:aws:execute-api:${this.region}:${this.account}:${this.api.restApiId}/*/*/user*`,
+        });
+        hybridSearchFunction.role?.addToPrincipalPolicy(new iam.PolicyStatement({
+          actions: [
+            "bedrock:InvokeModel",
+            "bedrock:InvokeModelWithResponseStream",
+            "secretsmanager:GetSecretValue",
+            "ssm:GetParameter",
+            "es:ESHttpGet",
+            "es:ESHttpPost",
+            "es:ESHttpPut",
+            "es:ESHttpDelete"
+          ],
+          resources: ["*"],
+        }));
+
+        
+        const openSearchQueryFunction = new lambda.DockerImageFunction(
+          this,
+          `${id}-OpenSearchQueryFunction`,
+          {
+            code: lambda.DockerImageCode.fromImageAsset("./lambda/searchFunction", {
+              platform: Platform.LINUX_AMD64
+            }),
+            memorySize: 512,
+            timeout: cdk.Duration.seconds(300),
+            vpc: vpcStack.vpc,
+            functionName: `${id}-OpenSearchQueryFunction`,
+            environment: {
+              SM_DB_CREDENTIALS: db.secretPathUser.secretName,
+              RDS_PROXY_ENDPOINT: db.rdsProxyEndpoint,
+              REGION: this.region,
+              BEDROCK_LLM_PARAM: bedrockLLMParameter.parameterName,
+              EMBEDDING_MODEL_PARAM: embeddingModelParameter.parameterName,
+              TABLE_NAME_PARAM: tableNameParameter.parameterName,
+            },
+          }
+        );
+        const cfnOpenSearchQueryFunc = openSearchQueryFunction.node.defaultChild as lambda.CfnFunction;
+        cfnOpenSearchQueryFunc.overrideLogicalId("OpenSearchLambdaDockerFunction");
+        openSearchQueryFunction.addPermission("AllowApiGatewayInvoke", {
+          principal: new iam.ServicePrincipal("apigateway.amazonaws.com"),
+          action: "lambda:InvokeFunction",
+          sourceArn: `arn:aws:execute-api:${this.region}:${this.account}:${this.api.restApiId}/*/*/user*`,
+        });
+        openSearchQueryFunction.role?.addToPrincipalPolicy(new iam.PolicyStatement({
+          actions: [
+            "bedrock:InvokeModel",
+            "bedrock:InvokeModelWithResponseStream",
+            "secretsmanager:GetSecretValue",
+            "ssm:GetParameter",
+            "es:ESHttpGet",
+            "es:ESHttpPost",
+            "es:ESHttpPut",
+            "es:ESHttpDelete"
+          ],
+          resources: ["*"],
+        }));
+
+    
+    const llmAnalysisFunction = new lambda.DockerImageFunction(
+      this,
+      `${id}-LlmAnalysisFunction`,
+      {
+        code: lambda.DockerImageCode.fromImageAsset("./lambda/searchFunction", {
+          platform: Platform.LINUX_AMD64
+        }),
+        memorySize: 512,
+        timeout: cdk.Duration.seconds(300),
+        vpc: vpcStack.vpc,
+        functionName: `${id}-LlmAnalysisFunction`,
+        environment: {
+          SM_DB_CREDENTIALS: db.secretPathUser.secretName,
+          RDS_PROXY_ENDPOINT: db.rdsProxyEndpoint,
+          REGION: this.region,
+          BEDROCK_LLM_PARAM: bedrockLLMParameter.parameterName,
+          EMBEDDING_MODEL_PARAM: embeddingModelParameter.parameterName,
+          TABLE_NAME_PARAM: tableNameParameter.parameterName,
+        },
+      }
+    );
+    const cfnLlmAnalysisFunc = llmAnalysisFunction.node.defaultChild as lambda.CfnFunction;
+    cfnLlmAnalysisFunc.overrideLogicalId("ExpertAnalysisDockerFunction");
+    llmAnalysisFunction.addPermission("AllowApiGatewayInvoke", {
+      principal: new iam.ServicePrincipal("apigateway.amazonaws.com"),
+      action: "lambda:InvokeFunction",
+      sourceArn: `arn:aws:execute-api:${this.region}:${this.account}:${this.api.restApiId}/*/*/user*`,
+    });
+    llmAnalysisFunction.role?.addToPrincipalPolicy(new iam.PolicyStatement({
+      actions: [
+        "bedrock:InvokeModel",
+        "bedrock:InvokeModelWithResponseStream",
+        "secretsmanager:GetSecretValue",
+        "ssm:GetParameter",
+        "es:ESHttpGet",
+        "es:ESHttpPost",
+        "es:ESHttpPut",
+        "es:ESHttpDelete"
+      ],
+      resources: ["*"],
+    }));
+    
+    
+
+    // Lambda function for generating presigned URLs
     const generatePreSignedURL = new lambda.Function(
       this,
       `${id}-GeneratePreSignedURLFunc`,

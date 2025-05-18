@@ -451,7 +451,7 @@ exports.handler = async (event) => {
                   ROW_NUMBER() OVER (PARTITION BY uel.user_role ORDER BY uel.timestamp DESC) AS rn
                 FROM user_engagement_log uel
                 WHERE uel.engagement_type = 'message creation'
-                  AND uel.user_role IN ('public', 'educator', 'admin')
+                  AND uel.user_role IN ('public', 'educator', 'admin', 'policy_maker', 'external_researcher')
               )
               SELECT user_role, engagement_type, timestamp, user_info, engagement_details
               FROM RankedMessages
@@ -743,7 +743,7 @@ exports.handler = async (event) => {
                 FROM feedback f
                 INNER JOIN user_engagement_log uel
                 ON f.session_id = uel.session_id
-                WHERE uel.user_role IN ('admin', 'public', 'educator')
+                WHERE uel.user_role IN ('admin', 'public', 'educator', 'policy_maker', 'external_researcher')
               )
               SELECT 
                 user_role,
