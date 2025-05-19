@@ -9,7 +9,7 @@ import 'react-date-range/dist/theme/default.css';
 import { ResponsiveContainer } from "recharts";
 import { useRef } from "react";
 import { useClickAway } from "react-use";
-import { LineChart, Line, XAxis, YAxis, Tooltip, Legend } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, Bar, BarChart, Cell } from 'recharts';
 
 export default function TopicTrends() {
   const [showCalendar, setShowCalendar] = useState(false);
@@ -62,6 +62,11 @@ export default function TopicTrends() {
     },
   ]);
   const [selectedTopics, setSelectedTopics] = useState([]);
+
+  const getTotalDocuments = (topic) => {
+    return chartData.reduce((total, data) => total + (data[topic] || 0), 0);
+  };
+
 
   const handleTopicSearch = async (inputValue) => {
     const allTopics = [
@@ -169,7 +174,12 @@ export default function TopicTrends() {
                 <Info className="h-4 w-4 text-gray-500 dark:text-gray-400" />
               </div>
             </div>
-            <ResponsiveContainer width="100%" height={300}>
+            {(selectedTopics.length === 0) ?
+              (<div className="aspect-square bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+              {/* Placeholder */}
+              <p className="text-sm text-gray-600 dark:text-gray-300">Select topics to begin</p>
+            </div>) : (
+            <ResponsiveContainer width="100%" height={450}>
               <LineChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
                 <XAxis dataKey="year" label={{ value: "Year", position: "insideBottom", offset: -5 }} />
                 <YAxis label={{ value: "# of Documents", angle: -90, position: "insideLeft" }} />
@@ -186,14 +196,14 @@ export default function TopicTrends() {
                   />
                 ))}
               </LineChart>
-            </ResponsiveContainer>
+            </ResponsiveContainer>)}
           </div>
 
           {/* Trend Over Time */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-3 md:p-4 border dark:border-gray-700">
             <div className="flex justify-between items-center mb-3 md:mb-4">
               <h3 className="font-medium dark:text-white text-sm md:text-base">
-                Total Document Count by Topic (2010 - 2023)
+                Total Document Count by Topic
               </h3>
               <div className="flex items-center space-x-2">
                 <span className="text-xs text-gray-500 dark:text-gray-400 hidden sm:inline">
@@ -202,10 +212,28 @@ export default function TopicTrends() {
                 <Info className="h-4 w-4 text-gray-500 dark:text-gray-400" />
               </div>
             </div>
-            <div className="aspect-square bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+            {(selectedTopics.length === 0) ?
+              (<div className="aspect-square bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
               {/* Placeholder */}
-              <p className="text-sm text-gray-600 dark:text-gray-300">Line Chart Placeholder</p>
-            </div>
+              <p className="text-sm text-gray-600 dark:text-gray-300">Select topics to begin</p>
+            </div>) : (
+            <ResponsiveContainer width="100%" height={450}>
+      <BarChart data={selectedTopics.map(topic => ({ name: topic.label, count: getTotalDocuments(topic.value) }))} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+
+        <XAxis dataKey="name" />  {/* Topic name on X-axis */}
+        <YAxis />  {/* Document count on Y-axis */}
+        <Tooltip />
+        <Bar
+          dataKey="count"  // Map bar height to the "count" value
+          barSize={30}  // Adjust the size of the bars
+        >
+          {/* Use Cell to apply a unique color to each bar */}
+          {selectedTopics.map((entry, index) => (
+            <Cell key={`cell-${index}`} fill={colorPalette[index % colorPalette.length]} />
+          ))}
+        </Bar>
+      </BarChart>
+            </ResponsiveContainer>)}
           </div>
 
           {/* Distribution */}
