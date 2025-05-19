@@ -224,8 +224,8 @@ export default function TopicTrends() {
         <YAxis />  {/* Document count on Y-axis */}
         <Tooltip />
         <Bar
-          dataKey="count"  // Map bar height to the "count" value
-          barSize={75}  // Adjust the size of the bars
+          dataKey="count"
+          barSize={75}
         >
           {/* Use Cell to apply a unique color to each bar */}
           {selectedTopics.map((entry, index) => (
