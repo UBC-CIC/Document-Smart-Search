@@ -8,18 +8,20 @@ import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import { Effect, ManagedPolicy, PolicyStatement } from 'aws-cdk-lib/aws-iam';
 import { RemovalPolicy } from 'aws-cdk-lib';
 import { VpcStack } from './vpc-stack';
+import { DatabaseStack } from './database-stack';
+import { OpenSearchStack } from './opensearch-stack';
 
 export class DataPipelineStack extends cdk.Stack {
   public readonly dataUploadBucket: s3.Bucket;
   public readonly glueBucket: s3.Bucket;
   public readonly glueConnection: glue.CfnConnection;
 
-  constructor(scope: Construct, id: string, vpcStack: VpcStack, props?: cdk.StackProps) {
+  constructor(scope: Construct, id: string, vpcStack: VpcStack, databaseStack: DatabaseStack, opensearchStack: OpenSearchStack, props?: cdk.StackProps) {
     super(scope, id, props);
 
     // Create S3 bucket for data uploads with batch structure
     this.dataUploadBucket = new s3.Bucket(this, 'DataUploadBucket', {
-      bucketName: `data-upload-bucket`,
+      bucketName: `${id}-data-upload-bucket`,
       removalPolicy: cdk.RemovalPolicy.RETAIN,
       versioned: false,
       publicReadAccess: false,
@@ -29,7 +31,7 @@ export class DataPipelineStack extends cdk.Stack {
 
     // Create S3 bucket for Glue scripts and custom modules
     this.glueBucket = new s3.Bucket(this, 'GlueScriptsBucket', {
-      bucketName: `glue-bucket`,
+      bucketName: `${id}-glue-bucket`,
       removalPolicy: RemovalPolicy.DESTROY,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       encryption: s3.BucketEncryption.S3_MANAGED,
@@ -43,7 +45,7 @@ export class DataPipelineStack extends cdk.Stack {
     });
 
     // Create an IAM role for Glue jobs
-    const roleName = 'AWSGlueServiceRole-datapipeline';
+    const roleName = `${id}-AWSGlueServiceRole-datapipeline`;
     const glueJobRole = new iam.Role(this, 'GlueJobRole', {
       roleName: roleName,
       assumedBy: new iam.ServicePrincipal('glue.amazonaws.com'),
@@ -59,13 +61,13 @@ export class DataPipelineStack extends cdk.Stack {
 
     // Allow inbound access from Glue to RDS and OpenSearch
     glueSecurityGroup.addIngressRule(
-      ec2.Peer.ipv4(vpcStack.vpc.vpcCidrBlock),
+      ec2.Peer.securityGroupId(glueSecurityGroup.securityGroupId),
       ec2.Port.tcp(5432),
       'Allow PostgreSQL access'
     );
 
     glueSecurityGroup.addIngressRule(
-      ec2.Peer.ipv4(vpcStack.vpc.vpcCidrBlock),
+      ec2.Peer.securityGroupId(glueSecurityGroup.securityGroupId),
       ec2.Port.tcp(443),
       'Allow OpenSearch access'
     );
