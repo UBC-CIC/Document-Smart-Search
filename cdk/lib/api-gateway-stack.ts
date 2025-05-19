@@ -702,7 +702,7 @@ export class ApiGatewayStack extends cdk.Stack {
           this,
           `${id}-DocDetailViewFunction`,
           {
-            code: lambda.DockerImageCode.fromImageAsset("./lambda/searchFunction", {
+            code: lambda.DockerImageCode.fromImageAsset("./lambda/docDetailViewFunction", {
               platform: Platform.LINUX_AMD64
             }),
             memorySize: 512,
@@ -744,7 +744,7 @@ export class ApiGatewayStack extends cdk.Stack {
           this,
           `${id}-HybridSearchFunction`,
           {
-            code: lambda.DockerImageCode.fromImageAsset("./lambda/searchFunction", {
+            code: lambda.DockerImageCode.fromImageAsset("./lambda/hybridSearchFunction", {
               platform: Platform.LINUX_AMD64
             }),
             memorySize: 512,
@@ -787,7 +787,7 @@ export class ApiGatewayStack extends cdk.Stack {
           this,
           `${id}-OpenSearchQueryFunction`,
           {
-            code: lambda.DockerImageCode.fromImageAsset("./lambda/searchFunction", {
+            code: lambda.DockerImageCode.fromImageAsset("./lambda/openSearchQueryFunction", {
               platform: Platform.LINUX_AMD64
             }),
             memorySize: 512,
@@ -830,7 +830,7 @@ export class ApiGatewayStack extends cdk.Stack {
       this,
       `${id}-LlmAnalysisFunction`,
       {
-        code: lambda.DockerImageCode.fromImageAsset("./lambda/searchFunction", {
+        code: lambda.DockerImageCode.fromImageAsset("./lambda/llmAnalysisFunction", {
           platform: Platform.LINUX_AMD64
         }),
         memorySize: 512,
@@ -1306,39 +1306,39 @@ export class ApiGatewayStack extends cdk.Stack {
 
     
     
-    // 1) create the new Lambda
-    const searchFunction = new lambda.Function(this, `${id}-searchFunction`, {
-      runtime: lambda.Runtime.PYTHON_3_11,
-      code:    lambda.Code.fromAsset("lambda/searchFunction"),
-      handler: "index.handler",
-      timeout: Duration.seconds(10),
-      memorySize: 128,
-      vpc: vpcStack.vpc,
-      layers: [ this.layerList["opensearchLayer"] ],
-      environment: {
-        OPENSEARCH_ENDPOINT: osEndpoint,
-        OS_USER_SECRET_ARN: osUserSecretArn,
-        REGION: this.region,
-      },
-      role: lambdaRole,
-    });
+    // // 1) create the new Lambda
+    // const searchFunction = new lambda.Function(this, `${id}-searchFunction`, {
+    //   runtime: lambda.Runtime.PYTHON_3_11,
+    //   code:    lambda.Code.fromAsset("lambda/searchFunction"),
+    //   handler: "index.handler",
+    //   timeout: Duration.seconds(10),
+    //   memorySize: 128,
+    //   vpc: vpcStack.vpc,
+    //   layers: [ this.layerList["opensearchLayer"] ],
+    //   environment: {
+    //     OPENSEARCH_ENDPOINT: osEndpoint,
+    //     OS_USER_SECRET_ARN: osUserSecretArn,
+    //     REGION: this.region,
+    //   },
+    //   role: lambdaRole,
+    // });
 
-    // 2) grant it permissions
-    osStack.domain.grantRead(searchFunction);
-    searchFunction.addToRolePolicy(new iam.PolicyStatement({
-      actions: ["secretsmanager:GetSecretValue"],
-      resources: [ osUserSecretArn ]
-    }));
+    // // 2) grant it permissions
+    // osStack.domain.grantRead(searchFunction);
+    // searchFunction.addToRolePolicy(new iam.PolicyStatement({
+    //   actions: ["secretsmanager:GetSecretValue"],
+    //   resources: [ osUserSecretArn ]
+    // }));
 
-    // 3) hook it into API Gateway
-    const searchIntegration = new apigateway.LambdaIntegration(searchFunction, { proxy: true });
-    const searchResource    = this.api.root.addResource("search");
-    searchResource.addMethod("GET", searchIntegration, {
-      authorizationType: apigateway.AuthorizationType.NONE,
-      requestParameters: {
-        "method.request.querystring.q": false
-      }
-    });
+    // // 3) hook it into API Gateway
+    // const searchIntegration = new apigateway.LambdaIntegration(searchFunction, { proxy: true });
+    // const searchResource    = this.api.root.addResource("search");
+    // searchResource.addMethod("GET", searchIntegration, {
+    //   authorizationType: apigateway.AuthorizationType.NONE,
+    //   requestParameters: {
+    //     "method.request.querystring.q": false
+    //   }
+    // });
 
 
   }
