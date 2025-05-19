@@ -210,7 +210,6 @@ def prepare_topics_table(topic_df: pd.DataFrame, subcategory_df: pd.DataFrame, m
         right_on='tag'
     ).loc[:, ['topic_name', 'subcategory_name', 'mandate_name']].copy()
     topics_table = topics_table.replace(np.nan, None)
-    topics_table.loc[:, 'isDFO'] = True
     topics_table.loc[:, 'last_updated'] = now
     return topics_table
 

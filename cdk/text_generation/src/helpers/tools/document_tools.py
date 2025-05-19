@@ -115,7 +115,7 @@ class DocumentTools:
                        dt.llm_explanation
                 FROM documents_topics dt
                 JOIN topics t ON dt.topic_name = t.topic_name
-                WHERE dt.html_url = '{url}' AND t."isDFO" = true AND dt.llm_score >= 4
+                WHERE dt.html_url = '{url}' AND dt.llm_score >= 4
 
                 UNION ALL
 
@@ -126,7 +126,7 @@ class DocumentTools:
                        dt.llm_explanation
                 FROM documents_topics dt
                 JOIN topics t ON dt.topic_name = t.topic_name
-                WHERE dt.html_url = '{url}' AND (t."isDFO" = false OR t."isDFO" IS NULL)
+                WHERE dt.html_url = '{url}' AND dt.llm_score >= 4
             ) AS combined_results
             ORDER BY llm_score DESC;
             """

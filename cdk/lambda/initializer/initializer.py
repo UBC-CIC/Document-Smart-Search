@@ -85,8 +85,6 @@ def handler(event, context):
                 "time_created" timestamp
             );
 
-            
-
             CREATE TABLE IF NOT EXISTS "categories" (
                 "category_id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
                 "category_name" varchar,
@@ -95,16 +93,6 @@ def handler(event, context):
 
             CREATE TABLE IF NOT EXISTS "sessions" (
                 "session_id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-                "time_created" timestamp
-            );
-
-            CREATE TABLE IF NOT EXISTS "documents" (
-                "document_id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-                "category_id" uuid,
-                "document_s3_file_path" varchar,
-                "document_name" varchar,
-                "document_type" varchar,
-                "metadata" text,
                 "time_created" timestamp
             );
 
@@ -135,11 +123,6 @@ def handler(event, context):
             ALTER TABLE "feedback" 
                 ADD FOREIGN KEY ("session_id") 
                 REFERENCES "sessions" ("session_id") 
-                ON DELETE CASCADE ON UPDATE CASCADE;
-
-            ALTER TABLE "documents" 
-                ADD FOREIGN KEY ("category_id") 
-                REFERENCES "categories" ("category_id") 
                 ON DELETE CASCADE ON UPDATE CASCADE;
         """
 
@@ -465,12 +448,6 @@ def handler(event, context):
         
         sql = """
             SELECT * FROM sessions;
-        """
-        cursor.execute(sql)
-        print(cursor.fetchall())
-
-        sql = """
-            SELECT * FROM documents;
         """
         cursor.execute(sql)
         print(cursor.fetchall())

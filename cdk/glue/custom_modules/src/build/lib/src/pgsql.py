@@ -68,7 +68,6 @@ def create_tables_if_not_exists(conn_info: dict):
         "topic_name" TEXT PRIMARY KEY,
         "subcategory_name" TEXT,
         "mandate_name" TEXT NOT NULL, 
-        "isDFO" BOOLEAN,
         "last_updated" TIMESTAMP,
         FOREIGN KEY ("subcategory_name") REFERENCES "subcategories" ("subcategory_name") ON DELETE SET NULL,
         FOREIGN KEY ("mandate_name") REFERENCES "mandates" ("mandate_name") ON DELETE CASCADE
@@ -203,8 +202,8 @@ def bulk_upsert_mandates(mandates, conn_info: dict, upsert=True):
 
 def bulk_upsert_topics(topics, conn_info: dict, upsert=True):
     sql = """
-    INSERT INTO topics ("topic_name", "subcategory_name", "mandate_name", "isDFO", "last_updated")
-    VALUES (%s, %s, %s, %s, %s)
+    INSERT INTO topics ("topic_name", "subcategory_name", "mandate_name", "last_updated")
+    VALUES (%s, %s, %s, %s)
     ON CONFLICT (topic_name)
     """
     if upsert:
@@ -212,7 +211,6 @@ def bulk_upsert_topics(topics, conn_info: dict, upsert=True):
         DO UPDATE SET 
             "subcategory_name" = EXCLUDED."subcategory_name",
             "mandate_name" = EXCLUDED."mandate_name",
-            "isDFO" = EXCLUDED."isDFO", 
             "last_updated" = EXCLUDED.last_updated;
         '''
     else:

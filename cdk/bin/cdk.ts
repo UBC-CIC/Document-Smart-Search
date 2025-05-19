@@ -53,6 +53,6 @@ const dbFlowStack = new DBFlowStack(
 const amplifyStack = new AmplifyStack(app, `${StackPrefix}-Amplify`, apiStack, { env });
 
 // 7) Data Pipeline
-const dataPipelineStack = new DataPipelineStack(app, `${StackPrefix}-DataPipeline`, vpcStack, { env });
+const dataPipelineStack = new DataPipelineStack(app, `${StackPrefix}-DataPipeline`, vpcStack, dbStack, osStack, { env });
 
 Tags.of(app).add("app", "DFO-Smart-Search");
