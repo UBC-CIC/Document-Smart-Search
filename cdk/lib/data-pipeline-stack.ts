@@ -4,14 +4,17 @@ import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as glue from 'aws-cdk-lib/aws-glue';
+import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import { Effect, ManagedPolicy, PolicyStatement } from 'aws-cdk-lib/aws-iam';
 import { RemovalPolicy } from 'aws-cdk-lib';
+import { VpcStack } from './vpc-stack';
 
 export class DataPipelineStack extends cdk.Stack {
   public readonly dataUploadBucket: s3.Bucket;
   public readonly glueBucket: s3.Bucket;
+  public readonly glueConnection: glue.CfnConnection;
 
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+  constructor(scope: Construct, id: string, vpcStack: VpcStack, props?: cdk.StackProps) {
     super(scope, id, props);
 
     // Create S3 bucket for data uploads with batch structure
@@ -47,22 +50,72 @@ export class DataPipelineStack extends cdk.Stack {
       description: 'Role used by AWS Glue for data pipeline processing',
     });
 
-    // Add necessary policies to the Glue role
-    glueJobRole.addManagedPolicy(
-      iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonBedrockFullAccess')
+    // Create a security group for Glue
+    const glueSecurityGroup = new ec2.SecurityGroup(this, 'GlueSecurityGroup', {
+      vpc: vpcStack.vpc,
+      description: 'Security group for Glue jobs',
+      allowAllOutbound: true,
+    });
+
+    // Allow inbound access from Glue to RDS and OpenSearch
+    glueSecurityGroup.addIngressRule(
+      ec2.Peer.ipv4(vpcStack.vpc.vpcCidrBlock),
+      ec2.Port.tcp(5432),
+      'Allow PostgreSQL access'
     );
-    glueJobRole.addManagedPolicy(
-      iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonS3FullAccess')
+
+    glueSecurityGroup.addIngressRule(
+      ec2.Peer.ipv4(vpcStack.vpc.vpcCidrBlock),
+      ec2.Port.tcp(443),
+      'Allow OpenSearch access'
     );
-    glueJobRole.addManagedPolicy(
-      iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMFullAccess')
-    );
-    glueJobRole.addManagedPolicy(
-      iam.ManagedPolicy.fromAwsManagedPolicyName('AWSGlueServiceRole')
-    );
-    glueJobRole.addManagedPolicy(
-      iam.ManagedPolicy.fromAwsManagedPolicyName('SecretsManagerReadWrite')
-    );
+
+    // Create Glue network connection
+    this.glueConnection = new glue.CfnConnection(this, 'GlueVpcConnection', {
+      catalogId: this.account,
+      connectionInput: {
+        name: `${id}-glue-vpc-connection`,
+        description: 'VPC connection for Glue jobs',
+        connectionType: 'NETWORK',
+        physicalConnectionRequirements: {
+          availabilityZone: vpcStack.vpc.availabilityZones[0],
+          securityGroupIdList: [glueSecurityGroup.securityGroupId],
+          subnetId: vpcStack.vpc.privateSubnets[0].subnetId,
+        },
+      },
+    });
+
+    // Add necessary permissions to Glue role
+    glueJobRole.addToPolicy(new iam.PolicyStatement({
+      effect: Effect.ALLOW,
+      actions: [
+        'ec2:CreateNetworkInterface',
+        'ec2:DescribeNetworkInterfaces',
+        'ec2:DeleteNetworkInterface',
+        'ec2:DescribeVpcAttribute',
+        'ec2:DescribeSubnets',
+        'ec2:DescribeSecurityGroups',
+        'ec2:DescribeRouteTables',
+      ],
+      resources: ['*'],
+    }));
+
+    // Add S3 access
+    glueJobRole.addToPolicy(new iam.PolicyStatement({
+      effect: Effect.ALLOW,
+      actions: [
+        's3:GetObject',
+        's3:PutObject',
+        's3:DeleteObject',
+        's3:ListBucket',
+      ],
+      resources: [
+        this.dataUploadBucket.bucketArn,
+        `${this.dataUploadBucket.bucketArn}/*`,
+        this.glueBucket.bucketArn,
+        `${this.glueBucket.bucketArn}/*`,
+      ],
+    }));
 
     const PYTHON_VER = "3.9";
     const GLUE_VER = "3.0";

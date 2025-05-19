@@ -8,6 +8,7 @@ import { DatabaseStack }    from "../lib/database-stack";
 import { VpcStack }         from "../lib/vpc-stack";
 import { OpenSearchStack }  from "../lib/opensearch-stack";
 import { DBFlowStack }      from "../lib/dbFlow-stack";
+import { DataPipelineStack } from "../lib/data-pipeline-stack";
 
 const app = new cdk.App();
 
@@ -35,7 +36,6 @@ const osStack = new OpenSearchStack(
 // 3) API Gateway
 const apiStack = new ApiGatewayStack(app, `${StackPrefix}-Api`, dbStack, vpcStack, osStack, { env });
 
-
 // apiStack.addDependency(osStack);
 
 // 5) DBFlow (wires in the RDS _and_ the OpenSearch initializers)
@@ -51,5 +51,8 @@ const dbFlowStack = new DBFlowStack(
 
 // 6) Amplify
 const amplifyStack = new AmplifyStack(app, `${StackPrefix}-Amplify`, apiStack, { env });
+
+// 7) Data Pipeline
+const dataPipelineStack = new DataPipelineStack(app, `${StackPrefix}-DataPipeline`, vpcStack, { env });
 
 Tags.of(app).add("app", "DFO-Smart-Search");
