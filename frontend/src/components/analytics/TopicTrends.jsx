@@ -225,7 +225,7 @@ export default function TopicTrends() {
         <Tooltip />
         <Bar
           dataKey="count"  // Map bar height to the "count" value
-          barSize={30}  // Adjust the size of the bars
+          barSize={75}  // Adjust the size of the bars
         >
           {/* Use Cell to apply a unique color to each bar */}
           {selectedTopics.map((entry, index) => (
