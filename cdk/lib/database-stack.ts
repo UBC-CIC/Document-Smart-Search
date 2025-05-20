@@ -91,7 +91,7 @@ export class DatabaseStack extends Stack {
         subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
       },
       engine: rds.DatabaseInstanceEngine.postgres({
-        version: rds.PostgresEngineVersion.VER_17_2,
+        version: rds.PostgresEngineVersion.VER_16_3,
       }),
       instanceType: ec2.InstanceType.of(
         ec2.InstanceClass.BURSTABLE4_GRAVITON,
@@ -111,7 +111,7 @@ export class DatabaseStack extends Stack {
       backupRetention: Duration.days(7),
       deleteAutomatedBackups: true,
       deletionProtection: true,
-      databaseName: "smartsearch-postgres",
+      databaseName: "DFO",
       publiclyAccessible: false,
       cloudwatchLogsRetention: logs.RetentionDays.INFINITE,
       cloudwatchLogsExports: ["postgresql", "upgrade"],

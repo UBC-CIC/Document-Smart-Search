@@ -54,8 +54,7 @@ export class OpenSearchStack extends Stack {
     );
 
     // 3) The OpenSearch Domain
-    this.domain = new opensearch.Domain(this, "OpenSearchDomain", {
-      domainName: `${id}-smartsearch-domain`,
+    this.domain = new opensearch.Domain(this, `${id}-smartsearch`, {
       version: opensearch.EngineVersion.OPENSEARCH_2_19,
       vpc: vpcStack.vpc,
       vpcSubnets: [{ subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS }],

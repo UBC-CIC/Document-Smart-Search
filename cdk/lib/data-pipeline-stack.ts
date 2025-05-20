@@ -25,8 +25,7 @@ export class DataPipelineStack extends cdk.Stack {
     super(scope, id, props);
 
     // Create S3 bucket for data uploads with batch structure
-    this.dataUploadBucket = new s3.Bucket(this, 'DataUploadBucket', {
-      bucketName: `${id}-data-upload-bucket`,
+    this.dataUploadBucket = new s3.Bucket(this, `${id}-data-upload-bucket`, {
       removalPolicy: cdk.RemovalPolicy.RETAIN,
       versioned: false,
       publicReadAccess: false,
@@ -34,10 +33,18 @@ export class DataPipelineStack extends cdk.Stack {
       encryption: s3.BucketEncryption.S3_MANAGED,
     });
 
+    // Create empty folders in the data upload bucket
+    new s3deploy.BucketDeployment(this, 'CreateEmptyFolders', {
+      sources: [
+        s3deploy.Source.data('batches/.ignore', ''),
+        s3deploy.Source.data('bertopic_models/.ignore', ''),
+      ],
+      destinationBucket: this.dataUploadBucket,
+    });
+
     // Create S3 bucket for Glue scripts and custom modules
-    this.glueBucket = new s3.Bucket(this, 'GlueScriptsBucket', {
-      bucketName: `${id}-glue-bucket`,
-      removalPolicy: RemovalPolicy.DESTROY,
+    this.glueBucket = new s3.Bucket(this, `${id}-glue-bucket`, {
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       encryption: s3.BucketEncryption.S3_MANAGED,
     });
@@ -45,14 +52,11 @@ export class DataPipelineStack extends cdk.Stack {
     // Upload existing Glue scripts to the scripts bucket
     new s3deploy.BucketDeployment(this, 'DeployGlueScripts', {
       sources: [
-        s3deploy.Source.asset('./glue/scripts/clean_and_ingest_html.py'),
-        s3deploy.Source.asset('./glue/scripts/ingest_topics_and_mandates.py'),
-        s3deploy.Source.asset('./glue/scripts/vector_llm_categorization.py'),
-        s3deploy.Source.asset('./glue/scripts/sql_ingestion.py'),
-        s3deploy.Source.asset('./glue/scripts/topic_modelling.py'),
+        s3deploy.Source.asset('./glue/scripts/'),
       ],
       destinationBucket: this.glueBucket,
       destinationKeyPrefix: 'glue/scripts',
+      exclude: ['.ipynb', '*test*']
     });
 
     // Create a security group for Glue
