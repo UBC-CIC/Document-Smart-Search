@@ -17,6 +17,7 @@ export function useDocumentSearch() {
   const [topicFilters, setTopicFilters] = useState({})
   const [mandateFilters, setMandateFilters] = useState({})
   const [authorFilters, setAuthorFilters] = useState({})
+  const [documentTypeFilters, setDocumentTypeFilters] = useState({}) // Add new filter state
 
   // Fetch filter options on component mount
   useEffect(() => {
@@ -31,6 +32,7 @@ export function useDocumentSearch() {
         setTopicFilters(Object.fromEntries(options.topics.map((topic) => [topic, false])))
         setMandateFilters(Object.fromEntries(options.mandates.map((mandate) => [mandate, false])))
         setAuthorFilters(Object.fromEntries(options.authors.map((author) => [author, false])))
+        setDocumentTypeFilters(Object.fromEntries((options.documentTypes || []).map((type) => [type, false])))
       } catch (error) {
         console.error("Error getting filter options:", error)
       } finally {
@@ -43,11 +45,12 @@ export function useDocumentSearch() {
 
   // Apply all filters and perform search
   const applyFilters = async () => {
-    // Don't perform search if query is empty
+    // Don't perform search if query is empty and no filters active
     if (!searchQuery.trim() && !Object.values(yearFilters).some(val => val) && 
         !Object.values(topicFilters).some(val => val) && 
         !Object.values(mandateFilters).some(val => val) &&
-        !Object.values(authorFilters).some(val => val)) {
+        !Object.values(authorFilters).some(val => val) &&
+        !Object.values(documentTypeFilters).some(val => val)) {
       return;
     }
     
@@ -60,6 +63,7 @@ export function useDocumentSearch() {
         topicFilters,
         mandateFilters,
         authorFilters,
+        documentTypeFilters,
       }
       
       // When fetching results, we don't need to pass the sortBy parameter to the backend
@@ -99,6 +103,7 @@ export function useDocumentSearch() {
     setTopicFilters(Object.fromEntries(filterOptions.topics.map((topic) => [topic, false])))
     setMandateFilters(Object.fromEntries(filterOptions.mandates.map((mandate) => [mandate, false])))
     setAuthorFilters(Object.fromEntries(filterOptions.authors.map((author) => [author, false])))
+    setDocumentTypeFilters(Object.fromEntries((filterOptions.documentTypes || []).map((type) => [type, false])))
     setSearchQuery("")
     
     // Clear results
@@ -106,7 +111,7 @@ export function useDocumentSearch() {
     setRawResults([])
     setHasSearched(false)
   }
-
+  
   // Update results when sort option changes (client-side sorting)
   useEffect(() => {
     if (hasSearched && rawResults.length > 0) {
@@ -131,6 +136,8 @@ export function useDocumentSearch() {
     setMandateFilters,
     authorFilters,
     setAuthorFilters,
+    documentTypeFilters,
+    setDocumentTypeFilters,
     resetFilters,
     applyFilters,
     totalResults: filteredResults.length,

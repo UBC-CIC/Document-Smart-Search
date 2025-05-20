@@ -33,6 +33,8 @@ export default function DocumentSearch() {
     setMandateFilters,
     authorFilters,
     setAuthorFilters,
+    documentTypeFilters,
+    setDocumentTypeFilters,
     resetFilters,
     applyFilters,
     totalResults,
@@ -111,6 +113,8 @@ export default function DocumentSearch() {
             setMandateFilters={setMandateFilters}
             authorFilters={authorFilters}
             setAuthorFilters={setAuthorFilters}
+            documentTypeFilters={documentTypeFilters}
+            setDocumentTypeFilters={setDocumentTypeFilters}
             resetFilters={resetFilters}
             isLoading={isLoading}
           />

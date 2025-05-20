@@ -1,9 +1,12 @@
 // Default filter options - used when API fails to provide filter options
 export const filterOptions = {
-  years: ["2021", "2020", "2019"],
+  years: ["2019", "2021", "2020", "2019", "2025"],
   topics: ["Salmon Population", "Climate Change", "Conservation", "Indigenous Rights"],
+  // topics: ["Salmon Population", "Climate Change", "Conservation", "Indigenous Rights", "Aquaculture", 
+    // "Pollution", "Marine Ecosystems", "Sustainable Fisheries", "Species at Risk", "Aquatic Ecosystem", "Fishing Policy"],
   mandates: ["Sustainable Fisheries", "Species at Risk", "Aquatic Ecosystem", "Indigenous Fisheries"],
   authors: ["DFO Research Team", "External Researchers", "Policy Division"],
+  documentTypes: ["Research Document", "Terms of Reference", "Scientific Advice", "Unknown"]
 }
 
 

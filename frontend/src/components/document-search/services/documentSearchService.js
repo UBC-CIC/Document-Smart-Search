@@ -75,7 +75,13 @@ export async function performDocumentSearch(query, filters) {
 
 // Helper function to filter mock data when API call fails
 function filterMockData(query, filters) {
-  const { yearFilters, topicFilters, mandateFilters, authorFilters } = filters
+  const { 
+    yearFilters, 
+    topicFilters, 
+    mandateFilters, 
+    authorFilters, 
+    documentTypeFilters 
+  } = filters
   
   const filtered = allMockResults.filter((result) => {
     // Check if any year filter is active, if not, show all years
@@ -106,6 +112,16 @@ function filterMockData(query, filters) {
     const anyAuthorFilterActive = Object.values(authorFilters).some((value) => value)
     if (anyAuthorFilterActive && !authorFilters[result.author]) {
       return false
+    }
+    
+    // Check if any document type filter is active
+    const anyDocTypeFilterActive = documentTypeFilters && Object.values(documentTypeFilters).some((value) => value)
+    if (anyDocTypeFilterActive) {
+      // Assume documentType is a property on result, use 'Unknown' if not present
+      const docType = result.documentType || 'Unknown'
+      if (!documentTypeFilters[docType]) {
+        return false
+      }
     }
 
     // Filter by search query
