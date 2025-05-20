@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { filterOptions as defaultFilters } from "../data/defaultData"
 import { fetchFilterOptions, performDocumentSearch } from "../services/documentSearchService"
 
@@ -7,6 +7,7 @@ export function useDocumentSearch() {
   const [filteredResults, setFilteredResults] = useState([])
   const [sortBy, setSortBy] = useState("recent") // Default sort is recent (newest first)
   const [currentPage, setCurrentPage] = useState(1)
+  const [resultsPerPage] = useState(5) // Number of results to show per page
   const [isLoading, setIsLoading] = useState(false)
   const [filterOptions, setFilterOptions] = useState(defaultFilters) // Use default filters initially
   const [hasSearched, setHasSearched] = useState(false)
@@ -97,6 +98,23 @@ export function useDocumentSearch() {
     return resultsToSort
   }
 
+  // Get paginated results based on current page
+  const paginatedResults = useMemo(() => {
+    const startIndex = (currentPage - 1) * resultsPerPage
+    const endIndex = startIndex + resultsPerPage
+    return filteredResults.slice(startIndex, endIndex)
+  }, [filteredResults, currentPage, resultsPerPage])
+
+  // Calculate total pages
+  const totalPages = useMemo(() => {
+    return Math.ceil(filteredResults.length / resultsPerPage)
+  }, [filteredResults, resultsPerPage])
+
+  // Reset to page 1 when search results change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [filteredResults.length])
+
   // Reset all filters
   const resetFilters = () => {
     setYearFilters(Object.fromEntries(filterOptions.years.map((year) => [year, false])))
@@ -123,7 +141,7 @@ export function useDocumentSearch() {
   return {
     searchQuery,
     setSearchQuery,
-    filteredResults,
+    filteredResults: paginatedResults, // Return only current page results
     sortBy,
     setSortBy,
     currentPage,
@@ -140,7 +158,8 @@ export function useDocumentSearch() {
     setDocumentTypeFilters,
     resetFilters,
     applyFilters,
-    totalResults: filteredResults.length,
+    totalResults: filteredResults.length, // Total, not just current page
+    totalPages,
     isLoading,
     hasSearched,
   }

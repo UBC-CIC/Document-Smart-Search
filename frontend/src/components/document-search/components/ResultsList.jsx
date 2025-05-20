@@ -11,7 +11,8 @@ export default function ResultsList({
   setCurrentPage,
   openQuerySummary,
   isLoading,
-  hasSearched
+  hasSearched,
+  totalPages
 }) {
   return (
     <div className="flex-1">
@@ -88,9 +89,13 @@ export default function ResultsList({
         )}
       </div>
 
-      {/* Pagination - only show when not loading and results exist */}
-      {!isLoading && hasSearched && filteredResults.length > 0 && (
-        <Pagination currentPage={currentPage} setCurrentPage={setCurrentPage} />
+      {/* Pagination - only show when not loading and total results exist */}
+      {!isLoading && hasSearched && totalResults > 0 && (
+        <Pagination 
+          currentPage={currentPage} 
+          totalPages={totalPages} 
+          setCurrentPage={setCurrentPage} 
+        />
       )}
     </div>
   )

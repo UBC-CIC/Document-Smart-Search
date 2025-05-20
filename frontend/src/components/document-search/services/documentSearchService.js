@@ -2,7 +2,7 @@ import { use } from "react";
 import { allMockResults, filterOptions as defaultFilters } from "../data/defaultData"
 
 // Simple boolean flag to enable/disable mock data
-export const USE_MOCK_DATA = true; // Set to false to disable mock data in development
+export const USE_MOCK_DATA = false; // Set to false to disable mock data in development
 
 // Fetch available filter options from the API
 export async function fetchFilterOptions() {
@@ -45,6 +45,9 @@ export async function performDocumentSearch(query, filters) {
   }
   
   try {
+    // print("Performing document search with query:", query)
+    // print("Filters:", filters)
+
     const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}search/documents`, {
       method: "POST",
       headers: {
@@ -65,7 +68,7 @@ export async function performDocumentSearch(query, filters) {
   } catch (error) {
     console.error("Error performing document search:", error.message)
     // Fall back to mock data filtering
-    if (useMockData) {
+    if (USE_MOCK_DATA) {
       console.error("Using mock data due to API failure")
       return filterMockData(query, filters);
     }

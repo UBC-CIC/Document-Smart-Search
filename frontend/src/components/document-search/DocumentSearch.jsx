@@ -38,6 +38,7 @@ export default function DocumentSearch() {
     resetFilters,
     applyFilters,
     totalResults,
+    totalPages,
     isLoading,
     hasSearched,
   } = useDocumentSearch()
@@ -127,6 +128,7 @@ export default function DocumentSearch() {
             totalResults={totalResults}
             currentPage={currentPage}
             setCurrentPage={setCurrentPage}
+            totalPages={totalPages}
             openQuerySummary={openQuerySummary}
             isLoading={isLoading}
             hasSearched={hasSearched}
