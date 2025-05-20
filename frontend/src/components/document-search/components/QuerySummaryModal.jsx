@@ -1,17 +1,13 @@
-import { X } from "lucide-react"
-import { allMockResults } from "../data/defaultData"
+import { X } from "lucide-react";
 
 export default function QuerySummaryModal({
   isOpen,
   onClose,
   modalRef,
-  documentId,
   loading,
   summaryData,
 }) {
-  if (!isOpen) return null
-
-  const document = allMockResults.find((doc) => doc.id === documentId)
+  if (!isOpen) return null;
   
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
@@ -21,7 +17,7 @@ export default function QuerySummaryModal({
       >
         <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
           <h3 className="text-lg font-medium dark:text-white">
-            {summaryData?.title || document?.title || "Loading..."}
+            {summaryData?.title || "Loading..."}
           </h3>
           <button
             onClick={onClose}
@@ -76,5 +72,5 @@ export default function QuerySummaryModal({
         </div>
       </div>
     </div>
-  )
+  );
 }
