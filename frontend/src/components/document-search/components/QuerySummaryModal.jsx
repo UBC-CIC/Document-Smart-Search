@@ -1,5 +1,5 @@
 import { X } from "lucide-react"
-import { allSearchResults } from "../data/mockData"
+import { allMockResults } from "../data/defaultData"
 
 export default function QuerySummaryModal({
   isOpen,
@@ -11,7 +11,7 @@ export default function QuerySummaryModal({
 }) {
   if (!isOpen) return null
 
-  const document = allSearchResults.find((doc) => doc.id === documentId)
+  const document = allMockResults.find((doc) => doc.id === documentId)
   
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">

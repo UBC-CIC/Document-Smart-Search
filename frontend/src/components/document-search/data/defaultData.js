@@ -1,4 +1,14 @@
-export const allSearchResults = [
+// Default filter options - used when API fails to provide filter options
+export const filterOptions = {
+  years: ["2021", "2020", "2019"],
+  topics: ["Salmon Population", "Climate Change", "Conservation", "Indigenous Rights"],
+  mandates: ["Sustainable Fisheries", "Species at Risk", "Aquatic Ecosystem", "Indigenous Fisheries"],
+  authors: ["DFO Research Team", "External Researchers", "Policy Division"],
+}
+
+
+// Mock search results - used when API fails and mock mode is enabled
+export const allMockResults = [
   {
     id: "6472",
     title: "Salmon Fishing Impact Assessment",
@@ -98,10 +108,3 @@ export const allSearchResults = [
     mandates: ["Sustainable Fisheries", "Species at Risk"],
   },
 ]
-
-export const filterOptions = {
-  years: ["2021", "2020", "2019"],
-  topics: ["Salmon Population", "Climate Change", "Conservation", "Indigenous Rights"],
-  mandates: ["Sustainable Fisheries", "Species at Risk", "Aquatic Ecosystem", "Indigenous Fisheries"],
-  authors: ["DFO Research Team", "External Researchers", "Policy Division"],
-}

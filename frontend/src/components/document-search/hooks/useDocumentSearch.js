@@ -1,96 +1,96 @@
 import { useState, useEffect } from "react"
-import { allSearchResults, filterOptions } from "../data/mockData"
+import { filterOptions as defaultFilters } from "../data/defaultData"
+import { fetchFilterOptions, performDocumentSearch } from "../services/documentSearchService"
 
 export function useDocumentSearch() {
   const [searchQuery, setSearchQuery] = useState("")
   const [filteredResults, setFilteredResults] = useState([])
   const [sortBy, setSortBy] = useState("recent") // Default sort is recent (newest first)
   const [currentPage, setCurrentPage] = useState(1)
+  const [isLoading, setIsLoading] = useState(false)
+  const [filterOptions, setFilterOptions] = useState(defaultFilters) // Use default filters initially
+  const [hasSearched, setHasSearched] = useState(false)
+  const [rawResults, setRawResults] = useState([]) // Store the raw results before sorting
 
   // Filter states
-  const [yearFilters, setYearFilters] = useState(
-    Object.fromEntries(filterOptions.years.map((year) => [year, false]))
-  )
+  const [yearFilters, setYearFilters] = useState({})
+  const [topicFilters, setTopicFilters] = useState({})
+  const [mandateFilters, setMandateFilters] = useState({})
+  const [authorFilters, setAuthorFilters] = useState({})
 
-  const [topicFilters, setTopicFilters] = useState(
-    Object.fromEntries(filterOptions.topics.map((topic) => [topic, false]))
-  )
-
-  const [mandateFilters, setMandateFilters] = useState(
-    Object.fromEntries(filterOptions.mandates.map((mandate) => [mandate, false]))
-  )
-
-  const [authorFilters, setAuthorFilters] = useState(
-    Object.fromEntries(filterOptions.authors.map((author) => [author, false]))
-  )
-
-  // Apply all filters
-  const applyFilters = () => {
-
-    const filtered = allSearchResults.filter((result) => {
-      // Check if any year filter is active, if not, show all years
-      const anyYearFilterActive = Object.values(yearFilters).some((value) => value)
-
-      // Filter by year
-      if (anyYearFilterActive && !yearFilters[result.year]) {
-        return false
+  // Fetch filter options on component mount
+  useEffect(() => {
+    async function getFilterOptions() {
+      setIsLoading(true)
+      try {
+        const options = await fetchFilterOptions()
+        setFilterOptions(options)
+        
+        // Initialize filter states based on fetched options
+        setYearFilters(Object.fromEntries(options.years.map((year) => [year, false])))
+        setTopicFilters(Object.fromEntries(options.topics.map((topic) => [topic, false])))
+        setMandateFilters(Object.fromEntries(options.mandates.map((mandate) => [mandate, false])))
+        setAuthorFilters(Object.fromEntries(options.authors.map((author) => [author, false])))
+      } catch (error) {
+        console.error("Error getting filter options:", error)
+      } finally {
+        setIsLoading(false)
       }
-
-      // Check if any topic filter is active
-      const anyTopicFilterActive = Object.values(topicFilters).some((value) => value)
-
-      // Filter by topic
-      if (anyTopicFilterActive) {
-        const hasMatchingTopic = result.topics.some((topic) => topicFilters[topic])
-        if (!hasMatchingTopic) {
-          return false
-        }
-      }
-
-      // Check if any mandate filter is active
-      const anyMandateFilterActive = Object.values(mandateFilters).some((value) => value)
-
-      // Filter by mandate
-      if (anyMandateFilterActive) {
-        const hasMatchingMandate = result.mandates.some((mandate) => mandateFilters[mandate])
-        if (!hasMatchingMandate) {
-          return false
-        }
-      }
-
-      // Check if any author filter is active
-      const anyAuthorFilterActive = Object.values(authorFilters).some((value) => value)
-
-      // Filter by author
-      if (anyAuthorFilterActive && !authorFilters[result.author]) {
-        return false
-      }
-
-      // Filter by search query
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase()
-        return (
-          result.title.toLowerCase().includes(query) ||
-          result.category.toLowerCase().includes(query) ||
-          result.highlights.some((highlight) => highlight.toLowerCase().includes(query)) ||
-          result.topics.some((topic) => topic.toLowerCase().includes(query)) ||
-          result.mandates.some((mandate) => mandate.toLowerCase().includes(query))
-        )
-      }
-
-      return true
-    })
-
-    // Sort results based on sortBy
-    if (sortBy === "recent") {
-      filtered.sort((a, b) => Number.parseInt(b.year) - Number.parseInt(a.year))
-    } else if (sortBy === "oldest") {
-      filtered.sort((a, b) => Number.parseInt(a.year) - Number.parseInt(b.year))
-    } else if (sortBy === "a-z") {
-      filtered.sort((a, b) => a.title.localeCompare(b.title))
     }
+    
+    getFilterOptions()
+  }, [])
 
-    setFilteredResults(filtered)
+  // Apply all filters and perform search
+  const applyFilters = async () => {
+    // Don't perform search if query is empty
+    if (!searchQuery.trim() && !Object.values(yearFilters).some(val => val) && 
+        !Object.values(topicFilters).some(val => val) && 
+        !Object.values(mandateFilters).some(val => val) &&
+        !Object.values(authorFilters).some(val => val)) {
+      return;
+    }
+    
+    setIsLoading(true)
+    setHasSearched(true)
+    
+    try {
+      const filters = {
+        yearFilters,
+        topicFilters,
+        mandateFilters,
+        authorFilters,
+      }
+      
+      // When fetching results, we don't need to pass the sortBy parameter to the backend
+      const results = await performDocumentSearch(searchQuery, filters)
+      setRawResults(results) // Store raw results
+      
+      // Apply sorting in the frontend
+      const sortedResults = sortResults(results, sortBy)
+      setFilteredResults(sortedResults)
+    } catch (error) {
+      console.error("Error applying filters:", error)
+      setFilteredResults([])
+      setRawResults([])
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Function to sort results based on sortBy
+  const sortResults = (results, sortOption) => {
+    const resultsToSort = [...results] // Create a copy to avoid mutating the original
+    
+    if (sortOption === "recent") {
+      return resultsToSort.sort((a, b) => Number.parseInt(b.year) - Number.parseInt(a.year))
+    } else if (sortOption === "oldest") {
+      return resultsToSort.sort((a, b) => Number.parseInt(a.year) - Number.parseInt(b.year))
+    } else if (sortOption === "a-z") {
+      return resultsToSort.sort((a, b) => a.title.localeCompare(b.title))
+    }
+    
+    return resultsToSort
   }
 
   // Reset all filters
@@ -100,17 +100,20 @@ export function useDocumentSearch() {
     setMandateFilters(Object.fromEntries(filterOptions.mandates.map((mandate) => [mandate, false])))
     setAuthorFilters(Object.fromEntries(filterOptions.authors.map((author) => [author, false])))
     setSearchQuery("")
+    
+    // Clear results
+    setFilteredResults([])
+    setRawResults([])
+    setHasSearched(false)
   }
 
-  // Apply filters when search query or filters change
+  // Update results when sort option changes (client-side sorting)
   useEffect(() => {
-    applyFilters()
-  }, [searchQuery, yearFilters, topicFilters, mandateFilters, authorFilters, sortBy])
-
-  // Initial load of all results
-  useEffect(() => {
-    setFilteredResults(allSearchResults)
-  }, [])
+    if (hasSearched && rawResults.length > 0) {
+      const sortedResults = sortResults(rawResults, sortBy)
+      setFilteredResults(sortedResults)
+    }
+  }, [sortBy, rawResults])
 
   return {
     searchQuery,
@@ -131,5 +134,7 @@ export function useDocumentSearch() {
     resetFilters,
     applyFilters,
     totalResults: filteredResults.length,
+    isLoading,
+    hasSearched,
   }
 }

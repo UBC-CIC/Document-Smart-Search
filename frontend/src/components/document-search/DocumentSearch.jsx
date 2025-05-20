@@ -36,6 +36,8 @@ export default function DocumentSearch() {
     resetFilters,
     applyFilters,
     totalResults,
+    isLoading,
+    hasSearched,
   } = useDocumentSearch()
   
   const {
@@ -51,7 +53,9 @@ export default function DocumentSearch() {
   // Handle search input
   const handleSearch = (e) => {
     e.preventDefault()
-    applyFilters()
+    if (searchQuery.trim()) {
+      applyFilters()
+    }
   }
 
   // Handle sort change
@@ -72,6 +76,7 @@ export default function DocumentSearch() {
           searchQuery={searchQuery} 
           setSearchQuery={setSearchQuery} 
           handleSearch={handleSearch} 
+          isLoading={isLoading}
         />
 
         {/* Mobile Filter Toggle */}
@@ -107,6 +112,7 @@ export default function DocumentSearch() {
             authorFilters={authorFilters}
             setAuthorFilters={setAuthorFilters}
             resetFilters={resetFilters}
+            isLoading={isLoading}
           />
 
           {/* Results */}
@@ -118,6 +124,8 @@ export default function DocumentSearch() {
             currentPage={currentPage}
             setCurrentPage={setCurrentPage}
             openQuerySummary={openQuerySummary}
+            isLoading={isLoading}
+            hasSearched={hasSearched}
           />
         </div>
       </main>

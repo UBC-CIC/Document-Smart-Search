@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react"
-import { allSearchResults } from "../data/mockData"
+import { allMockResults } from "../data/defaultData"
+import { USE_MOCK_DATA } from "../services/documentSearchService"
 
 export function useQuerySummary() {
   const [isQuerySummaryOpen, setIsQuerySummaryOpen] = useState(false)
@@ -9,25 +10,43 @@ export function useQuerySummary() {
   const modalRef = useRef(null)
 
   const getQuerySummary = async (documentId) => {
-    // Find the document by ID
-    const document = allSearchResults.find((doc) => doc.id === documentId)
-
-    if (!document) {
-      return {
-        title: "Document Not Found",
-        summary: "The requested document could not be found.",
-        keyInsights: ["No information available"],
-      }
-    }
-
     // Return cached summary if available
     if (querySummaryData && querySummaryData.documentId === documentId) {
       return querySummaryData
     }
 
     setQuerySummaryLoading(true)
-
+    
     try {
+      // Get document details
+      let document = null;
+      
+      // If not using mock data, try to get from API
+      if (!USE_MOCK_DATA) {
+        try {
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}search/document/${documentId}`)
+          if (response.ok) {
+            document = await response.json()
+          }
+        } catch (error) {
+          console.error("Error fetching document:", error)
+        }
+      }
+      
+      // If API fetch failed or using mock data
+      if (!document) {
+        document = allMockResults.find((doc) => doc.id === documentId)
+      }
+
+      // If document is still not found
+      if (!document) {
+        return {
+          title: "Document Not Found",
+          summary: "The requested document could not be found.",
+          keyInsights: ["No information available"],
+        }
+      }
+
       // Create a prompt that asks for a summary of the document
       const prompt = `Please provide a comprehensive summary of the document titled "${document.title}" (ID: ${document.id}). 
       The document is about ${document.topics.join(", ")} and was authored by ${document.author} in ${document.year}.
@@ -52,7 +71,6 @@ export function useQuerySummary() {
       const data = await response.json()
 
       // Parse the response to extract key insights
-      // This is a simple approach - in production you might want to prompt the LLM to format its response
       const paragraphs = data.content.split("\n\n").filter((p) => p.trim().length > 0)
       const summary = paragraphs[0] || data.content
 
@@ -93,7 +111,7 @@ export function useQuerySummary() {
     } catch (error) {
       console.error("Error generating summary:", error)
       return {
-        title: document.title,
+        title: "Summary Generation Failed",
         summary:
           "We couldn't generate a summary for this document. Please try again later or view the full document for more information.",
         keyInsights: [
