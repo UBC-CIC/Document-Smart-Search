@@ -45,8 +45,18 @@ export async function performDocumentSearch(query, filters) {
   }
   
   try {
-    // print("Performing document search with query:", query)
-    // print("Filters:", filters)
+    // Transform filter format for API
+    const transformedFilters = {
+      years: Object.keys(filters.yearFilters || {}).filter(key => filters.yearFilters[key]),
+      topics: Object.keys(filters.topicFilters || {}).filter(key => filters.topicFilters[key]),
+      mandates: Object.keys(filters.mandateFilters || {}).filter(key => filters.mandateFilters[key]),
+      authors: Object.keys(filters.authorFilters || {}).filter(key => filters.authorFilters[key]),
+      documentTypes: Object.keys(filters.documentTypeFilters || {}).filter(key => filters.documentTypeFilters[key]),
+    }
+    
+    // console.log("Performing document search with query:", query)
+    // console.log("Transformed filters:", transformedFilters)
+    // console.log("JSON SENDING:", JSON.stringify({ query, filters: transformedFilters }, null, 2))
 
     const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}search/documents`, {
       method: "POST",
@@ -55,7 +65,7 @@ export async function performDocumentSearch(query, filters) {
       },
       body: JSON.stringify({
         query,
-        filters
+        filters: transformedFilters
       }),
     })
     
