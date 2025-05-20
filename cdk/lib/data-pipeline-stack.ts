@@ -59,25 +59,18 @@ export class DataPipelineStack extends cdk.Stack {
       exclude: ['.ipynb', '*test*']
     });
 
-    // Create a security group for Glue
-    const glueSecurityGroup = new ec2.SecurityGroup(this, 'GlueSecurityGroup', {
+    const glueSecurityGroup = new ec2.SecurityGroup(this, "glueSelfReferencingSG", {
       vpc: vpcStack.vpc,
-      description: 'Security group for Glue jobs',
       allowAllOutbound: true,
+      description: "Self-referencing security group for Glue",
     });
-
-    // Allow inbound access from Glue to RDS and OpenSearch
+    // add self-referencing ingress rule
     glueSecurityGroup.addIngressRule(
-      ec2.Peer.securityGroupId(glueSecurityGroup.securityGroupId),
-      ec2.Port.tcp(5432),
-      'Allow PostgreSQL access'
+      glueSecurityGroup,
+      ec2.Port.allTcp(),
+      "self-referencing security group rule"
     );
 
-    glueSecurityGroup.addIngressRule(
-      ec2.Peer.securityGroupId(glueSecurityGroup.securityGroupId),
-      ec2.Port.tcp(443),
-      'Allow OpenSearch access'
-    );
 
     // Create Glue network connection
     this.glueConnection = new glue.CfnConnection(this, 'GlueVpcConnection', {
@@ -122,7 +115,7 @@ export class DataPipelineStack extends cdk.Stack {
     glueJobRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSSMReadOnlyAccess"));
     glueJobRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName("SecretsManagerReadWrite"));
     glueJobRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSSMReadOnlyAccess"));
-    glueJobRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName("AWSGlueServiceRole"));
+    glueJobRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName("service-role/AWSGlueServiceRole"));
     glueJobRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonBedrockFullAccess"));
 
     // Add Glue access
@@ -145,9 +138,9 @@ export class DataPipelineStack extends cdk.Stack {
         "--region_name": "us-west-2",
         "--html_urls_path": "",  // Will be set at runtime
         "--embedding_model": "amazon.titan-embed-text-v2:0",
-        "--opensearch_secret": opensearchStack.userSecret.secretName,
+        "--opensearch_secret":  "",// opensearchStack.userSecret.secretName,
         "--opensearch_host": `/${id}/opensearch/host`,  // SSM Parameter
-        "--rds_secret": databaseStack.secretPathUser.secretName,
+        "--rds_secret": "",// databaseStack.secretPathUser.secretName,
         "--dfo_html_full_index_name": "dfo-html-full-index",
         "--dfo_topic_full_index_name": "dfo-topic-full-index",
         "--dfo_mandate_full_index_name": "dfo-mandate-full-index",

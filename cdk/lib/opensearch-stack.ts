@@ -54,29 +54,33 @@ export class OpenSearchStack extends Stack {
     );
 
     // 3) The OpenSearch Domain
-    this.domain = new opensearch.Domain(this, `${id}-smartsearch`, {
-      version: opensearch.EngineVersion.OPENSEARCH_2_19,
+    this.domain = new opensearch.Domain(this, "OpenSearchDomain", {
+      version: opensearch.EngineVersion.OPENSEARCH_2_11,
       vpc: vpcStack.vpc,
       vpcSubnets: [{ subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS }],
       securityGroups: [osSg],
       capacity: {
-        dataNodes: 1,
-        dataNodeInstanceType: "t3.medium.search",
+        dataNodes:                  2,
+        dataNodeInstanceType:       "t3.medium.search",
         multiAzWithStandbyEnabled:  false,
       },
       ebs: {
         volumeSize: 100,
         volumeType: ec2.EbsDeviceVolumeType.GP3,
       },
+      zoneAwareness: {
+        enabled:               true,
+        availabilityZoneCount: 2,
+      },
       logging: {
-        appLogEnabled: true,
+        appLogEnabled:       true,
         slowSearchLogEnabled:true,
         slowIndexLogEnabled: true,
       },
       nodeToNodeEncryption: true,
-      encryptionAtRest: { enabled: true },
-      enforceHttps: true,
-      removalPolicy: RemovalPolicy.DESTROY,
+      encryptionAtRest:     { enabled: true },
+      enforceHttps:         true,
+      removalPolicy:        RemovalPolicy.DESTROY,
     });
 
     // 4) Persist endpoint & secret ARNs into SSM (namespaced by stack id)
