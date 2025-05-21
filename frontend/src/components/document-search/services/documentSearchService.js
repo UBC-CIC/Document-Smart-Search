@@ -99,7 +99,7 @@ function filterMockData(query, filters) {
   const filtered = allMockResults.filter((result) => {
     // Check if any year filter is active, if not, show all years
     const anyYearFilterActive = Object.values(yearFilters).some((value) => value)
-    if (anyYearFilterActive && !yearFilters[result.year]) {
+    if (anyYearFilterActive && !yearFilters[result.csasYear || result.year]) {
       return false
     }
 
@@ -121,17 +121,23 @@ function filterMockData(query, filters) {
       }
     }
 
-    // Check if any author filter is active
+    // Check if any author filter is active - could be in csasEvent now
     const anyAuthorFilterActive = Object.values(authorFilters).some((value) => value)
-    if (anyAuthorFilterActive && !authorFilters[result.author]) {
-      return false
+    if (anyAuthorFilterActive) {
+      const resultAuthor = result.author || "";
+      const resultEvent = result.csasEvent || "";
+      // Check both in author field or csasEvent
+      if (!authorFilters[resultAuthor] && !Object.keys(authorFilters).some(author => 
+        resultEvent.toLowerCase().includes(author.toLowerCase()))) {
+        return false;
+      }
     }
     
     // Check if any document type filter is active
     const anyDocTypeFilterActive = documentTypeFilters && Object.values(documentTypeFilters).some((value) => value)
     if (anyDocTypeFilterActive) {
-      // Assume documentType is a property on result, use 'Unknown' if not present
-      const docType = result.documentType || 'Unknown'
+      // Get document type, prioritize documentType over category for backwards compatibility
+      const docType = result.documentType || result.category || 'Unknown'
       if (!documentTypeFilters[docType]) {
         return false
       }
@@ -142,7 +148,8 @@ function filterMockData(query, filters) {
       const queryLower = query.toLowerCase()
       return (
         result.title.toLowerCase().includes(queryLower) ||
-        result.category.toLowerCase().includes(queryLower) ||
+        (result.csasEvent && result.csasEvent.toLowerCase().includes(queryLower)) ||
+        (result.documentType && result.documentType.toLowerCase().includes(queryLower)) ||
         result.highlights.some((highlight) => highlight.toLowerCase().includes(queryLower)) ||
         result.topics.some((topic) => topic.toLowerCase().includes(queryLower)) ||
         result.mandates.some((mandate) => mandate.toLowerCase().includes(queryLower))

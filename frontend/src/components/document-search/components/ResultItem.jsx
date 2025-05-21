@@ -5,17 +5,17 @@ export default function ResultItem({ result, openQuerySummary }) {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-3 md:p-4 border dark:border-gray-700">
       <div className="flex justify-between mb-2">
-        <div className="text-xs md:text-sm text-blue-600 dark:text-blue-400">{result.category}</div>
+        <div className="text-xs md:text-sm text-blue-600 dark:text-blue-400">{result.documentType || "Unknown Type"}</div>
       </div>
 
-      <div className="flex justify-between mb-2">
-        <div className="text-xs md:text-sm text-gray-500 dark:text-gray-400">Created: 4/5/{result.year}</div>
-        <div className="text-xs md:text-sm text-gray-500 dark:text-gray-400">Year: {result.year}</div>
-      </div>
+      {/* <div className="flex justify-between mb-2">
+        <div className="text-xs md:text-sm text-gray-500 dark:text-gray-400">CSAS Year: {result.csasYear || result.year}</div>
+      </div> */}
 
-      <div className="flex justify-between mb-2">
-        <div className="text-xs md:text-sm text-gray-500 dark:text-gray-400">Author: {result.author}</div>
-        <div className="text-xs md:text-sm text-gray-500 dark:text-gray-400">Mandates: {result.mandates.join(", ")}</div>
+      <div className="mb-2">
+        <div className="text-xs md:text-sm text-gray-500 dark:text-gray-400">
+          {result.csasEvent ? `${result.csasEvent} (${result.csasYear})` : "No Associated CSAS Event"}
+        </div>
       </div>
 
       <div className="mt-3 md:mt-4 mb-2">
