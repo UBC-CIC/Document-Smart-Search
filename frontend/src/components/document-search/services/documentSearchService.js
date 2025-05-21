@@ -2,7 +2,7 @@ import { use } from "react";
 import { allMockResults, filterOptions as defaultFilters } from "../data/defaultData"
 
 // Simple boolean flag to enable/disable mock data
-export const USE_MOCK_DATA = false; // Set to false to disable mock data in development
+export const USE_MOCK_DATA = true; // Set to false to disable mock data in development
 
 // Fetch available filter options from the API
 export async function fetchFilterOptions() {
