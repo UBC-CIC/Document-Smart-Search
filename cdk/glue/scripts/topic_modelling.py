@@ -29,10 +29,24 @@ import hashlib
 
 session = aws.session # always use this session for all AWS calls
 
-# Constants that will be replaced with Glue context args, SSM params, or Secrets Manager
+# from awsglue.utils import getResolvedOptions
+
+# args = getResolvedOptions(sys.argv, [
+#     'html_urls_path',
+#     'bucket_name',
+#     'batch_id',
+#     'region_name',
+#     'embedding_model',
+#     'opensearch_secret',
+#     'opensearch_host',
+#     'rds_secret',
+#     'dfo_html_full_index_name',
+#     'dfo_topic_full_index_name',
+#     'dfo_mandate_full_index_name',
+#     'pipeline_mode'
+# ])
 
 args = {
-    'JOB_NAME': 'topic_modelling',
     'html_urls_path': 's3://dfo-test-datapipeline/batches/2025-05-07/html_data/CSASDocuments.xlsx',
     'bucket_name': 'dfo-test-datapipeline',
     'batch_id': '2025-05-07',
@@ -52,6 +66,7 @@ args = {
 REGION_NAME = args['region_name']
 DFO_HTML_FULL_INDEX_NAME = args['dfo_html_full_index_name']
 CURRENT_DATETIME = datetime.now().strftime(r"%Y-%m-%d %H:%M:%S")
+
 
 def init_opensearch_client(host: str, region: str, secret_name: str) -> Tuple[OpenSearch, Any]:
     """
@@ -115,8 +130,12 @@ def init_opensearch_client(host: str, region: str, secret_name: str) -> Tuple[Op
             raise e
 
 # Initialize OpenSearch client with fallback authentication
+opensearch_host = aws.get_parameter_ssm(
+    parameter_name=args['opensearch_host'], region_name=REGION_NAME
+)
+
 op_client, auth = init_opensearch_client(
-    host=args['opensearch_host'],
+    host=opensearch_host,
     region=args['region_name'],
     secret_name=args['opensearch_secret']
 )

@@ -10,6 +10,7 @@ from typing import Union, Dict, Any, Tuple, List, Optional
 from pathlib import Path
 from datetime import datetime
 import hashlib
+import unicodedata
 
 import numpy as np
 import pandas as pd
@@ -22,28 +23,33 @@ from bs4 import BeautifulSoup
 from langchain_core.documents import Document
 from langchain_aws.embeddings import BedrockEmbeddings
 from langchain_community.vectorstores import OpenSearchVectorSearch
-# from awsglue.utils import getResolvedOptions
 import src.aws_utils as aws
 import src.opensearch as op
+import src.pgsql as pgsql
 
 session = aws.session
 
 # Constants
 
 # Get job parameters
+# from awsglue.utils import getResolvedOptions
+
 # args = getResolvedOptions(sys.argv, [
-#     'JOB_NAME',
 #     'html_urls_path',
+#     'bucket_name',
 #     'batch_id',
 #     'region_name',
 #     'embedding_model',
 #     'opensearch_secret',
-#     'opensearch_host'
+#     'opensearch_host',
+#     'rds_secret',
+#     'dfo_html_full_index_name',
+#     'dfo_topic_full_index_name',
+#     'dfo_mandate_full_index_name',
+#     'pipeline_mode'
 # ])
 
-# mock args dictionary
 args = {
-    'JOB_NAME': 'clean_and_ingest_html',
     'html_urls_path': 's3://dfo-test-datapipeline/batches/2025-05-07/html_data/CSASDocuments.xlsx',
     'bucket_name': 'dfo-test-datapipeline',
     'batch_id': '2025-05-07',
@@ -304,6 +310,35 @@ def save_html_content(url: str, content: str) -> None:
         f.write(content)
 
 
+def normalize_author_name(name: str) -> str:
+    """
+    Normalize author name by:
+    - Normalizing Unicode (e.g., é → e)
+    - Removing non-breaking spaces and stripping
+    - Collapsing multiple spaces
+    - Fixing common OCR punctuation issues
+    - Removing diacritics
+    
+    Args:
+        name: The author name to normalize
+        
+    Returns:
+        The normalized author name
+    """
+    # Normalize Unicode (e.g., é → e)
+    name = unicodedata.normalize("NFKC", name)
+    # Remove non-breaking spaces and strip
+    name = name.replace("\u00A0", " ").strip()
+    # Collapse multiple spaces
+    name = re.sub(r"\s+", " ", name)
+    # Fix common OCR punctuation issues
+    name = name.replace("“", '"').replace("”", '"').replace("’", "'")
+    # Remove diacritics
+    name = unicodedata.normalize("NFD", name)
+    name = ''.join(c for c in name if unicodedata.category(c) != 'Mn')
+    return name
+
+
 def extract_document_info(page: BeautifulSoup) -> Dict[str, Optional[str]]:
     """
     Extracts key information from the document page:
@@ -395,6 +430,7 @@ def extract_document_info(page: BeautifulSoup) -> Dict[str, Optional[str]]:
                 authors = []
                 for author in authors_text.split(','):
                     author = author.strip()
+                    author = normalize_author_name(author)
                     # Remove 'and' from the beginning of the last author
                     if author.startswith('and '):
                         author = author[4:]
@@ -448,12 +484,12 @@ def extract_document_info(page: BeautifulSoup) -> Dict[str, Optional[str]]:
 
     # Choose the best available language information.
     language = meta_lang or lang_attr or detected_lang
-
+    language = str(language).lower()
     # For languauge instead of 'eng' and 'fra'
     # Need to spell out fully
-    if language == 'eng':
+    if 'eng' in language or 'en' in language:
         language = 'English'
-    elif language == 'fra':
+    elif 'fra' in language or 'fr' in language:
         language = 'French'
 
     return {
@@ -489,6 +525,17 @@ def extract_document_year_from_title(html_page_title):
     else:
         return None
 
+def normalize_author_name(name: str) -> str:
+    # Normalize Unicode (e.g., é → e)
+    name = unicodedata.normalize("NFKC", name)
+    # Remove non-breaking spaces and strip
+    name = name.replace("\u00A0", " ").strip()
+    # Collapse multiple spaces
+    name = re.sub(r"\s+", " ", name)
+    # Fix common OCR punctuation issues (optional)
+    name = name.replace("“", '"').replace("”", '"').replace("’", "'")
+    return name
+
 def extract_doc_information(html_docs, pages):
     docs = []
     unloaded_docs = []
@@ -513,8 +560,8 @@ def extract_doc_information(html_docs, pages):
         metadata['pdf_url'] = info['download_url']
         metadata['html_language'] = info['language']
         metadata['html_page_title'] = info['title']
-        metadata['subject'] = info['subject']
-        metadata['authors'] = info['authors']
+        metadata['html_subject'] = info['subject']
+        metadata['html_authors'] = [normalize_author_name(author) for author in info['authors']]
         metadata['html_year'] = extract_document_year_from_title(info['title'])
         metadata['html_doc_type'] = extract_doc_type(info['title'])
 
@@ -695,8 +742,7 @@ async def process_html_docs(html_docs, enable_override=False, dryrun=False, debu
                 print(f"Document {doc['Document URL']} is English")
             docs_to_process.append(doc)
         else:
-            if debug:
-                print(f"Document {doc['Document URL']} is not valid")
+            continue
 
     # If there are no new documents to process, return early.
     if not docs_to_process:

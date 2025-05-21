@@ -18,26 +18,33 @@ from requests_aws4auth import AWS4Auth
 from langchain_core.documents import Document
 from langchain_aws.embeddings import BedrockEmbeddings
 from langchain_community.vectorstores import OpenSearchVectorSearch
-# from awsglue.utils import getResolvedOptions
 
+sys.path.append("..")
 import src.aws_utils as aws
 import src.opensearch as op
+import src.pgsql as pgsql
 
 # Constants
 
 # Get job parameters
+# from awsglue.utils import getResolvedOptions
+
 # args = getResolvedOptions(sys.argv, [
-#     'JOB_NAME',
-#     'topics_mandates_folder_path',
+#     'html_urls_path',
+#     'bucket_name',
 #     'batch_id',
 #     'region_name',
 #     'embedding_model',
 #     'opensearch_secret',
-#     'opensearch_host'
+#     'opensearch_host',
+#     'rds_secret',
+#     'dfo_html_full_index_name',
+#     'dfo_topic_full_index_name',
+#     'dfo_mandate_full_index_name',
+#     'pipeline_mode'
 # ])
 
 args = {
-    'JOB_NAME': 'ingest_topics_and_mandates',
     'html_urls_path': 's3://dfo-test-datapipeline/batches/2025-05-07/html_data/CSASDocuments.xlsx',
     'bucket_name': 'dfo-test-datapipeline',
     'batch_id': '2025-05-07',

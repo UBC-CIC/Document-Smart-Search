@@ -127,6 +127,7 @@ export class DataPipelineStack extends cdk.Stack {
     glueJobRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSSMReadOnlyAccess"));
     glueJobRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName("service-role/AWSGlueServiceRole"));
     glueJobRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonBedrockFullAccess"));
+    glueJobRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonS3FullAccess"));
 
     // Add Glue access
     const PYTHON_VER = "3.9";
@@ -140,17 +141,17 @@ export class DataPipelineStack extends cdk.Stack {
     // Function to get common job arguments
     const getCommonJobArguments = (): GlueJobArguments => {
       return {
-        "--extra-py-files": `s3://${this.glueBucket.bucketName}/glue/custom_modules/src/dist/src-0.1-py3-none-any.whl`,
+        "--extra-py-files": `s3://${this.glueBucket.bucketName}/glue/custom_modules/src-0.1-py3-none-any.whl`,
         "--additional-python-modules": PYTHON_LIBS,
         "library-set": "analytics",
-        "--batch_id": "",  // Will be set at runtime
+        "--batch_id": "2025_05_21",  // Will be set at runtime
         "--bucket_name": this.dataUploadBucket.bucketName,
         "--region_name": "us-west-2",
-        "--html_urls_path": "",  // Will be set at runtime
+        "--html_urls_path": "s3://dfo-datapipeline-dfodatapipelinedatauploadbucket8e-zsfxa89bwwx2/batches/2025_05_21/html_data/CSASDocuments.xlsx",  // Will be set at runtime
         "--embedding_model": "amazon.titan-embed-text-v2:0",
-        "--opensearch_secret":  "",// opensearchStack.userSecret.secretName,
-        "--opensearch_host": "",  // opensearchStack.domain.domainEndpoint
-        "--rds_secret": "",// databaseStack.secretPathUser.secretName,
+        "--opensearch_secret":  "DFO-OpenSearch-opensearch/admin/credentials",// opensearchStack.userSecret.secretName,
+        "--opensearch_host": "/DFO-OpenSearch/opensearch/host",  // opensearchStack.domain.domainEndpoint
+        "--rds_secret": "DFO-Database-DFO/credentials/DbCredential",// databaseStack.secretPathUser.secretName,
         "--dfo_html_full_index_name": "dfo-html-full-index",
         "--dfo_topic_full_index_name": "dfo-topic-full-index",
         "--dfo_mandate_full_index_name": "dfo-mandate-full-index",
