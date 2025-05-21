@@ -8,7 +8,7 @@ import "react-toastify/dist/ReactToastify.css";
 import ChatInput from "./components/ChatInput";
 import ChatMessages from "./components/ChatMessages";
 import DisclaimerModal from "./components/DisclaimerModal";
-import FeedbackComponent from "./components/feedback-component";
+import FeedbackComponent from "./components/UserFeedback";
 import { CitationsSidebar } from "../components/citations-sidebar";
 
 // Import hooks
