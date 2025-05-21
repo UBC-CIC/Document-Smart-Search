@@ -1,4 +1,3 @@
-import { use } from "react";
 import { allMockResults, filterOptions as defaultFilters } from "../data/defaultData"
 
 // Simple boolean flag to enable/disable mock data
@@ -12,7 +11,7 @@ export async function fetchFilterOptions() {
   }
 
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}search/filters`)
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/filters`)
     
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
@@ -58,14 +57,14 @@ export async function performDocumentSearch(query, filters) {
     // console.log("Transformed filters:", transformedFilters)
     // console.log("JSON SENDING:", JSON.stringify({ query, filters: transformedFilters }, null, 2))
 
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}search/documents`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/hybridSearch`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        query,
-        filters: transformedFilters
+        user_query: query,
+        filters: transformedFilters,
       }),
     })
     
