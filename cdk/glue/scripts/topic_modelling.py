@@ -128,7 +128,7 @@ rds_secret = aws.get_secret(secret_name=args['rds_secret'],region_name=args['reg
 conn_info = {
     "host": rds_secret['host'],
     "port": rds_secret['port'],
-    # "dbname": 'postgres',
+    "dbname": rds_secret['dbname'],
     "user": rds_secret['username'],
     "password": rds_secret['password']
 }

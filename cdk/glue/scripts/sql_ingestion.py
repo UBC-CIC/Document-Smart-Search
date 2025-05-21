@@ -487,7 +487,7 @@ def main(dryrun: bool = False, debug: bool = False):
     conn_info = {
         "host": rds_secret['host'],
         "port": rds_secret['port'],
-        "dbname": 'postgres',
+        "dbname": rds_secret['dbname'],
         "user": rds_secret['username'],
         "password": rds_secret['password']
     }
