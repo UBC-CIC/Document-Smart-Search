@@ -14,3 +14,4 @@ beautifulsoup4==4.12.3
 bertopic==0.16.2
 langdetect==1.0.9
 "psycopg[binary]"==3.2.6
+requests-aws4auth==1.1.1

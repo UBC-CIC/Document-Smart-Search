@@ -56,7 +56,17 @@ export class DataPipelineStack extends cdk.Stack {
       ],
       destinationBucket: this.glueBucket,
       destinationKeyPrefix: 'glue/scripts',
-      exclude: ['.ipynb', '*test*']
+      exclude: ['*.ipynb', '*test*', '*src*', '*DS_Store', '*__pycache__*', '*.pyc', '*.json', '*temp*']
+    });
+
+    // Upload existing Glue scripts to the scripts bucket
+    new s3deploy.BucketDeployment(this, 'DeployGlueCustomModules', {
+      sources: [
+        s3deploy.Source.asset('./glue/custom_modules/src/dist/'),
+      ],
+      destinationBucket: this.glueBucket,
+      destinationKeyPrefix: 'glue/custom_modules',
+      exclude: ['*DS_Store', '*__pycache__*', '*.json']
     });
 
     const glueSecurityGroup = new ec2.SecurityGroup(this, "glueSelfReferencingSG", {
@@ -125,7 +135,7 @@ export class DataPipelineStack extends cdk.Stack {
     const MAX_RETRIES = 0;
     const MAX_CAPACITY = 1;
     const TIMEOUT = 170;
-    const PYTHON_LIBS = "psycopg[binary]==3.2.6,boto3==1.38.1,langchain==0.3.12,langchain-community==0.3.12,langchain-aws==0.2.21,opensearch-py==2.5.0,pandas==2.2.3,numpy==1.26.4,scikit-learn==1.6.1,rank-bm25==0.2.2,aiohttp==3.11.10,beautifulsoup4==4.12.3,bertopic==0.16.2,langdetect==1.0.9"
+    const PYTHON_LIBS = "psycopg[binary]==3.2.6,boto3==1.38.1,langchain==0.3.12,langchain-community==0.3.12,langchain-aws==0.2.21,opensearch-py==2.5.0,pandas==2.2.3,numpy==1.26.4,scikit-learn==1.6.1,aiohttp==3.11.10,beautifulsoup4==4.12.3,bertopic==0.16.2,langdetect==1.0.9"
 
     // Function to get common job arguments
     const getCommonJobArguments = (): GlueJobArguments => {
@@ -139,7 +149,7 @@ export class DataPipelineStack extends cdk.Stack {
         "--html_urls_path": "",  // Will be set at runtime
         "--embedding_model": "amazon.titan-embed-text-v2:0",
         "--opensearch_secret":  "",// opensearchStack.userSecret.secretName,
-        "--opensearch_host": `/${id}/opensearch/host`,  // SSM Parameter
+        "--opensearch_host": "",  // opensearchStack.domain.domainEndpoint
         "--rds_secret": "",// databaseStack.secretPathUser.secretName,
         "--dfo_html_full_index_name": "dfo-html-full-index",
         "--dfo_topic_full_index_name": "dfo-topic-full-index",
@@ -251,10 +261,17 @@ export class DataPipelineStack extends cdk.Stack {
       }),
     };
 
-    // Create the workflow
+    // Create the workflow with parameters
     const workflow = new glue.CfnWorkflow(this, "DataPipelineWorkflow", {
       name: `${id}-data-pipeline-workflow`,
       description: "Workflow for processing and categorizing documents",
+      defaultRunProperties: {
+        "--batch_id":  "",
+        "--html_urls_path": "",
+        "--opensearch_host": "",
+        "--opensearch_secret": "",
+        "--rds_secret": "",
+      }
     });
 
     // Create triggers for the workflow - now fully sequential

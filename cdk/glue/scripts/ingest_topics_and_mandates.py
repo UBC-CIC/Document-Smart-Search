@@ -13,7 +13,8 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 import boto3
-from opensearchpy import OpenSearch
+from opensearchpy import OpenSearch, RequestsHttpConnection
+from requests_aws4auth import AWS4Auth
 from langchain_core.documents import Document
 from langchain_aws.embeddings import BedrockEmbeddings
 from langchain_community.vectorstores import OpenSearchVectorSearch
@@ -73,28 +74,87 @@ OPENSEARCH_HOST = args['opensearch_host']
 # Runtime Variables
 CURRENT_DATETIME = datetime.now().strftime(r"%Y-%m-%d %H:%M:%S")
 
+def init_opensearch_client(host: str, region: str, secret_name: str) -> OpenSearch:
+    """
+    Initialize OpenSearch client with fallback authentication.
+    First tries basic auth, then falls back to AWS4Auth if that fails.
+    
+    Parameters
+    ----------
+    host : str
+        OpenSearch host URL
+    region : str
+        AWS region name
+    secret_name : str
+        Name of the secret containing OpenSearch credentials
+        
+    Returns
+    -------
+    OpenSearch
+        Initialized OpenSearch client
+    """
+    secrets = aws.get_secret(secret_name=secret_name, region_name=region)
+    username = secrets.get('username')
+    password = secrets.get('password')
+    
+    # First try basic auth
+    try:
+        client = OpenSearch(
+            hosts=[{'host': host, 'port': 443}],
+            http_auth=(username, password),
+            use_ssl=True,
+            verify_certs=True,
+            connection_class=RequestsHttpConnection
+        )
+        # Test connection
+        client.info()
+        print("Connected using basic authentication")
+        return client
+    except Exception as e:
+        if "AuthorizationException" in str(e):
+            print("Basic auth failed, falling back to AWS4Auth")
+            # Fall back to AWS4Auth
+            session = aws.session
+            credentials = session.get_credentials()
+            awsauth = AWS4Auth(
+                credentials.access_key,
+                credentials.secret_key,
+                region,
+                'es',
+                session_token=credentials.token
+            )
+            
+            client = OpenSearch(
+                hosts=[{'host': host, 'port': 443}],
+                http_auth=awsauth,
+                use_ssl=True,
+                verify_certs=True,
+                connection_class=RequestsHttpConnection
+            )
+            # Test connection
+            client.info()
+            print("Connected using AWS4Auth")
+            return client
+        else:
+            raise e
+
 session = aws.session # always use this session for boto3
 
-
-secrets = aws.get_secret(secret_name=OPENSEARCH_SEC,region_name=REGION_NAME)
+# Connect to OpenSearch
 opensearch_host = aws.get_parameter_ssm(
     parameter_name=OPENSEARCH_HOST, region_name=REGION_NAME
 )
-# Connect to OpenSearch
-auth = (secrets['username'], secrets['password'])
 
-client = OpenSearch(
-    hosts=[{'host': opensearch_host, 'port': 443}],
-    http_compress=True,
-    http_auth=auth,
-    use_ssl=True,
-    verify_certs=True
+# Initialize OpenSearch client with fallback authentication
+client = init_opensearch_client(
+    host=opensearch_host,
+    region=REGION_NAME,
+    secret_name=OPENSEARCH_SEC
 )
 
 info = client.info()
 print(f"Welcome to {info['version']['distribution']} {info['version']['number']}!")
 print(op.list_indexes(client))
-
 
 # Get and print all index names with sizes
 indexes = client.cat.indices(format="json")
@@ -106,25 +166,25 @@ for index in indexes:
 bedrock_client = session.client("bedrock-runtime", region_name=REGION_NAME)
 embedder = BedrockEmbeddings(client=bedrock_client, model_id=EMBEDDING_MODEL)
 
-
+# Update vector stores to use AWS4Auth
 topics_vector_store = OpenSearchVectorSearch(
     index_name=DFO_TOPIC_FULL_INDEX_NAME,
     embedding_function=embedder,
-    opensearch_url="https://search-dfo-test-domain-7q7o6yzv2fgbsul7sbijedtltu.us-west-2.es.amazonaws.com",
-    http_compress=True,
-    http_auth = auth,
-    use_ssl = True,
+    opensearch_url=f"https://{opensearch_host}",
+    http_auth=awsauth,
+    use_ssl=True,
     verify_certs=True,
+    connection_class=RequestsHttpConnection
 )
 
 mandates_vector_store = OpenSearchVectorSearch(
     index_name=DFO_MANDATE_FULL_INDEX_NAME,
     embedding_function=embedder,
-    opensearch_url="https://search-dfo-test-domain-7q7o6yzv2fgbsul7sbijedtltu.us-west-2.es.amazonaws.com",
-    http_compress=True,
-    http_auth = auth,
-    use_ssl = True,
+    opensearch_url=f"https://{opensearch_host}",
+    http_auth=awsauth,
+    use_ssl=True,
     verify_certs=True,
+    connection_class=RequestsHttpConnection
 )
 
 def list_csv_files_in_s3_folder(s3_folder_path: str) -> List[str]:

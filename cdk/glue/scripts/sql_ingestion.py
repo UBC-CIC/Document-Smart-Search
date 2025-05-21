@@ -4,7 +4,9 @@ import io
 from typing import Dict, List, Iterable, Literal, Optional, Tuple
 import pandas as pd
 import numpy as np
-from opensearchpy import OpenSearch
+from opensearchpy import OpenSearch, RequestsHttpConnection
+from requests_aws4auth import AWS4Auth
+import boto3
 import psycopg
 from datetime import datetime
 
@@ -38,7 +40,71 @@ DFO_HTML_FULL_INDEX_NAME = args['dfo_html_full_index_name']
 
 CURRENT_DATETIME = datetime.now().strftime(r"%Y-%m-%d %H:%M:%S")
 
-session = aws.session # always use this session for boto3 operations
+session = aws.session # always use this session for all AWS calls
+
+def init_opensearch_client(host: str, region: str, secret_name: str) -> OpenSearch:
+    """
+    Initialize OpenSearch client with fallback authentication.
+    First tries basic auth, then falls back to AWS4Auth if that fails.
+    
+    Parameters
+    ----------
+    host : str
+        OpenSearch host URL
+    region : str
+        AWS region name
+    secret_name : str
+        Name of the secret containing OpenSearch credentials
+        
+    Returns
+    -------
+    OpenSearch
+        Initialized OpenSearch client
+    """
+    secrets = aws.get_secret(secret_name=secret_name, region_name=region)
+    username = secrets.get('username')
+    password = secrets.get('password')
+    
+    # First try basic auth
+    try:
+        client = OpenSearch(
+            hosts=[{'host': host, 'port': 443}],
+            http_auth=(username, password),
+            use_ssl=True,
+            verify_certs=True,
+            connection_class=RequestsHttpConnection
+        )
+        # Test connection
+        client.info()
+        print("Connected using basic authentication")
+        return client
+    except Exception as e:
+        if "AuthorizationException" in str(e):
+            print("Basic auth failed, falling back to AWS4Auth")
+            # Fall back to AWS4Auth
+            session = aws.session
+            credentials = session.get_credentials()
+            awsauth = AWS4Auth(
+                credentials.access_key,
+                credentials.secret_key,
+                region,
+                'es',
+                session_token=credentials.token
+            )
+            
+            client = OpenSearch(
+                hosts=[{'host': host, 'port': 443}],
+                http_auth=awsauth,
+                use_ssl=True,
+                verify_certs=True,
+                connection_class=RequestsHttpConnection
+            )
+            # Test connection
+            client.info()
+            print("Connected using AWS4Auth")
+            return client
+        else:
+            raise e
 
 def fetch_specific_fields(client, index_name: str, fields: List[str], scroll: str = "2m", batch_size: int = 5000) -> List[Dict]:
     """
@@ -410,19 +476,14 @@ def main(dryrun: bool = False, debug: bool = False):
     
     print(f"Dryrun: {dryrun}, Debug: {debug}")
     # Get AWS credentials and parameters
-    secrets = aws.get_secret(secret_name=args['opensearch_secret'], region_name=args['region_name'])
     opensearch_host = aws.get_parameter_ssm(parameter_name=args['opensearch_host'], region_name=args['region_name'])
-    # rds_hosturl = aws.get_parameter_ssm('/dfo/rds/host_url')
     rds_secret = aws.get_secret(args['rds_secret'])
 
-    # Connect to OpenSearch
-    auth = (secrets['username'], secrets['password'])
-    op_client = OpenSearch(
-        hosts=[{'host': opensearch_host, 'port': 443}],
-        http_compress=True,
-        http_auth=auth,
-        use_ssl=True,
-        verify_certs=True
+    # Initialize OpenSearch client with fallback authentication
+    op_client = init_opensearch_client(
+        host=opensearch_host,
+        region=args['region_name'],
+        secret_name=args['opensearch_secret']
     )
 
     # Connect to PostgreSQL
