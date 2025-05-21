@@ -7,7 +7,7 @@ import {
 } from "../data/topicRelatedData";
 
 // Filter documents by year and document type
-const filterDocuments = (documents, filters) => {
+const filterMockDocuments = (documents, filters) => {
   let result = [...documents];
   
   // Filter by years if any year filters are active
@@ -68,29 +68,6 @@ const sortDocuments = (documents, sortBy, topicType) => {
 };
 
 /**
- * Fetch metadata about a topic (total document count, counts by filters)
- */
-export async function fetchTopicMetadata(topicName) {
-  if (USE_MOCK_DATA) {
-    // Add a small delay to simulate network request
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    return topicMetadata[topicName] || defaultTopicMetadata;
-  }
-  
-  try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}topics/metadata/${encodeURIComponent(topicName)}`);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    return await response.json();
-  } catch (error) {
-    console.error("Error fetching topic metadata:", error);
-    return defaultTopicMetadata;
-  }
-}
-
-/**
  * Fetch related documents for a topic
  * @param {string} topicName - Name of the topic or mandate
  * @param {string} topicType - Type of topic ('mandate', 'dfo', or 'derived')
@@ -98,7 +75,7 @@ export async function fetchTopicMetadata(topicName) {
  * @param {object} filters - Filter settings for years and document types
  * @param {string} sortBy - How to sort the results
  * @param {string} excludeDocumentId - ID of the current document to exclude
- * @returns {Promise<{documents: Array, totalCount: number}>} - Filtered and paginated documents with total count
+ * @returns {Promise<{documents: Array, totalCount: number, metadata: Object}>} - Filtered and paginated documents with total count and metadata
  */
 export async function fetchRelatedDocumentsByTopic(
   topicName, 
@@ -125,7 +102,7 @@ export async function fetchRelatedDocumentsByTopic(
       }
       
       // Filter the documents based on filters
-      const filteredDocuments = filterDocuments(allDocuments, filters);
+      const filteredDocuments = filterMockDocuments(allDocuments, filters);
       
       // Sort documents
       const sortedDocuments = sortDocuments(filteredDocuments, sortBy, topicType);
@@ -133,11 +110,13 @@ export async function fetchRelatedDocumentsByTopic(
       // Paginate the results
       const paginatedDocuments = paginateDocuments(sortedDocuments, page);
       
+      // Get metadata from mock data for this topic
+      const metadata = topicMetadata[topicName] || defaultTopicMetadata;
+      
       return {
         documents: paginatedDocuments,
         totalCount: filteredDocuments.length,
-        // Include metadata for UI display
-        metadata: await fetchTopicMetadata(topicName)
+        metadata: metadata // Include metadata directly without a separate API call
       };
     } catch (error) {
       console.error("Error processing mock data for topic:", error);
@@ -147,19 +126,15 @@ export async function fetchRelatedDocumentsByTopic(
 
   // Real API implementation
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}topics/related-documents`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/related-documents?type=${encodeURIComponent("Mandate" | "DFO Topic" | "Derived Topic")}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        topicName,
-        topicType,
-        page,
-        pageSize: 5,
-        filters,
-        sortBy,
-        excludeDocumentId
+        name: topicName | mandateName,
+        filters: filters,
+        currentDocID: excludeDocumentId,
       }),
     });
     

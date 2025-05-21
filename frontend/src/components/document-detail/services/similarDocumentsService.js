@@ -88,8 +88,8 @@ export async function fetchSimilarDocuments(documentId, page = 1, filters = { ye
   
   // Real API implementation
   try {
-    // This should call user/hybridSearch according to the OpenAPI spec
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/hybridSearch`, {
+    // This should call user/similarity-search according to the OpenAPI spec
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/similarity-search`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

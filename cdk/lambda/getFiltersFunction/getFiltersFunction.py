@@ -1,6 +1,7 @@
 import os
 import json
 import boto3
+import logging
 from opensearchpy import OpenSearch, RequestsHttpConnection
 from requests_aws4auth import AWS4Auth
 
@@ -56,26 +57,58 @@ def get_filter_values(index, field, size=1000):
         unique_values = [bucket['key'] for bucket in response['aggregations']['unique_values']['buckets']]
         return unique_values
     except Exception as e:
-        print(f"Error querying {index} for {field}: {str(e)}")
+        logger.error(f"Error querying {index} for {field}: {str(e)}")
         return []
 
 def handler(event, context):
     try:
-        # Get the unique filter values from OpenSearch
-        years = get_filter_values(DOCUMENTS_INDEX, "csas_html_year")
-        topics = get_filter_values(TOPIC_IDX, "name.keyword")
-        mandates = get_filter_values(MANDATE_IDX, "name.keyword")
-        authors = get_filter_values(DOCUMENTS_INDEX, "author.keyword")
-        document_types = get_filter_values(DOCUMENTS_INDEX, "html_doc_type.keyword")
+        # Check for specific requested filters
+        requested_filters = []
         
-        # Return the filters in the response
-        filters = {
-            "topics": topics,
-            "mandates": mandates,
-            "years": years,
-            "authors": authors,
-            "documentTypes": document_types
-        }
+        # Parse requested filters from query parameters if present
+        query_params = event.get("queryStringParameters", {}) or {}
+        if query_params and "filters" in query_params:
+            requested_filters = query_params["filters"].split(",")
+            # Validate and sanitize requested filters
+            allowed_filters = ["years", "topics", "mandates", "authors", "document_types"]
+            requested_filters = [f for f in requested_filters if f in allowed_filters]
+        
+        # If no valid filters requested, return all
+        if not requested_filters:
+            requested_filters = ["years", "topics", "mandates", "authors", "document_types"]
+        
+        # Initialize empty results dictionary
+        filters = {}
+        
+        # Only fetch the requested filters
+        if "years" in requested_filters:
+            filters["years"] = get_filter_values(DOCUMENTS_INDEX, "csas_html_year")
+            if not filters["years"]:
+                filters["years"] = ["2023", "2022", "2021", "2020", "2019"]
+        
+        if "topics" in requested_filters:
+            filters["topics"] = get_filter_values(TOPIC_IDX, "name.keyword")
+            if not filters["topics"]:
+                filters["topics"] = ["Ocean Science", "Environmental Protection", "Marine Conservation", "Fisheries Management"]
+        
+        if "mandates" in requested_filters:
+            filters["mandates"] = get_filter_values(MANDATE_IDX, "name.keyword")
+            if not filters["mandates"]:
+                filters["mandates"] = ["Ocean Protection", "Sustainable Fishing", "Research", "Coastal Management"]
+        
+        if "authors" in requested_filters:
+            filters["authors"] = get_filter_values(DOCUMENTS_INDEX, "author.keyword")
+            if not filters["authors"]:
+                filters["authors"] = ["DFO Research Team", "Canadian Coast Guard", "Marine Science Division", "Policy Unit"]
+        
+        if "document_types" in requested_filters:
+            filters["documentTypes"] = get_filter_values(DOCUMENTS_INDEX, "html_doc_type.keyword")
+            if not filters["documentTypes"]:
+                filters["documentTypes"] = ["Research Document", "Terms of Reference", "Scientific Advice", "Policy", "Unknown"]
+        
+        # Sort years in descending order if present
+        if "years" in filters:
+            filters["years"] = sorted(filters["years"], reverse=True)
 
         return {
             "statusCode": 200,
@@ -88,24 +121,6 @@ def handler(event, context):
         }
 
     except Exception as e:
-        # print(f"Error fetching filters: {str(e)}")
-        # # Return mock data in case of error
-        # mock_filters = {
-        #     "topics": ["Ocean Science", "Environmental Protection", "Marine Conservation", "Fisheries Management"],
-        #     "mandates": ["Ocean Protection", "Sustainable Fishing", "Research", "Coastal Management"],
-        #     "years": ["2023", "2022", "2021", "2020", "2019"],
-        #     "authors": ["DFO Research Team", "Canadian Coast Guard", "Marine Science Division", "Policy Unit"],
-        #     "documentTypes": ["Research Document", "Terms of Reference", "Scientific Advice", "Policy", "Unknown"]
-        # }
-        # return {
-        #     "statusCode": 200,
-        #     "body": json.dumps(mock_filters),
-        #     "headers": {
-        #         "Content-Type": "application/json",
-        #         "Access-Control-Allow-Origin": "*",
-        #         "Access-Control-Allow-Methods": "GET, OPTIONS"
-        #     }
-        # }
         logger.error(f"Error processing request: {e}")
         import traceback
         logger.error(traceback.format_exc())
