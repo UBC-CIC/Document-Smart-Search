@@ -88,17 +88,15 @@ export async function fetchSimilarDocuments(documentId, page = 1, filters = { ye
   
   // Real API implementation
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}documents/similar`, {
+    // This should call user/hybridSearch according to the OpenAPI spec
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/hybridSearch`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        documentId,
-        page,
-        pageSize: 5, // Exactly 5 results per page
-        filters,
-        sortBy
+        documentId: documentId,
+        filters: filters,
       }),
     });
     
