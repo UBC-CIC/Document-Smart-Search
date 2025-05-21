@@ -6,7 +6,7 @@ requests
 
 # Document and embedding processing
 pandas
-torch
+# torch
 
 # LangChain core and community integrations
 langchain
