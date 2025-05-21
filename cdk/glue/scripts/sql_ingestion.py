@@ -1,10 +1,10 @@
 import sys
 import os
 import io
-from typing import Dict, List, Iterable, Literal, Optional, Tuple
+from typing import Dict, List, Iterable, Literal, Optional, Tuple, Any
 import pandas as pd
 import numpy as np
-from opensearchpy import OpenSearch, RequestsHttpConnection
+from opensearchpy import OpenSearch, RequestsHttpConnection, RequestsAWSV4SignerAuth
 from requests_aws4auth import AWS4Auth
 import boto3
 import psycopg
@@ -42,7 +42,7 @@ CURRENT_DATETIME = datetime.now().strftime(r"%Y-%m-%d %H:%M:%S")
 
 session = aws.session # always use this session for all AWS calls
 
-def init_opensearch_client(host: str, region: str, secret_name: str) -> OpenSearch:
+def init_opensearch_client(host: str, region: str, secret_name: str) -> Tuple[OpenSearch, Any]:
     """
     Initialize OpenSearch client with fallback authentication.
     First tries basic auth, then falls back to AWS4Auth if that fails.
@@ -58,8 +58,10 @@ def init_opensearch_client(host: str, region: str, secret_name: str) -> OpenSear
         
     Returns
     -------
-    OpenSearch
-        Initialized OpenSearch client
+    Tuple[OpenSearch, Any]
+        Tuple containing:
+        - Initialized OpenSearch client
+        - Authentication object used (either tuple of (username, password) or AWS4Auth)
     """
     secrets = aws.get_secret(secret_name=secret_name, region_name=region)
     username = secrets.get('username')
@@ -67,9 +69,10 @@ def init_opensearch_client(host: str, region: str, secret_name: str) -> OpenSear
     
     # First try basic auth
     try:
+        auth = (username, password)
         client = OpenSearch(
             hosts=[{'host': host, 'port': 443}],
-            http_auth=(username, password),
+            http_auth=auth,
             use_ssl=True,
             verify_certs=True,
             connection_class=RequestsHttpConnection
@@ -77,32 +80,26 @@ def init_opensearch_client(host: str, region: str, secret_name: str) -> OpenSear
         # Test connection
         client.info()
         print("Connected using basic authentication")
-        return client
+        return client, auth
     except Exception as e:
         if "AuthorizationException" in str(e):
             print("Basic auth failed, falling back to AWS4Auth")
             # Fall back to AWS4Auth
-            session = aws.session
             credentials = session.get_credentials()
-            awsauth = AWS4Auth(
-                credentials.access_key,
-                credentials.secret_key,
-                region,
-                'es',
-                session_token=credentials.token
-            )
+            auth = RequestsAWSV4SignerAuth(credentials, region, 'es')
             
             client = OpenSearch(
                 hosts=[{'host': host, 'port': 443}],
-                http_auth=awsauth,
+                http_auth=auth,
                 use_ssl=True,
                 verify_certs=True,
-                connection_class=RequestsHttpConnection
+                connection_class=RequestsHttpConnection,
+                pool_maxsize=20
             )
             # Test connection
             client.info()
             print("Connected using AWS4Auth")
-            return client
+            return client, auth
         else:
             raise e
 
@@ -480,7 +477,7 @@ def main(dryrun: bool = False, debug: bool = False):
     rds_secret = aws.get_secret(args['rds_secret'])
 
     # Initialize OpenSearch client with fallback authentication
-    op_client = init_opensearch_client(
+    client, auth = init_opensearch_client(
         host=opensearch_host,
         region=args['region_name'],
         secret_name=args['opensearch_secret']
@@ -517,7 +514,7 @@ def main(dryrun: bool = False, debug: bool = False):
     ]
 
     # Fetch data from OpenSearch
-    fetched_documents = fetch_specific_fields(op_client, DFO_HTML_FULL_INDEX_NAME, document_fields)
+    fetched_documents = fetch_specific_fields(client, DFO_HTML_FULL_INDEX_NAME, document_fields)
     
     # Convert to DataFrames
     document_df = pd.DataFrame(fetched_documents).drop_duplicates()

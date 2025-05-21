@@ -13,7 +13,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 import boto3
-from opensearchpy import OpenSearch, RequestsHttpConnection
+from opensearchpy import OpenSearch, RequestsHttpConnection, RequestsAWSV4SignerAuth
 from requests_aws4auth import AWS4Auth
 from opensearchpy.helpers import bulk
 import aiohttp
@@ -24,6 +24,8 @@ from langchain_community.vectorstores import OpenSearchVectorSearch
 # from awsglue.utils import getResolvedOptions
 import src.aws_utils as aws
 import src.opensearch as op
+
+session = aws.session
 
 # Constants
 
@@ -77,7 +79,7 @@ OPENSEARCH_HOST = args['opensearch_host']
 # Runtime Variables
 CURRENT_DATETIME = datetime.now().strftime(r"%Y-%m-%d %H:%M:%S")
 
-def init_opensearch_client(host: str, region: str, secret_name: str) -> OpenSearch:
+def init_opensearch_client(host: str, region: str, secret_name: str) -> Tuple[OpenSearch, Any]:
     """
     Initialize OpenSearch client with fallback authentication.
     First tries basic auth, then falls back to AWS4Auth if that fails.
@@ -93,8 +95,10 @@ def init_opensearch_client(host: str, region: str, secret_name: str) -> OpenSear
         
     Returns
     -------
-    OpenSearch
-        Initialized OpenSearch client
+    Tuple[OpenSearch, Any]
+        Tuple containing:
+        - Initialized OpenSearch client
+        - Authentication object used (either tuple of (username, password) or AWS4Auth)
     """
     secrets = aws.get_secret(secret_name=secret_name, region_name=region)
     username = secrets.get('username')
@@ -102,9 +106,10 @@ def init_opensearch_client(host: str, region: str, secret_name: str) -> OpenSear
     
     # First try basic auth
     try:
+        auth = (username, password)
         client = OpenSearch(
             hosts=[{'host': host, 'port': 443}],
-            http_auth=(username, password),
+            http_auth=auth,
             use_ssl=True,
             verify_certs=True,
             connection_class=RequestsHttpConnection
@@ -112,32 +117,26 @@ def init_opensearch_client(host: str, region: str, secret_name: str) -> OpenSear
         # Test connection
         client.info()
         print("Connected using basic authentication")
-        return client
+        return client, auth
     except Exception as e:
         if "AuthorizationException" in str(e):
             print("Basic auth failed, falling back to AWS4Auth")
             # Fall back to AWS4Auth
-            session = aws.session
             credentials = session.get_credentials()
-            awsauth = AWS4Auth(
-                credentials.access_key,
-                credentials.secret_key,
-                region,
-                'es',
-                session_token=credentials.token
-            )
+            auth = RequestsAWSV4SignerAuth(credentials, region, 'es')
             
             client = OpenSearch(
                 hosts=[{'host': host, 'port': 443}],
-                http_auth=awsauth,
+                http_auth=auth,
                 use_ssl=True,
                 verify_certs=True,
-                connection_class=RequestsHttpConnection
+                connection_class=RequestsHttpConnection,
+                pool_maxsize=20
             )
             # Test connection
             client.info()
             print("Connected using AWS4Auth")
-            return client
+            return client, auth
         else:
             raise e
 
@@ -147,7 +146,7 @@ opensearch_host = aws.get_parameter_ssm(
 )
 
 # Initialize OpenSearch client with fallback authentication
-client = init_opensearch_client(
+client, auth = init_opensearch_client(
     host=opensearch_host,
     region=REGION_NAME,
     secret_name=OPENSEARCH_SEC
