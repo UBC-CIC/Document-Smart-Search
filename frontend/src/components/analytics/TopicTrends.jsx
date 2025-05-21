@@ -120,8 +120,9 @@ export default function TopicTrends() {
       // Update dateRange state to use the new min and max dates
       setDateRange([{ startDate: dynamicMinDate, endDate: dynamicMaxDate, key: "selection" }]);
     } catch (error) {
-      console.error(`Error fetching ${userRole} sessions:`, error)
-      setSession([])
+      console.error(`Error fetching min/max dates:`, error)
+      setDateRange([{ startDate: new Date(2000, 0, 1), endDate: new Date(), key: "selection" }]);
+      setChartData([]); // Reset chart data on error
     } finally {
       setLoading(false)
     }
@@ -153,7 +154,7 @@ export default function TopicTrends() {
       setAllTopics(data)
     } catch (error) {
       console.error(`Error fetching topics:`, error)
-      setSession([])
+      
     } finally {
       setLoading(false)
     }
