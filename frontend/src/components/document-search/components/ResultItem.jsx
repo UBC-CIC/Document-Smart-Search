@@ -22,7 +22,7 @@ export default function ResultItem({ result, openQuerySummary }) {
         <div className="flex flex-col sm:flex-row sm:justify-between gap-2 mb-2">
           <div className="font-medium dark:text-white text-sm md:text-base">{result.title}</div>
           <div className="flex space-x-2 text-xs md:text-sm">
-            <Link href={`/document-summary/`} className="text-blue-600 dark:text-blue-400">
+            <Link href={`/documents/${result.id}`} className="text-blue-600 dark:text-blue-400">
               Document Summary
             </Link>
             <button className="text-blue-600 dark:text-blue-400" onClick={() => openQuerySummary(result.id)}>
@@ -42,7 +42,7 @@ export default function ResultItem({ result, openQuerySummary }) {
 
       <div className="flex justify-end mt-2">
         <a
-          href="https://publications.gc.ca/site/archivee-archived.html?url=https://publications.gc.ca/collections/collection_2023/mpo-dfo/fs70-7/Fs70-7-2023-036-eng.pdf"
+          href={result.documentUrl || "https://publications.gc.ca/site/eng/search/search.html"}
           target="_blank"
           rel="noopener noreferrer"
           className="text-blue-600 dark:text-blue-400 text-xs md:text-sm flex items-center"
