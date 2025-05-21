@@ -1,20 +1,11 @@
-# Core AWS and OpenSearch
 boto3
-opensearch-py==2.3.1 # For OpenSearch 2.3.1
-urllib3
-requests
-
-# Document and embedding processing
-#pandas
-#torch
-
-# LangChain core and community integrations
+botocore
 langchain
 langchain-aws
+langchain-core
 langchain-community
-langchain-huggingface
-#jq
-
-# HuggingFace embeddings:
-#sentence-transformers
-#transformers
+langchain-postgres
+psycopg[binary,pool]
+psycopg2-binary
+python-dotenv
+opensearch-py
