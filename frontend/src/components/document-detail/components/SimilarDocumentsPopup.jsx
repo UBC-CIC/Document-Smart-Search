@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { X, Filter, ArrowUp, ArrowDown } from "lucide-react";
-import { fetchSimilarDocuments } from "../services/similarDocumentsService";
+import { fetchSimilarDocuments, fetchSimilarDocumentFilterOptions } from "../services/similarDocumentsService";
 import Link from "next/link";
 
 export default function SimilarDocumentsPopup({ 
@@ -8,8 +8,12 @@ export default function SimilarDocumentsPopup({
   onClose, 
   documentId 
 }) {
-  const [documents, setDocuments] = useState([]);
-  const [filterOptions, setFilterOptions] = useState(null);
+  // State for all fetched documents and filter options
+  const [allDocuments, setAllDocuments] = useState([]);
+  const [filterOptions, setFilterOptions] = useState({
+    years: [],
+    documentTypes: []
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -22,28 +26,57 @@ export default function SimilarDocumentsPopup({
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState('semanticScore');
   
-  // FIXED: Results per page is 5, not 10
+  // Results per page
   const RESULTS_PER_PAGE = 5;
 
+  // Sort documents based on different criteria
+  const sortDocuments = (docs, sortOption) => {
+    if (!docs || docs.length === 0) return [];
+    
+    const docsToSort = [...docs]; // Create a copy to avoid mutating the original
+    
+    switch (sortOption) {
+      case 'semanticScore':
+        return docsToSort.sort((a, b) => b.semanticScore - a.semanticScore);
+      case 'yearDesc':
+        return docsToSort.sort((a, b) => b.year - a.year);
+      case 'yearAsc':
+        return docsToSort.sort((a, b) => a.year - b.year);
+      default:
+        return docsToSort.sort((a, b) => b.semanticScore - a.semanticScore);
+    }
+  };
+
+  // Fetch filter options when popup opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchSimilarDocumentFilterOptions().then(options => {
+        setFilterOptions(options);
+        setFilters({
+          years: Object.fromEntries(options.years.map(year => [year, false])),
+          documentTypes: Object.fromEntries(options.documentTypes.map(type => [type, false]))
+        });
+      }).catch(error => {
+        console.error("Error fetching filter options:", error);
+      });
+    }
+  }, [isOpen]);
+
+  // Fetch documents when popup opens or filters change
   useEffect(() => {
     if (!isOpen || !documentId) return;
     
     async function fetchData() {
       setLoading(true);
       try {
-        const data = await fetchSimilarDocuments(
-          documentId, 
-          currentPage, 
-          filters, 
-          sortBy
-        );
+        // Using updated service function - only pass documentId and filters
+        const data = await fetchSimilarDocuments(documentId, filters);
         
-        setDocuments(data.documents);
-        setTotalDocuments(data.totalCount);
-        setTotalPages(Math.ceil(data.totalCount / RESULTS_PER_PAGE));
+        setAllDocuments(data.documents || []);
+        setTotalDocuments(data.totalCount || 0);
         
-        // Set filter options if available
-        if (data.filterOptions) {
+        // Set filter options if available and not already set
+        if (data.filterOptions && (!filterOptions.years.length || !filterOptions.documentTypes.length)) {
           setFilterOptions(data.filterOptions);
         }
       } catch (err) {
@@ -55,7 +88,31 @@ export default function SimilarDocumentsPopup({
     }
     
     fetchData();
-  }, [isOpen, documentId, currentPage, filters, sortBy]);
+  }, [isOpen, documentId, filters]);
+  
+  // Apply sorting and pagination to documents
+  const displayedDocuments = useMemo(() => {
+    if (!allDocuments || allDocuments.length === 0) return [];
+    
+    // First sort the documents
+    const sortedDocs = sortDocuments(allDocuments, sortBy);
+    
+    // Calculate total pages
+    const newTotalPages = Math.ceil(sortedDocs.length / RESULTS_PER_PAGE);
+    if (totalPages !== newTotalPages) {
+      setTotalPages(newTotalPages);
+      
+      // Reset current page if it's out of bounds
+      if (currentPage > newTotalPages) {
+        setCurrentPage(1);
+      }
+    }
+    
+    // Apply pagination
+    const startIndex = (currentPage - 1) * RESULTS_PER_PAGE;
+    const endIndex = startIndex + RESULTS_PER_PAGE;
+    return sortedDocs.slice(startIndex, endIndex);
+  }, [allDocuments, sortBy, currentPage, RESULTS_PER_PAGE, totalPages]);
   
   if (!isOpen) return null;
   
@@ -119,7 +176,7 @@ export default function SimilarDocumentsPopup({
                 <div className="mb-4">
                   <h5 className="text-xs font-medium mb-2 dark:text-gray-400">Years</h5>
                   <div className="flex flex-wrap gap-2">
-                    {filterOptions && filterOptions.years ? 
+                    {filterOptions && filterOptions.years && filterOptions.years.length > 0 ? 
                       filterOptions.years.map(year => (
                         <label key={year} className="flex items-center space-x-1.5 text-sm">
                           <input
@@ -150,7 +207,7 @@ export default function SimilarDocumentsPopup({
                 <div>
                   <h5 className="text-xs font-medium mb-2 dark:text-gray-400">Document Types</h5>
                   <div className="flex flex-wrap gap-2">
-                    {filterOptions && filterOptions.documentTypes ?
+                    {filterOptions && filterOptions.documentTypes && filterOptions.documentTypes.length > 0 ?
                       filterOptions.documentTypes.map(type => (
                         <label key={type} className="flex items-center space-x-1.5 text-sm">
                           <input
@@ -180,7 +237,7 @@ export default function SimilarDocumentsPopup({
               
               {/* Sort options */}
               <div>
-                <h4 className="text-sm font-medium mb-3 dark:text-gray-300">Sort By (Within Top Results)</h4>
+                <h4 className="text-sm font-medium mb-3 dark:text-gray-300">Sort By</h4>
                 <div className="space-y-2">
                   <button 
                     onClick={() => handleSortChange('semanticScore')}
@@ -226,7 +283,9 @@ export default function SimilarDocumentsPopup({
         <div className="p-4 flex-1 overflow-y-auto">
           <div className="flex justify-between items-center mb-4">
             <div className="text-sm text-gray-600 dark:text-gray-400">
-              <strong className="font-medium">Most semantically similar documents (By text content)</strong>
+              <strong className="font-medium">
+                {totalDocuments > 0 ? `${totalDocuments} semantically similar documents found` : "Finding similar documents..."}
+              </strong>
             </div>
             
             {/* If active filters are applied, show filter indicator */}
@@ -249,13 +308,13 @@ export default function SimilarDocumentsPopup({
             <div className="text-center py-8 text-red-500">
               {error}
             </div>
-          ) : documents.length === 0 ? (
+          ) : displayedDocuments.length === 0 ? (
             <div className="text-center py-8 text-gray-500 dark:text-gray-400">
               No similar documents found with the current filters.
             </div>
           ) : (
             <div className="space-y-4">
-              {documents.map((doc) => (
+              {displayedDocuments.map((doc) => (
                 <div key={doc.id} className="border dark:border-gray-700 rounded-lg p-4">
                   <Link href={`/documents/${doc.id}`} className="block">
                     <h4 className="text-blue-600 dark:text-blue-400 font-medium hover:underline">{doc.title}</h4>
@@ -279,56 +338,64 @@ export default function SimilarDocumentsPopup({
                   </div>
                 </div>
               ))}
-              
-              {/* Show a message when there are more results */}
-              {totalPages > 1 && currentPage < totalPages && (
-                <div className="text-center py-2 text-sm text-gray-500 dark:text-gray-400">
-                  Showing {currentPage * RESULTS_PER_PAGE} of {Math.min(totalDocuments, 50)} most similar documents
-                </div>
-              )}
             </div>
           )}
         </div>
 
-        {/* Make sure pagination is visible when there are multiple pages */}
-        {totalPages > 1 && (
+        {/* Pagination - only show when there are multiple pages */}
+        {totalDocuments > RESULTS_PER_PAGE && (
           <div className="p-4 border-t dark:border-gray-700">
             <div className="flex items-center justify-between">
               <button
                 onClick={() => handlePageChange(currentPage - 1)}
                 disabled={currentPage === 1}
-                className={`px-2 py-1 rounded ${currentPage === 1 ? 'text-gray-400 cursor-not-allowed' : 'text-blue-600 dark:text-blue-400 hover:underline'}`}
+                className={`px-2 py-1 rounded ${currentPage === 1 ? 'text-gray-400 cursor-not-allowed' : 'text-blue-600 dark:text-blue-400'}`}
               >
                 Previous
               </button>
               
               <div className="flex items-center space-x-1">
-                {/* Make pagination more visible by enhancing the styling */}
-                {Array.from({ length: Math.min(totalPages, 5) }).map((_, i) => {
+                {Array.from({ length: Math.min(10, totalPages) }).map((_, i) => {
+                  // Show first page, last page, and pages around current page
                   const pageNumber = i + 1;
-                  return (
-                    <button
-                      key={i}
-                      onClick={() => handlePageChange(pageNumber)}
-                      className={`w-8 h-8 flex items-center justify-center rounded-full ${
-                        currentPage === pageNumber
-                          ? 'bg-blue-600 text-white'
-                          : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                      }`}
-                    >
-                      {pageNumber}
-                    </button>
-                  );
+                  
+                  // Handle display of page numbers with potential ellipsis
+                  if (
+                    pageNumber === 1 || 
+                    pageNumber === totalPages || 
+                    (pageNumber >= currentPage - 1 && pageNumber <= currentPage + 1)
+                  ) {
+                    return (
+                      <button
+                        key={pageNumber}
+                        onClick={() => handlePageChange(pageNumber)}
+                        className={`w-8 h-8 flex items-center justify-center rounded-full ${
+                          currentPage === pageNumber
+                            ? 'bg-blue-600 text-white'
+                            : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                        }`}
+                      >
+                        {pageNumber}
+                      </button>
+                    );
+                  }
+                  
+                  // Show ellipsis for skipped pages
+                  if (pageNumber === 2 && currentPage > 3) {
+                    return <span key="ellipsis-start" className="px-1">...</span>;
+                  }
+                  if (pageNumber === totalPages - 1 && currentPage < totalPages - 2) {
+                    return <span key="ellipsis-end" className="px-1">...</span>;
+                  }
+                  
+                  return null;
                 })}
-                
-                {/* Show ellipsis if there are more pages */}
-                {totalPages > 5 && <span className="px-1">...</span>}
               </div>
               
               <button
                 onClick={() => handlePageChange(currentPage + 1)}
                 disabled={currentPage === totalPages}
-                className={`px-2 py-1 rounded ${currentPage === totalPages ? 'text-gray-400 cursor-not-allowed' : 'text-blue-600 dark:text-blue-400 hover:underline'}`}
+                className={`px-2 py-1 rounded ${currentPage === totalPages ? 'text-gray-400 cursor-not-allowed' : 'text-blue-600 dark:text-blue-400'}`}
               >
                 Next
               </button>
