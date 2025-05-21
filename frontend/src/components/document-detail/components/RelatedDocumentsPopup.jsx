@@ -1,16 +1,17 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { X, Filter, ArrowUp, ArrowDown } from "lucide-react";
-import { fetchRelatedDocumentsByTopic } from "../services/topicService";
+import { fetchRelatedDocumentsByTopic, fetchTopicFilterOptions } from "../services/topicService";
 import Link from "next/link";
 
-export default function RelatedDocumentsPopup({ 
-  isOpen, 
-  onClose, 
-  topicName, 
-  topicType, 
-  documentId 
+export default function RelatedDocumentsPopup({
+  isOpen,
+  onClose,
+  topicName,
+  topicType,
+  documentId
 }) {
-  const [documents, setDocuments] = useState([]);
+  // State for all fetched documents and filter options
+  const [allDocuments, setAllDocuments] = useState([]);
   const [metadata, setMetadata] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -21,30 +22,88 @@ export default function RelatedDocumentsPopup({
     years: {},
     documentTypes: {}
   });
+  const [filterOptions, setFilterOptions] = useState({
+    years: [],
+    documentTypes: []
+  });
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState('combined');
   
   // Results per page
   const RESULTS_PER_PAGE = 5;
 
+  // Format the document count
+  const formatCount = (count) => {
+    return count > 1000 ? `${(count / 1000).toFixed(1)}K` : count;
+  };
+  
+  // Sort documents based on different criteria
+  // IMPORTANT: Moving this function BEFORE it's used in useMemo
+  const sortDocuments = (docs, sortOption, docTopicType) => {
+    if (!docs || docs.length === 0) return [];
+    
+    const docsToSort = [...docs]; // Create a copy to avoid mutating the original
+    
+    switch (sortOption) {
+      case 'semanticScore':
+        return docsToSort.sort((a, b) => b.semanticScore - a.semanticScore);
+      case 'llmScore':
+        // Only applicable for non-derived topics
+        if (docTopicType !== 'derived') {
+          return docsToSort.sort((a, b) => b.llmScore - a.llmScore);
+        }
+        return docsToSort;
+      case 'yearDesc':
+        return docsToSort.sort((a, b) => b.year - a.year);
+      case 'yearAsc':
+        return docsToSort.sort((a, b) => a.year - b.year);
+      case 'combined':
+      default:
+        // For derived topics, just use semantic score
+        if (docTopicType === 'derived') {
+          return docsToSort.sort((a, b) => b.semanticScore - a.semanticScore);
+        }
+        // For others, use average of semantic and LLM scores
+        return docsToSort.sort((a, b) => {
+          const scoreA = (a.semanticScore + a.llmScore) / 2;
+          const scoreB = (b.semanticScore + b.llmScore) / 2;
+          return scoreB - scoreA;
+        });
+    }
+  };
+
+  // Fetch filter options when popup opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchTopicFilterOptions().then(options => {
+        setFilterOptions(options);
+        setFilters({
+          years: Object.fromEntries(options.years.map(year => [year, false])),
+          documentTypes: Object.fromEntries(options.documentTypes.map(type => [type, false]))
+        });
+      }).catch(error => {
+        console.error("Error fetching filter options:", error);
+      });
+    }
+  }, [isOpen]);
+
+  // Fetch documents when needed
   useEffect(() => {
     if (!isOpen || !topicName) return;
     
     async function fetchData() {
       setLoading(true);
       try {
+        // Using the updated service function (no pagination/sorting parameters)
         const data = await fetchRelatedDocumentsByTopic(
-          topicName, 
-          topicType, 
-          currentPage, 
-          filters, 
-          sortBy,
+          topicName,
+          topicType,
+          filters,
           documentId
         );
         
-        setDocuments(data.documents);
-        setTotalDocuments(data.totalCount);
-        setTotalPages(Math.ceil(data.totalCount / RESULTS_PER_PAGE));
+        setAllDocuments(data.documents || []);
+        setTotalDocuments(data.totalCount || 0);
         
         // Set metadata if available
         if (data.metadata) {
@@ -59,7 +118,31 @@ export default function RelatedDocumentsPopup({
     }
     
     fetchData();
-  }, [isOpen, topicName, topicType, currentPage, filters, sortBy, documentId]);
+  }, [isOpen, topicName, topicType, filters, documentId]);
+  
+  // Apply sorting and pagination to documents
+  const displayedDocuments = useMemo(() => {
+    if (!allDocuments || allDocuments.length === 0) return [];
+    
+    // First sort the documents
+    const sortedDocs = sortDocuments(allDocuments, sortBy, topicType);
+    
+    // Calculate total pages
+    const newTotalPages = Math.ceil(sortedDocs.length / RESULTS_PER_PAGE);
+    if (totalPages !== newTotalPages) {
+      setTotalPages(newTotalPages);
+      
+      // Reset current page if it's out of bounds
+      if (currentPage > newTotalPages) {
+        setCurrentPage(1);
+      }
+    }
+    
+    // Apply pagination
+    const startIndex = (currentPage - 1) * RESULTS_PER_PAGE;
+    const endIndex = startIndex + RESULTS_PER_PAGE;
+    return sortedDocs.slice(startIndex, endIndex);
+  }, [allDocuments, sortBy, topicType, currentPage, totalPages]);
   
   if (!isOpen) return null;
   
@@ -84,39 +167,6 @@ export default function RelatedDocumentsPopup({
   const handleSortChange = (newSortBy) => {
     setSortBy(newSortBy);
     setCurrentPage(1); // Reset to first page when sort changes
-  };
-  
-  // Format the document count
-  const formatCount = (count) => {
-    return count > 1000 ? `${(count / 1000).toFixed(1)}K` : count;
-  };
-
-  // Modify the sortDocuments function to handle derived topics differently
-  const sortResults = (documents, sortOption) => {
-    const docs = [...documents];
-    
-    switch (sortBy) {
-      case 'semanticScore':
-        return docs.sort((a, b) => b.semanticScore - a.semanticScore);
-      case 'llmScore':
-        return docs.sort((a, b) => b.llmScore - a.llmScore);
-      case 'yearDesc':
-        return docs.sort((a, b) => b.year - a.year);
-      case 'yearAsc':
-        return docs.sort((a, b) => a.year - b.year);
-      case 'combined':
-      default:
-        // For derived topics, just use semantic score since there's no LLM score
-        if (topicType === 'derived') {
-          return docs.sort((a, b) => b.semanticScore - a.semanticScore);
-        }
-        // For others, use average of semantic and LLM scores
-        return docs.sort((a, b) => {
-          const scoreA = (a.semanticScore + a.llmScore) / 2;
-          const scoreB = (b.semanticScore + b.llmScore) / 2;
-          return scoreB - scoreA;
-        });
-    }
   };
 
   return (
@@ -170,7 +220,7 @@ export default function RelatedDocumentsPopup({
                           <span className="text-xs text-gray-500 dark:text-gray-400">({count})</span>
                         </label>
                       ))
-                    : ['2022', '2021', '2020', '2019', '2018'].map(year => (
+                    : filterOptions.years.map(year => (
                         <label key={year} className="flex items-center space-x-1.5 text-sm">
                           <input
                             type="checkbox"
@@ -202,7 +252,7 @@ export default function RelatedDocumentsPopup({
                           <span className="text-xs text-gray-500 dark:text-gray-400">({count})</span>
                         </label>
                       ))
-                    : ['Research Document', 'Terms of Reference', 'Scientific Advice', 'Policy'].map(type => (
+                    : filterOptions.documentTypes.map(type => (
                         <label key={type} className="flex items-center space-x-1.5 text-sm">
                           <input
                             type="checkbox"
@@ -323,13 +373,13 @@ export default function RelatedDocumentsPopup({
             <div className="text-center py-8 text-red-500">
               {error}
             </div>
-          ) : documents.length === 0 ? (
+          ) : displayedDocuments.length === 0 ? (
             <div className="text-center py-8 text-gray-500 dark:text-gray-400">
               No related documents found with the current filters.
             </div>
           ) : (
             <div className="space-y-4">
-              {documents.map((doc) => (
+              {displayedDocuments.map((doc) => (
                 <div key={doc.id} className="border dark:border-gray-700 rounded-lg p-4">
                   <Link href={`/documents/${doc.id}`} className="block">
                     <h4 className="text-blue-600 dark:text-blue-400 font-medium hover:underline">{doc.title}</h4>
@@ -369,7 +419,7 @@ export default function RelatedDocumentsPopup({
         </div>
 
         {/* Pagination */}
-        {totalPages > 1 && (
+        {totalDocuments > RESULTS_PER_PAGE && (
           <div className="p-4 border-t dark:border-gray-700">
             <div className="flex items-center justify-between">
               <button
@@ -381,33 +431,36 @@ export default function RelatedDocumentsPopup({
               </button>
               
               <div className="flex items-center space-x-1">
-                {Array.from({ length: totalPages }).map((_, i) => {
+                {Array.from({ length: Math.min(10, totalPages) }).map((_, i) => {
                   // Show first page, last page, and pages around current page
+                  const pageNumber = i + 1;
+                  
+                  // Handle display of page numbers with potential ellipsis
                   if (
-                    i === 0 || 
-                    i === totalPages - 1 || 
-                    (i >= currentPage - 2 && i <= currentPage + 2)
+                    pageNumber === 1 || 
+                    pageNumber === totalPages || 
+                    (pageNumber >= currentPage - 1 && pageNumber <= currentPage + 1)
                   ) {
                     return (
                       <button
-                        key={i}
-                        onClick={() => handlePageChange(i + 1)}
+                        key={pageNumber}
+                        onClick={() => handlePageChange(pageNumber)}
                         className={`w-8 h-8 flex items-center justify-center rounded-full ${
-                          currentPage === i + 1
+                          currentPage === pageNumber
                             ? 'bg-blue-600 text-white'
                             : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                         }`}
                       >
-                        {i + 1}
+                        {pageNumber}
                       </button>
                     );
                   }
                   
                   // Show ellipsis for skipped pages
-                  if (i === 1 && currentPage > 4) {
+                  if (pageNumber === 2 && currentPage > 3) {
                     return <span key="ellipsis-start" className="px-1">...</span>;
                   }
-                  if (i === totalPages - 2 && currentPage < totalPages - 3) {
+                  if (pageNumber === totalPages - 1 && currentPage < totalPages - 2) {
                     return <span key="ellipsis-end" className="px-1">...</span>;
                   }
                   

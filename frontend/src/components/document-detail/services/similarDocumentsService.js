@@ -2,53 +2,50 @@ import { USE_MOCK_DATA } from "./documentDetailService";
 import { 
   mockSimilarDocuments, 
   defaultSimilarDocuments,
-  similarDocumentFilterOptions
+  similarDocumentFilterOptions as defaultFilterOptions
 } from "../data/similarDocumentsData";
 
-// Filter documents by year and document type
-const filterDocuments = (documents, filters) => {
-  let result = [...documents];
-  
-  // Filter by years if any year filters are active
-  const activeYearFilters = Object.entries(filters.years).filter(([_, isActive]) => isActive);
-  if (activeYearFilters.length > 0) {
-    result = result.filter(doc => 
-      activeYearFilters.some(([year, _]) => doc.year === year)
-    );
+/**
+ * Fetch available filter options for similar documents
+ * This is now a separate function with a single responsibility
+ */
+export async function fetchSimilarDocumentFilterOptions() {
+  // Use mock data if enabled
+  if (USE_MOCK_DATA) {
+    return defaultFilterOptions;
   }
-  
-  // Filter by document types if any document type filters are active
-  const activeTypeFilters = Object.entries(filters.documentTypes).filter(([_, isActive]) => isActive);
-  if (activeTypeFilters.length > 0) {
-    result = result.filter(doc =>
-      activeTypeFilters.some(([type, _]) => doc.documentType === type)
-    );
-  }
-  
-  return result;
-};
 
-// Sort documents based on different criteria
-const sortDocuments = (documents, sortBy) => {
-  const docs = [...documents];
-  
-  switch (sortBy) {
-    case 'semanticScore':
-      return docs.sort((a, b) => b.semanticScore - a.semanticScore);
-    case 'yearDesc':
-      return docs.sort((a, b) => b.year - a.year);
-    case 'yearAsc':
-      return docs.sort((a, b) => a.year - b.year);
-    default:
-      // Default is semantic score
-      return docs.sort((a, b) => b.semanticScore - a.semanticScore);
+  try {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/filters`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        filters: ["years", "documentTypes"],
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return {
+      years: data.years || [],
+      documentTypes: data.documentTypes || []
+    };
+  } catch (error) {
+    console.error("Error fetching filter options:", error.message);
+    return defaultFilterOptions;
   }
-};
+}
 
 /**
  * Fetch semantically similar documents for a document ID
+ * Returns up to 50 filtered documents without pagination or sorting
  */
-export async function fetchSimilarDocuments(documentId, page = 1, filters = { years: {}, documentTypes: {} }, sortBy = 'semanticScore') {
+export async function fetchSimilarDocuments(documentId, filters = { years: {}, documentTypes: {} }) {
   // Use mock data if enabled
   if (USE_MOCK_DATA) {
     console.log("Using mock data for similar documents with ID:", documentId);
@@ -60,25 +57,15 @@ export async function fetchSimilarDocuments(documentId, page = 1, filters = { ye
       // Get mock data for the document
       let allDocuments = mockSimilarDocuments[documentId] || defaultSimilarDocuments;
       
-      // Filter documents
-      const filteredDocuments = filterDocuments(allDocuments, filters);
+      // Filter documents - only apply filtering
+      const filteredDocuments = filterMockDocuments(allDocuments, filters);
       
-      // Sort documents
-      const sortedDocuments = sortDocuments(filteredDocuments, sortBy);
-      
-      // Paginate the results - using exactly 5 per page
-      const resultsPerPage = 5;
-      const startIndex = (page - 1) * resultsPerPage;
-      const paginatedDocuments = sortedDocuments.slice(startIndex, startIndex + resultsPerPage);
-      
-      // Calculate total pages
-      const totalPages = Math.ceil(sortedDocuments.length / resultsPerPage);
+      // Limit to 50 results maximum
+      const limitedResults = filteredDocuments.slice(0, 50);
       
       return {
-        documents: paginatedDocuments,
-        totalCount: sortedDocuments.length,
-        totalPages,
-        filterOptions: similarDocumentFilterOptions
+        documents: limitedResults,
+        totalCount: filteredDocuments.length
       };
     } catch (error) {
       console.error("Error processing mock similar documents:", error);
@@ -88,7 +75,16 @@ export async function fetchSimilarDocuments(documentId, page = 1, filters = { ye
   
   // Real API implementation
   try {
-    // This should call user/similarity-search according to the OpenAPI spec
+    // Convert our filter format to API expected format
+    const apiFilters = {
+      years: Object.entries(filters.years)
+        .filter(([_, isActive]) => isActive)
+        .map(([year]) => year),
+      documentTypes: Object.entries(filters.documentTypes)
+        .filter(([_, isActive]) => isActive)
+        .map(([type]) => type)
+    };
+    
     const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/similarity-search`, {
       method: "POST",
       headers: {
@@ -96,7 +92,10 @@ export async function fetchSimilarDocuments(documentId, page = 1, filters = { ye
       },
       body: JSON.stringify({
         documentId: documentId,
-        filters: filters,
+        filters: {
+          years: Object.keys(filters.years).filter(year => filters.years[year]),
+          documentTypes: Object.keys(filters.documentTypes).filter(type => filters.documentTypes[type])
+        },
       }),
     });
     
@@ -104,9 +103,40 @@ export async function fetchSimilarDocuments(documentId, page = 1, filters = { ye
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     
-    return await response.json();
+    // Get response data
+    const responseData = await response.json();
+    
+    // Return documents and metadata without pagination or sorting
+    return {
+      documents: responseData.documents || [],
+      totalCount: responseData.totalCount || 0
+    };
   } catch (error) {
     console.error("Error fetching similar documents:", error);
     throw error;
   }
 }
+
+// Filter documents by year and document type
+const filterMockDocuments = (documents, filters) => {
+  if (!documents) return [];
+  
+  // Create a copy of documents to avoid mutation
+  let result = [...documents];
+  
+  // Filter by years if any year filters are active
+  const activeYearFilters = Object.entries(filters.years).filter(([_, isActive]) => isActive);
+  if (activeYearFilters.length > 0) {
+    const activeYears = activeYearFilters.map(([year]) => year);
+    result = result.filter(doc => activeYears.includes(String(doc.year)));
+  }
+  
+  // Filter by document types if any document type filters are active
+  const activeTypeFilters = Object.entries(filters.documentTypes).filter(([_, isActive]) => isActive);
+  if (activeTypeFilters.length > 0) {
+    const activeTypes = activeTypeFilters.map(([type]) => type);
+    result = result.filter(doc => activeTypes.includes(doc.documentType));
+  }
+  
+  return result;
+};
