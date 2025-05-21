@@ -395,6 +395,8 @@ def bulk_insert_html_documents(client: OpenSearch, index_name: str, documents: l
       - 'doc_url': from 'html_url'
       - 'download_url': from 'pdf_url'
       - 'language': from 'html_language'
+
+    The document _id is set as the SHA-256 hash of the document's URL.
     """
     actions = []
     for doc, vector in zip(documents, vectors):
@@ -430,11 +432,14 @@ def bulk_insert_html_documents(client: OpenSearch, index_name: str, documents: l
             "language": metadata.get("html_language", "")
         }
 
+        # Create a unique ID based on the document URL
+        id_str = hashlib.sha256(metadata["html_url"].encode('utf-8')).hexdigest()
+
         # Use update action with doc_as_upsert for replacement by _id
         action = {
             "_op_type": "update",
             "_index": index_name,
-            "_id": metadata["html_url"],  # MUST BE DEFINED and used as unique id
+            "_id": id_str,  # Use SHA-256 hash of URL as ID
             "doc": doc_body,
             "doc_as_upsert": True
         }
@@ -717,7 +722,7 @@ def bulk_update_categorizations(
         {
             "_op_type": "update",
             "_index": index_name,
-            "_id": doc_url,
+            "_id": hashlib.sha256(doc_url.encode('utf-8')).hexdigest(),
             "doc": {
                 field_name: names
             }

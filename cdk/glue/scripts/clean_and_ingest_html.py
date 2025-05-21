@@ -9,6 +9,7 @@ import re
 from typing import Union, Dict, Any, Tuple, List, Optional
 from pathlib import Path
 from datetime import datetime
+import hashlib
 
 import numpy as np
 import pandas as pd
@@ -628,7 +629,8 @@ def existing_document_is_valid(doc, client, index, enable_override=False, debug=
         # With override enabled, we want to process the document regardless.
         return False
 
-    doc_id = doc["Document URL"]
+    # Create a unique ID based on the document URL
+    doc_id = hashlib.sha256(doc["Document URL"].encode('utf-8')).hexdigest()
 
     # Check if the document exists in the index.
     if not client.exists(index=index, id=doc_id):

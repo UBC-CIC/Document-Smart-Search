@@ -37,7 +37,8 @@ def create_tables_if_not_exists(conn_info: dict):
 
     -- Documents Table
     CREATE TABLE IF NOT EXISTS "documents" (
-        "html_url" TEXT PRIMARY KEY,
+        "doc_id" TEXT PRIMARY KEY,
+        "html_url" TEXT UNIQUE NOT NULL,
         "year" INT,
         "title" TEXT,
         "doc_type" TEXT,
@@ -68,6 +69,7 @@ def create_tables_if_not_exists(conn_info: dict):
         "topic_name" TEXT PRIMARY KEY,
         "subcategory_name" TEXT,
         "mandate_name" TEXT NOT NULL, 
+        "isDFO" BOOLEAN,
         "last_updated" TIMESTAMP,
         FOREIGN KEY ("subcategory_name") REFERENCES "subcategories" ("subcategory_name") ON DELETE SET NULL,
         FOREIGN KEY ("mandate_name") REFERENCES "mandates" ("mandate_name") ON DELETE CASCADE
@@ -83,17 +85,19 @@ def create_tables_if_not_exists(conn_info: dict):
 
     -- Document-Derived_topics Many-to-One Table
     CREATE TABLE IF NOT EXISTS "documents_derived_topic" (
+        "doc_id" TEXT NOT NULL,
         "html_url" TEXT NOT NULL,
         "topic_name" TEXT NOT NULL,
         "confidence_score" NUMERIC,
         "last_updated" TIMESTAMP,
-        PRIMARY KEY("html_url", "topic_name"),
-        FOREIGN KEY ("html_url") REFERENCES "documents" ("html_url") ON DELETE CASCADE,
+        PRIMARY KEY("doc_id", "topic_name"),
+        FOREIGN KEY ("doc_id") REFERENCES "documents" ("doc_id") ON DELETE CASCADE,
         FOREIGN KEY ("topic_name") REFERENCES "derived_topics" ("topic_name") ON DELETE CASCADE
     );
 
     -- Document-Mandates Many-to-Many Table
     CREATE TABLE IF NOT EXISTS "documents_mandates" (
+        "doc_id" TEXT NOT NULL,
         "html_url" TEXT NOT NULL,
         "mandate_name" TEXT NOT NULL,
         "llm_belongs" TEXT,
@@ -101,13 +105,14 @@ def create_tables_if_not_exists(conn_info: dict):
         "llm_explanation" TEXT,
         "semantic_score" NUMERIC,
         "last_updated" TIMESTAMP,
-        PRIMARY KEY ("html_url", "mandate_name"),
-        FOREIGN KEY ("html_url") REFERENCES "documents" ("html_url") ON DELETE CASCADE,
+        PRIMARY KEY ("doc_id", "mandate_name"),
+        FOREIGN KEY ("doc_id") REFERENCES "documents" ("doc_id") ON DELETE CASCADE,
         FOREIGN KEY ("mandate_name") REFERENCES "mandates" ("mandate_name") ON DELETE CASCADE
     );
 
     -- Document-Topics Many-to-Many Table
     CREATE TABLE IF NOT EXISTS "documents_topics" (
+        "doc_id" TEXT NOT NULL,
         "html_url" TEXT NOT NULL,
         "topic_name" TEXT NOT NULL,
         "llm_belongs" TEXT,
@@ -116,8 +121,8 @@ def create_tables_if_not_exists(conn_info: dict):
         "semantic_score" NUMERIC,
         "isPrimary" BOOLEAN NOT NULL,
         "last_updated" TIMESTAMP,
-        PRIMARY KEY ("html_url", "topic_name"),
-        FOREIGN KEY ("html_url") REFERENCES "documents" ("html_url") ON DELETE CASCADE,
+        PRIMARY KEY ("doc_id", "topic_name"),
+        FOREIGN KEY ("doc_id") REFERENCES "documents" ("doc_id") ON DELETE CASCADE,
         FOREIGN KEY ("topic_name") REFERENCES "topics" ("topic_name") ON DELETE CASCADE
     );
     """
@@ -131,20 +136,21 @@ def bulk_upsert_documents(documents, conn_info: dict, upsert=True):
     Parameters
     ----------
     documents : list of tuples
-        Each tuple contains (html_url, year, title, doc_type, pdf_url, doc_language, event_year, event_subject, last_updated).
+        Each tuple contains (doc_id, html_url, year, title, doc_type, pdf_url, doc_language, event_year, event_subject, last_updated).
     conn_info : dict
         A dictionary containing the connection information for PostgreSQL.
     upsert : bool, optional
         Whether to update existing records on conflict. Defaults to True.
     """
     sql = """
-    INSERT INTO documents (html_url, year, title, doc_type, pdf_url, doc_language, event_year, event_subject, last_updated)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-    ON CONFLICT (html_url)
+    INSERT INTO documents (doc_id, html_url, year, title, doc_type, pdf_url, doc_language, event_year, event_subject, last_updated)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    ON CONFLICT (doc_id)
     """
     if upsert:
         sql += """
         DO UPDATE SET
+            html_url = EXCLUDED.html_url,
             year = EXCLUDED.year,
             title = EXCLUDED.title,
             doc_type = EXCLUDED.doc_type,
@@ -152,7 +158,7 @@ def bulk_upsert_documents(documents, conn_info: dict, upsert=True):
             doc_language = EXCLUDED.doc_language,
             event_year = EXCLUDED.event_year,
             event_subject = EXCLUDED.event_subject,
-            last_updated =  EXCLUDED.last_updated;
+            last_updated = EXCLUDED.last_updated;
         """
     else:
         sql += "DO NOTHING;"
@@ -202,8 +208,8 @@ def bulk_upsert_mandates(mandates, conn_info: dict, upsert=True):
 
 def bulk_upsert_topics(topics, conn_info: dict, upsert=True):
     sql = """
-    INSERT INTO topics ("topic_name", "subcategory_name", "mandate_name", "last_updated")
-    VALUES (%s, %s, %s, %s)
+    INSERT INTO topics ("topic_name", "subcategory_name", "mandate_name", "isDFO", "last_updated")
+    VALUES (%s, %s, %s, %s, %s)
     ON CONFLICT (topic_name)
     """
     if upsert:
@@ -211,6 +217,7 @@ def bulk_upsert_topics(topics, conn_info: dict, upsert=True):
         DO UPDATE SET 
             "subcategory_name" = EXCLUDED."subcategory_name",
             "mandate_name" = EXCLUDED."mandate_name",
+            "isDFO" = EXCLUDED."isDFO", 
             "last_updated" = EXCLUDED.last_updated;
         '''
     else:
@@ -243,15 +250,28 @@ def bulk_upsert_subcategories(subcategories, conn_info: dict, upsert=True):
         conn.commit()
 
 
-def bulk_upsert_documents_mandates(documents_mandates, conn_info: dict, upsert=True):
+def bulk_upsert_documents_mandates(documents_mandates: List[Tuple], conn_info: Dict, upsert=True) -> None:
+    """
+    Bulk upsert documents_mandates table.
+
+    Parameters
+    ----------
+    documents_mandates : list of tuples
+        Each tuple contains (doc_id, html_url, mandate_name, llm_belongs, llm_score, llm_explanation, semantic_score, last_updated).
+    conn_info : dict
+        A dictionary containing the connection information for PostgreSQL.
+    upsert : bool, optional
+        Whether to update existing records on conflict. Defaults to True.
+    """
     sql = """
-    INSERT INTO documents_mandates (html_url, mandate_name, llm_belongs, llm_score, llm_explanation, semantic_score, last_updated)
-    VALUES (%s, %s, %s, %s, %s, %s, %s)
-    ON CONFLICT (html_url, mandate_name)
+    INSERT INTO documents_mandates (doc_id, html_url, mandate_name, llm_belongs, llm_score, llm_explanation, semantic_score, last_updated)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+    ON CONFLICT (doc_id, mandate_name)
     """
     if upsert:
         sql += """
         DO UPDATE SET
+            html_url = EXCLUDED.html_url,
             llm_belongs = EXCLUDED.llm_belongs,
             llm_score = EXCLUDED.llm_score,
             llm_explanation = EXCLUDED.llm_explanation,
@@ -268,14 +288,27 @@ def bulk_upsert_documents_mandates(documents_mandates, conn_info: dict, upsert=T
 
 
 def bulk_upsert_documents_topics(documents_topics, conn_info: dict, upsert=True):
+    """
+    Bulk upsert document-topic relationships.
+
+    Parameters
+    ----------
+    documents_topics : list of tuples
+        Each tuple contains (doc_id, html_url, topic_name, llm_belongs, llm_score, llm_explanation, semantic_score, isPrimary, last_updated).
+    conn_info : dict
+        A dictionary containing the connection information for PostgreSQL.
+    upsert : bool, optional
+        Whether to update existing records on conflict. Defaults to True.
+    """
     sql = """
-    INSERT INTO documents_topics (html_url, topic_name, llm_belongs, llm_score, llm_explanation, semantic_score, "isPrimary", last_updated)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-    ON CONFLICT (html_url, topic_name)
+    INSERT INTO documents_topics (doc_id, html_url, topic_name, llm_belongs, llm_score, llm_explanation, semantic_score, "isPrimary", last_updated)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+    ON CONFLICT (doc_id, topic_name)
     """
     if upsert:
         sql += """
         DO UPDATE SET
+            html_url = EXCLUDED.html_url,
             llm_belongs = EXCLUDED.llm_belongs,
             llm_score = EXCLUDED.llm_score,
             llm_explanation = EXCLUDED.llm_explanation,
@@ -393,6 +426,87 @@ def get_first_row(table_name: str, conn_info: dict) -> Dict:
             if row:
                 return dict(zip(columns, row))
             return {}
+
+
+def bulk_upsert_derived_topics(derived_topics_table, conn_info: dict, upsert=True):
+    """
+    Given a dataframe exactly like the SQL table, insert the rows into the database
+    """
+    
+    sql = """
+    INSERT INTO derived_topics (topic_name, representation, representative_docs, last_updated)
+    VALUES (%s, %s, %s, %s)
+    ON CONFLICT (topic_name)
+    """
+    if upsert:
+        sql += """
+        DO UPDATE SET
+            representation = EXCLUDED.representation,
+            representative_docs = EXCLUDED.representative_docs,
+            last_updated = EXCLUDED.last_updated;
+        """
+    else:
+        sql += "DO NOTHING;"
+
+    data = [
+        (
+            row["topic_name"],
+            row["representation"],
+            row["representative_docs"],
+            row["last_updated"],
+        )
+        for _, row in derived_topics_table.iterrows()
+    ]
+
+    with psycopg.connect(**conn_info) as conn:
+        with conn.cursor() as cur:
+            cur.executemany(sql, data)
+        conn.commit()
+
+
+def bulk_upsert_documents_derived_topic(documents_derived_topic_table, conn_info: dict, upsert=True):
+    """
+    Given a dataframe exactly like the SQL table, insert the rows into the database
+
+    Parameters
+    ----------
+    documents_derived_topic_table : pd.DataFrame
+        DataFrame containing (doc_id, html_url, topic_name, confidence_score, last_updated)
+    conn_info : dict
+        A dictionary containing the connection information for PostgreSQL.
+    upsert : bool, optional
+        Whether to update existing records on conflict. Defaults to True.
+    """
+    sql = """
+    INSERT INTO documents_derived_topic (doc_id, html_url, topic_name, confidence_score, last_updated)
+    VALUES (%s, %s, %s, %s, %s)
+    ON CONFLICT (doc_id, topic_name)
+    """
+    if upsert:
+        sql += """
+        DO UPDATE SET
+            html_url = EXCLUDED.html_url,
+            confidence_score = EXCLUDED.confidence_score,
+            last_updated = EXCLUDED.last_updated;
+        """
+    else:
+        sql += "DO NOTHING;"
+
+    data = [
+        (
+            row["doc_id"],
+            row["html_url"],
+            row["topic_name"],
+            row["confidence_score"],
+            row["last_updated"]
+        )
+        for _, row in documents_derived_topic_table.iterrows()
+    ]
+
+    with psycopg.connect(**conn_info) as conn:
+        with conn.cursor() as cur:
+            cur.executemany(sql, data)
+        conn.commit()
 
 
 

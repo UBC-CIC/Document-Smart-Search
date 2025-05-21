@@ -1,6 +1,7 @@
 import sys
 import os
 import io
+import hashlib
 from typing import Dict, List, Iterable, Literal, Optional, Tuple, Any
 import pandas as pd
 import numpy as np
@@ -184,6 +185,12 @@ def prepare_documents_table(document_df: pd.DataFrame, now: str) -> pd.DataFrame
         'csas_event': 'event_subject'
     }))
 
+    # Generate doc_id using SHA-256 hash of html_url
+    documents_table['doc_id'] = documents_table['html_url'].apply(lambda x: hashlib.sha256(str(x).encode('utf-8')).hexdigest())
+    
+    # Reorder columns to put doc_id first
+    documents_table = documents_table[['doc_id'] + [col for col in documents_table.columns if col != 'doc_id']]
+
     documents_table.loc[:, 'year'] = pd.to_numeric(documents_table['year'], errors='coerce').replace({np.nan: None})
     documents_table.loc[:, 'event_year'] = pd.to_numeric(documents_table['event_year'], errors='coerce').replace({np.nan: None})
     documents_table = documents_table.replace(np.nan, None)
@@ -339,13 +346,14 @@ def prepare_documents_mandates_table(
             "Semantic Score": "semantic_score"
         }
     ).astype({
+        "doc_id": str,
         "html_url": str,
         "mandate_name": str,
         "llm_belongs": str,
         "llm_score": int,
         "llm_explanation": str,
         "semantic_score": np.float32
-    }).loc[:, ["html_url", "mandate_name", "llm_belongs", "llm_score", "llm_explanation", "semantic_score"]]
+    }).loc[:, ["doc_id", "html_url", "mandate_name", "llm_belongs", "llm_score", "llm_explanation", "semantic_score"]]
     documents_mandates_table['last_updated'] = now
     return documents_mandates_table
 
@@ -398,6 +406,7 @@ def prepare_documents_topics_table(
             "Semantic Score": "semantic_score"
         }
     ).astype({
+        "doc_id": str,
         "html_url": str,
         "topic_name": str,
         "llm_belongs": str,
@@ -405,12 +414,12 @@ def prepare_documents_topics_table(
         "llm_explanation": str,
         "semantic_score": np.float32
     }).sort_values(
-        by=["html_url", "topic_name"]
+        by=["doc_id", "topic_name"]
     ).drop_duplicates(
-        subset=["html_url", "topic_name", "llm_belongs"]
+        subset=["doc_id", "topic_name", "llm_belongs"]
     ).assign(
         isPrimary=lambda x: True
-    ).loc[:, ["html_url", "topic_name", "llm_belongs", "llm_score", "llm_explanation", "semantic_score", "isPrimary"]]
+    ).loc[:, ["doc_id", "html_url", "topic_name", "llm_belongs", "llm_score", "llm_explanation", "semantic_score", "isPrimary"]]
     documents_topics_table['last_updated'] = now
     return documents_topics_table
 

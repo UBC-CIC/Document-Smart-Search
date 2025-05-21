@@ -25,6 +25,7 @@ from typing import Dict, List, Iterable, Literal, Optional, Tuple
 import src.aws_utils as aws
 import src.opensearch as op
 import src.pgsql as pgsql
+import hashlib
 
 session = aws.session # always use this session for all AWS calls
 
@@ -306,7 +307,10 @@ def fetch_and_prepare_documents():
     ]
     fetched = op.fetch_specific_fields(op_client, DFO_HTML_FULL_INDEX_NAME, fields=fields)
     print("Fetched:", len(fetched))
-    return pd.DataFrame(fetched)
+    df = pd.DataFrame(fetched)
+    # Compute doc_id from html_url
+    df['doc_id'] = df['html_url'].apply(lambda x: hashlib.sha256(x.encode()).hexdigest())
+    return df
 
 
 def train_and_label_main_topics(docs_df):
@@ -504,8 +508,9 @@ def prepare_data_to_insert(combined_df, topic_infos, outlier_topic_infos, mode='
         derived_topics_table['last_updated'] = CURRENT_DATETIME
         
         # documents_derived_topic table
-        documents_derived_topic_table  = combined_df.loc[
-            :, ["html_url", "llm_enhanced_topic", "topic_prob"]
+        combined_df['doc_id'] = combined_df['html_url'].apply(lambda x: hashlib.sha256(x.encode()).hexdigest())
+        documents_derived_topic_table = combined_df.loc[
+            :, ["doc_id", "html_url", "llm_enhanced_topic", "topic_prob"]
         ].rename(
             columns={
                 "llm_enhanced_topic": "topic_name",
@@ -515,8 +520,9 @@ def prepare_data_to_insert(combined_df, topic_infos, outlier_topic_infos, mode='
     else:
         derived_topics_table = None
         # documents_derived_topic table
-        documents_derived_topic_table  = combined_df.loc[
-            :, ["html_url", "topic_name", "topic_prob"]
+        combined_df['doc_id'] = combined_df['html_url'].apply(lambda x: hashlib.sha256(x.encode()).hexdigest())
+        documents_derived_topic_table = combined_df.loc[
+            :, ["doc_id", "html_url", "topic_name", "topic_prob"]
         ].rename(
             columns={
                 "topic_prob": "confidence_score"
@@ -537,70 +543,9 @@ def prepare_data_to_insert(combined_df, topic_infos, outlier_topic_infos, mode='
 
     return derived_topics_table, documents_derived_topic_table
 
-def bulk_upsert_derived_topics(derived_topics_table, conn_info: dict, upsert=True):
-    """
-    Given a dataframe exactly like the SQL table, insert the rows into the database
-    """
-    
-    sql = """
-    INSERT INTO derived_topics (topic_name, representation, representative_docs, last_updated)
-    VALUES (%s, %s, %s, %s)
-    ON CONFLICT (topic_name)
-    """
-    if upsert:
-        sql += """
-        DO UPDATE SET
-            representation = EXCLUDED.representation,
-            representative_docs = EXCLUDED.representative_docs,
-            last_updated = EXCLUDED.last_updated;
-        """
-    else:
-        sql += "DO NOTHING;"
-
-    data = [
-        (
-            row["topic_name"],
-            row["representation"],
-            row["representative_docs"],
-            row["last_updated"],
-        )
-        for _, row in derived_topics_table.iterrows()
-    ]
-
-    with psycopg.connect(**conn_info) as conn:
-        with conn.cursor() as cur:
-            cur.executemany(sql, data)
-        conn.commit()
-
-
-def bulk_upsert_documents_derived_topic(documents_derived_topic_table, conn_info: dict, upsert=True):
-    """
-    Given a dataframe exactly like the SQL table, insert the rows into the database
-    """
-
-    sql = """
-    INSERT INTO documents_derived_topic (html_url, topic_name, confidence_score, last_updated)
-    VALUES (%s, %s, %s, %s)
-    ON CONFLICT (html_url, topic_name)
-    """
-    if upsert:
-        sql += "DO NOTHING;"
-    else:
-        sql += "DO NOTHING;"  # keeping logic consistent for now
-
-    data = [
-        (row["html_url"], row["topic_name"], row["confidence_score"], row["last_updated"])
-        for _, row in documents_derived_topic_table.iterrows()
-    ]
-
-    with psycopg.connect(**conn_info) as conn:
-        with conn.cursor() as cur:
-            cur.executemany(sql, data)
-        conn.commit()
-
 def fetch_specific_documents_by_urls(client, index_name, urls, fields):
     """
-    Fetch specific documents from OpenSearch by their URLs (which are the _id fields).
+    Fetch specific documents from OpenSearch by their _id (which are the sha256 hash of the html_url).
     Uses mget API for faster retrieval.
     
     Parameters
@@ -627,7 +572,7 @@ def fetch_specific_documents_by_urls(client, index_name, urls, fields):
         "docs": [
             {
                 "_index": index_name,
-                "_id": url,
+                "_id": hashlib.sha256(url.encode()).hexdigest(),
                 "_source": fields
             }
             for url in urls
@@ -679,8 +624,10 @@ def fetch_new_documents():
         urls_to_fetch,
         fields
     )
-    
-    return pd.DataFrame(fetched)
+    df = pd.DataFrame(fetched)
+    # Compute doc_id from html_url
+    df['doc_id'] = df['html_url'].apply(lambda x: hashlib.sha256(x.encode()).hexdigest())
+    return df
 
 def main(dryrun=False, debug=False):
     
@@ -814,7 +761,7 @@ def main(dryrun=False, debug=False):
             os.makedirs(temp_dir, exist_ok=True)
             documents_derived_topic_table.to_csv(f"{temp_dir}/documents_derived_topic_table.csv", index=False)
         if not dryrun:
-            bulk_upsert_documents_derived_topic(documents_derived_topic_table, conn_info)
+            pgsql.bulk_upsert_documents_derived_topic(documents_derived_topic_table, conn_info)
             
             # Update OpenSearch with derived topic categorizations
             derived_topic_categorizations = {}
@@ -856,8 +803,8 @@ def main(dryrun=False, debug=False):
         derived_topics_table.to_csv(f"{temp_dir}/derived_topics_table.csv", index=False)
         documents_derived_topic_table.to_csv(f"{temp_dir}/documents_derived_topic_table.csv", index=False)
     if not dryrun:
-        bulk_upsert_derived_topics(derived_topics_table, conn_info)
-        bulk_upsert_documents_derived_topic(documents_derived_topic_table, conn_info)
+        pgsql.bulk_upsert_derived_topics(derived_topics_table, conn_info)
+        pgsql.bulk_upsert_documents_derived_topic(documents_derived_topic_table, conn_info)
         
         # Update OpenSearch with derived topic categorizations
         derived_topic_categorizations = {}

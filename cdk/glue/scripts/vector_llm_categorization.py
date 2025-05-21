@@ -9,6 +9,7 @@ import asyncio
 from collections import defaultdict
 from typing import Dict, List, Optional, Tuple, Any
 from datetime import datetime
+import hashlib
 
 # External library imports
 import numpy as np
@@ -764,10 +765,12 @@ def get_documents_to_process(client, batch_id: str, pipeline_mode: str) -> Tuple
             )
             tracking_df = pd.read_csv(response['Body'])
             doc_urls = tracking_df['html_url'].tolist()
-            print(f"Doc URLs: {len(doc_urls)}")
+            # Convert URLs to SHA-256 hashes for document IDs
+            doc_ids = [hashlib.sha256(url.encode('utf-8')).hexdigest() for url in doc_urls]
+            print(f"Doc IDs: {len(doc_ids)}")
             
             body = {
-                "ids": doc_urls
+                "ids": doc_ids
             }
             response = client.mget(index=DFO_HTML_FULL_INDEX_NAME, body=body)
             all_hits = response['docs'] if response['docs'] else []
