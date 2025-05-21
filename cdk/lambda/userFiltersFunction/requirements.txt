@@ -1,0 +1,5 @@
+boto3
+opensearch-py==2.3.1 # For OpenSearch 2.3.1
+urllib3
+requests
+psycopg2-binary

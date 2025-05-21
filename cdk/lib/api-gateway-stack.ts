@@ -825,6 +825,48 @@ export class ApiGatewayStack extends cdk.Stack {
           resources: ["*"],
         }));
 
+
+        const userFiltersFunction = new lambda.DockerImageFunction(
+          this,
+          `${id}-UserFiltersFunction`,
+          {
+            code: lambda.DockerImageCode.fromImageAsset("./lambda/userFiltersFunction", {
+              platform: Platform.LINUX_AMD64
+            }),
+            memorySize: 512,
+            timeout: cdk.Duration.seconds(300),
+            vpc: vpcStack.vpc,
+            functionName: `${id}-UserFiltersFunction`,
+            environment: {
+              SM_DB_CREDENTIALS: db.secretPathUser.secretName,
+              RDS_PROXY_ENDPOINT: db.rdsProxyEndpoint,
+              REGION: this.region,
+              BEDROCK_LLM_PARAM: bedrockLLMParameter.parameterName,
+              EMBEDDING_MODEL_PARAM: embeddingModelParameter.parameterName,
+              TABLE_NAME_PARAM: tableNameParameter.parameterName,
+            },
+          }
+        );
+        const cfnUserFiltersFunc = userFiltersFunction.node.defaultChild as lambda.CfnFunction;
+        cfnUserFiltersFunc.overrideLogicalId("userFiltersDockerFunction");
+        userFiltersFunction.addPermission("AllowApiGatewayInvoke", {
+          principal: new iam.ServicePrincipal("apigateway.amazonaws.com"),
+          action: "lambda:InvokeFunction",
+          sourceArn: `arn:aws:execute-api:${this.region}:${this.account}:${this.api.restApiId}/*/*/user*`,
+        });
+        userFiltersFunction.role?.addToPrincipalPolicy(new iam.PolicyStatement({
+          actions: [
+            "bedrock:InvokeModel",
+            "bedrock:InvokeModelWithResponseStream",
+            "secretsmanager:GetSecretValue",
+            "ssm:GetParameter",
+            "es:ESHttpGet",
+            "es:ESHttpPost",
+            "es:ESHttpPut",
+            "es:ESHttpDelete"
+          ],
+          resources: ["*"],
+        }));
     
     const llmAnalysisFunction = new lambda.DockerImageFunction(
       this,

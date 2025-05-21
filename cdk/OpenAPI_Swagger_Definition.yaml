@@ -169,7 +169,7 @@ paths:
       tags:
         - User
       summary: Semantic search for similar documents
-      operationId: user_search_get
+      operationId: user_search_post
       parameters:
         - in: query
           name: user_info
@@ -250,7 +250,7 @@ paths:
       tags:
         - User
       summary: Semantic search for similar documents
-      operationId: user_search_get
+      operationId: user_search_post
       parameters:
         - in: query
           name: user_info
@@ -681,6 +681,75 @@ paths:
         passthroughBehavior: "when_no_match"
         httpMethod: "POST"
         type: "aws_proxy"
+
+  /user/filters:
+    options:
+      summary: CORS support
+      description: Enable CORS by returning correct headers
+      responses:
+        200:
+          $ref: "#/components/responses/Success"
+      x-amazon-apigateway-integration:
+        type: mock
+        requestTemplates:
+          application/json: |
+            {
+              "statusCode" : 200
+            }
+        responses:
+          default:
+            statusCode: "200"
+            responseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key'"
+              method.response.header.Access-Control-Allow-Methods: "'OPTIONS,POST'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            responseTemplates:
+              application/json: "{}"
+
+    post:
+      tags:
+        - User
+      summary: Get available filters
+      operationId: get_user_filters
+      requestBody:
+        description: Filter categories to retrieve
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                filters:
+                  type: array
+                  items:
+                    type: string
+                  example: ["years", "topics", "mandates"]
+      responses:
+        "200":
+          description: Successfully retrieved filters
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    type: string
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+      x-amazon-apigateway-integration:
+        uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${userFiltersDockerFunction.Arn}/invocations
+        passthroughBehavior: when_no_match
+        httpMethod: POST
+        type: aws_proxy
 
   /user/chart_data:
     options:
