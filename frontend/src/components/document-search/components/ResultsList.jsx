@@ -80,7 +80,11 @@ export default function ResultsList({
           </div>
         ) : filteredResults.length > 0 ? (
           filteredResults.map((result) => (
-            <ResultItem key={result.id} result={result} openQuerySummary={openQuerySummary} />
+            <ResultItem 
+              key={result.id} 
+              result={result} 
+              openQuerySummary={openQuerySummary} 
+            />
           ))
         ) : (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">

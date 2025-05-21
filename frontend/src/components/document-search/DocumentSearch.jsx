@@ -46,6 +46,7 @@ export default function DocumentSearch() {
   const {
     isQuerySummaryOpen,
     selectedDocumentId,
+    userQuery,
     querySummaryLoading,
     querySummaryData,
     modalRef,
@@ -129,9 +130,10 @@ export default function DocumentSearch() {
             currentPage={currentPage}
             setCurrentPage={setCurrentPage}
             totalPages={totalPages}
-            openQuerySummary={openQuerySummary}
+            openQuerySummary={(documentId) => openQuerySummary(documentId, searchQuery)}
             isLoading={isLoading}
             hasSearched={hasSearched}
+            searchQuery={searchQuery}
           />
         </div>
       </main>
@@ -142,6 +144,7 @@ export default function DocumentSearch() {
         onClose={closeQuerySummary}
         modalRef={modalRef}
         documentId={selectedDocumentId}
+        userQuery={userQuery}
         loading={querySummaryLoading}
         summaryData={querySummaryData}
       />

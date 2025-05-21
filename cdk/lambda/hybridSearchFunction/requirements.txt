@@ -5,16 +5,16 @@ urllib3
 requests
 
 # Document and embedding processing
-pandas
-torch
+#pandas
+#torch
 
 # LangChain core and community integrations
 langchain
 langchain-aws
 langchain-community
 langchain-huggingface
-jq
+#jq
 
 # HuggingFace embeddings:
-sentence-transformers
-transformers
+#sentence-transformers
+#transformers

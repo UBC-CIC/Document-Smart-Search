@@ -1,131 +1,69 @@
-import { allMockResults } from "../data/defaultData";
 import { USE_MOCK_DATA } from "./documentSearchService";
+import { allMockResults } from "../data/defaultData";
 
 /**
- * Fetches document details by ID from API or mock data
+ * Gets a document summary directly from the backend API
  */
-export async function fetchDocumentById(documentId) {
-  // If using mock data, return from mock data
+export async function getQuerySummary(userQuery, documentId) {
+  // If using mock data, generate a mock summary
   if (USE_MOCK_DATA) {
-    return allMockResults.find((doc) => doc.id === documentId);
-  }
-
-  try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}search/document/${documentId}`)
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API delay
+    const document = allMockResults.find(doc => doc.id === documentId);
+    
+    if (!document) {
+      return {
+        documentId,
+        title: "Document Not Found",
+        summary: "The requested document could not be found.",
+        keyInsights: ["No information available"]
+      };
     }
-    return await response.json()
-  } catch (error) {
-    console.error("Error fetching document:", error)
-    // Fall back to mock data if available
-    return allMockResults.find((doc) => doc.id === documentId);
-  }
-}
-
-/**
- * Generates a summary for a document using the LLM API
- */
-export async function generateDocumentSummary(document) {
-  if (!document) {
+    
     return {
-      title: "Document Not Found",
-      summary: "The requested document could not be found.",
-      keyInsights: ["No information available"],
-    }
+      documentId,
+      title: document.title,
+      summary: `This is a mock summary of the document "${document.title}" which focuses on ${document.topics.join(", ")}. Published in ${document.year} by ${document.author}.`,
+      keyInsights: [
+        `Key topic: ${document.topics[0] || "Unknown"}`,
+        `Published in ${document.year} by ${document.author}`,
+        `Document category: ${document.category}`,
+        `Related to ${document.mandates.join(", ")}`
+      ]
+    };
   }
 
-  // Create a prompt that asks for a summary of the document
-  const prompt = `Please provide a comprehensive summary of the document titled "${document.title}" (ID: ${document.id}). 
-  The document is about ${document.topics.join(", ")} and was authored by ${document.author} in ${document.year}.
-  Include key insights and main points from the document.`
-
   try {
-    // Call the LLM API endpoint
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/text_generation`, {
+    // Single API call to get document summary from backend
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/expert-analysis`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        message_content: prompt,
-        user_role: "public",
-      }),
-    })
+        documentId: documentId,
+        userQuery: userQuery,
+      })
+    });
 
     if (!response.ok) {
-      throw new Error("Failed to generate summary")
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    const data = await response.json()
-
-    // Parse the response to extract key insights
-    const paragraphs = data.content.split("\n\n").filter((p) => p.trim().length > 0)
-    const summary = paragraphs[0] || data.content
-
-    // Extract key insights (assuming they might be in bullet points or separate paragraphs)
-    let keyInsights = []
-    if (paragraphs.length > 1) {
-      // Try to find bullet points
-      const bulletMatches = data.content.match(/[•\-*]\s+(.*?)(?=\n[•\-*]|\n\n|$)/gs)
-      if (bulletMatches && bulletMatches.length > 0) {
-        keyInsights = bulletMatches.map((point) => point.replace(/^[•\-*]\s+/, "").trim())
-      } else {
-        // Use additional paragraphs as insights
-        keyInsights = paragraphs.slice(1).map((p) => p.trim())
-      }
-    }
-
-    // Limit to 4 key insights
-    keyInsights = keyInsights.slice(0, 4)
-
-    // If no key insights were found, create some generic ones
-    if (keyInsights.length === 0) {
-      keyInsights = [
-        "This is an important document in the field of " + document.topics[0],
-        "Published in " + document.year + " by " + document.author,
-        "Relates to " + document.mandates.join(", "),
-      ]
-    }
-
+    const data = await response.json();
     return {
-      title: document.title,
-      summary,
-      keyInsights,
-    }
-  } catch (error) {
-    console.error("Error generating summary:", error)
-    return {
-      title: "Summary Generation Failed",
-      summary: "We couldn't generate a summary for this document. Please try again later or view the full document for more information.",
-      keyInsights: [
-        "Summary generation failed",
-        "Please try again later",
-        "You can view the full document for complete information",
-      ],
-    }
-  }
-}
-
-/**
- * Fetches and generates a summary for a document by ID
- */
-export async function getQuerySummary(documentId) {
-  try {
-    const document = await fetchDocumentById(documentId);
-    const summaryData = await generateDocumentSummary(document);
-    
-    return {
-      ...summaryData,
       documentId,
+      title: data.title,
+      summary: data.summary,
+      keyInsights: data.keyInsights || []
     };
   } catch (error) {
-    console.error("Error in getQuerySummary:", error);
+    console.error("Error getting document summary:", error);
+    
     return {
       documentId,
       title: "Error Retrieving Summary",
       summary: "There was an error retrieving the summary for this document.",
-      keyInsights: ["Please try again later"],
+      keyInsights: ["Please try again later"]
     };
   }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Info } from "lucide-react";
 import { DateRange } from "react-date-range";
 import AsyncSelect from "react-select/async";
@@ -13,33 +13,46 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, Bar, BarChart, Cell } f
 
 export default function TopicTrends() {
   const [showCalendar, setShowCalendar] = useState(false);
+  const [loading, setLoading] = useState(true);
   const calendarRef = useRef(null);
+  const [chartData, setChartData] = useState([]);
   const [editingField, setEditingField] = useState(null); // 'start' or 'end'
-  const chartData = [
-    { year: 2010, salmon: 26, "climate-change": 45 },
-    { year: 2011, salmon: 34, "climate-change": 37 },
-    { year: 2012, salmon: 49, "climate-change": 31 },
-    { year: 2013, salmon: 48, "climate-change": 9 },
-    { year: 2014, salmon: 46, "climate-change": 19 },
-    { year: 2015, salmon: 5, "climate-change": 25 },
-    { year: 2016, salmon: 9, "climate-change": 23 },
-    { year: 2017, salmon: 9, "climate-change": 16 },
-    { year: 2018, salmon: 41, "climate-change": 33 },
-    { year: 2019, salmon: 10, "climate-change": 15 },
-    { year: 2020, salmon: 29, "climate-change": 7 },
-    { year: 2021, salmon: 47, "climate-change": 28 },
-    { year: 2022, salmon: 25, "climate-change": 15 },
-    { year: 2023, salmon: 20, "climate-change": 11 }
-  ];
+  // const chartData = [
+  //   { year: 2010, salmon: 26, "climate-change": 45 },
+  //   { year: 2011, salmon: 34, "climate-change": 37 },
+  //   { year: 2012, salmon: 49, "climate-change": 31 },
+  //   { year: 2013, salmon: 48, "climate-change": 9 },
+  //   { year: 2014, salmon: 46, "climate-change": 19 },
+  //   { year: 2015, salmon: 5, "climate-change": 25 },
+  //   { year: 2016, salmon: 9, "climate-change": 23 },
+  //   { year: 2017, salmon: 9, "climate-change": 16 },
+  //   { year: 2018, salmon: 41, "climate-change": 33 },
+  //   { year: 2019, salmon: 10, "climate-change": 15 },
+  //   { year: 2020, salmon: 29, "climate-change": 7 },
+  //   { year: 2021, salmon: 47, "climate-change": 28 },
+  //   { year: 2022, salmon: 25, "climate-change": 15 },
+  //   { year: 2023, salmon: 20, "climate-change": 11 }
+  // ];
 
   const colorPalette = [
-    "#8884d8",
-    "#82ca9d",
-    "#ff7300",
-    "#ffc658",
-    "#a83279",
-    "#3b8beb",
+    "#1f77b4", // blue
+    "#d62728", // red
+    "#2ca02c", // green
+    "#ff7f0e", // orange
+    "#9467bd", // purple
+    "#8c564b", // brown
+    "#e377c2", // pink
+    "#7f7f7f", // gray
+    "#bcbd22", // yellow-green
+    "#17becf", // cyan
+    "#393b79", // deep indigo
+    "#637939", // olive
+    "#843c39", // dark red-brown
+    "#e7969c", // light pink
+    "#a55194", // violet
+    "#9c9ede"  // lavender blue
   ];
+  
   const [allTopics, setAllTopics] = useState([
     { label: "Salmon", value: "salmon" },
     { label: "Conservation", value: "conservation" },
@@ -67,6 +80,96 @@ export default function TopicTrends() {
     return chartData.reduce((total, data) => total + (data[topic] || 0), 0);
   };
 
+  
+
+
+  const fetchChartData = async () => {
+    setLoading(true);
+    try {
+      const session = await fetchAuthSession()
+      const token = session.tokens.idToken
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_ENDPOINT}user/chart_data?startDate=${dateRange[0].startDate.toISOString()}&endDate=${dateRange[0].endDate.toISOString()}&topics=${selectedTopics.map(topic => topic.value).join(",")}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: token,
+            "Content-Type": "application/json",
+          },
+        },
+      )
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      // Update state with the fetched data
+      setChartData(data);
+
+      // Dynamically calculate min and max dates based on the fetched chart data
+      const dates = data.map(item => item.year);
+      const dynamicMinDate = new Date(Math.min(...dates));
+      const dynamicMaxDate = new Date(Math.max(...dates));
+
+      // Set the min and max dates for the calendar based on the selected topics' data
+      setMinDate(dynamicMinDate);
+      setMaxDate(dynamicMaxDate);
+
+      // Update dateRange state to use the new min and max dates
+      setDateRange([{ startDate: dynamicMinDate, endDate: dynamicMaxDate, key: "selection" }]);
+    } catch (error) {
+      console.error(`Error fetching min/max dates:`, error)
+      setDateRange([{ startDate: new Date(2000, 0, 1), endDate: new Date(), key: "selection" }]);
+      setChartData([]); // Reset chart data on error
+    } finally {
+      setLoading(false)
+    }
+
+  };
+
+  const fetchTopics = async () => {
+    setLoading(true)
+    try {
+      const session = await fetchAuthSession()
+      const token = session.tokens.idToken
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_ENDPOINT}user/topics`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: token,
+            "Content-Type": "application/json",
+          },
+        },
+      )
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      console.log(data)
+      setAllTopics(data)
+    } catch (error) {
+      console.error(`Error fetching topics:`, error)
+      
+    } finally {
+      setLoading(false)
+    }
+  };
+
+  useEffect(() => {
+    fetchTopics(); // Fetch topics when component mounts
+  }, []);
+
+  useEffect(() => {
+    if (selectedTopics.length > 0) {
+      fetchChartData(); // Fetch the chart data when the date range or selected topics change
+    }
+  }, [dateRange, selectedTopics]); // Adding dateRange and selectedTopics as dependencies
+
 
   const handleTopicSearch = async (inputValue) => {
     const allTopics = [
@@ -90,7 +193,7 @@ export default function TopicTrends() {
     <div className="min-h-screen bg-white dark:bg-gray-900 transition-all duration-300">
       <main className="max-w-5xl mx-auto px-4 py-6 md:py-8">
         <h2 className="text-2xl md:text-3xl font-bold text-center mb-6 md:mb-8 dark:text-white">
-          Topics Trend Analytics
+          Topic Trends Analytics
         </h2>
 
         {/* Filters */}
@@ -160,7 +263,7 @@ export default function TopicTrends() {
         </div>
 
         {/* Analytics Dashboard */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-1 gap-4 md:gap-6">
           {/* Co-occurrence */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-3 md:p-4 border dark:border-gray-700">
             <div className="flex justify-between items-center mb-3 md:mb-4">
@@ -175,7 +278,7 @@ export default function TopicTrends() {
               </div>
             </div>
             {(selectedTopics.length === 0) ?
-              (<div className="aspect-square bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+              (<div className="aspect-video bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
               {/* Placeholder */}
               <p className="text-sm text-gray-600 dark:text-gray-300">Select topics to begin</p>
             </div>) : (
@@ -213,7 +316,7 @@ export default function TopicTrends() {
               </div>
             </div>
             {(selectedTopics.length === 0) ?
-              (<div className="aspect-square bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+              (<div className="aspect-video bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
               {/* Placeholder */}
               <p className="text-sm text-gray-600 dark:text-gray-300">Select topics to begin</p>
             </div>) : (
@@ -234,45 +337,7 @@ export default function TopicTrends() {
         </Bar>
       </BarChart>
             </ResponsiveContainer>)}
-          </div>
-
-          {/* Distribution */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-3 md:p-4 border dark:border-gray-700">
-            <div className="flex justify-between items-center mb-3 md:mb-4">
-              <h3 className="font-medium dark:text-white text-sm md:text-base">
-                Topic Distribution by Category
-              </h3>
-              <div className="flex items-center space-x-2">
-                <span className="text-xs text-gray-500 dark:text-gray-400 hidden sm:inline">
-                  Last updated: Jan 10, 2023
-                </span>
-                <Info className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-              </div>
-            </div>
-            <div className="aspect-square bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
-              {/* Placeholder */}
-              <p className="text-sm text-gray-600 dark:text-gray-300">Bar Chart Placeholder</p>
-            </div>
-          </div>
-
-          {/* Proportion */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-3 md:p-4 border dark:border-gray-700">
-            <div className="flex justify-between items-center mb-3 md:mb-4">
-              <h3 className="font-medium dark:text-white text-sm md:text-base">
-                Proportion of Documents by Topic
-              </h3>
-              <div className="flex items-center space-x-2">
-                <span className="text-xs text-gray-500 dark:text-gray-400 hidden sm:inline">
-                  Last updated: Jan 10, 2023
-                </span>
-                <Info className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-              </div>
-            </div>
-            <div className="aspect-square bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
-              {/* Placeholder */}
-              <p className="text-sm text-gray-600 dark:text-gray-300">Pie Chart Placeholder</p>
-            </div>
-          </div>
+          </div>      
         </div>
       </main>
     </div>

@@ -1,474 +1,98 @@
-"use client"
+"use client";
 
-import { useState, useRef, useEffect, useCallback } from "react"
-import { Search, Send, User, Mic, MicOff, RefreshCw, Download } from "lucide-react"
-import { CitationsSidebar } from "../components/citations-sidebar"
-import FeedbackComponent from "./feedback-component"
-import { getFingerprint } from "@thumbmarkjs/thumbmarkjs"
-import { toast, ToastContainer } from "react-toastify"
-import "react-toastify/dist/ReactToastify.css"
-import Image from "next/image"
-import { useRouter } from "next/navigation"
+import { useState, useCallback } from "react";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
-import mapleLeaf from "../../app/maple_leaf.png"
+// Import components
+import ChatInput from "./components/ChatInput";
+import ChatMessages from "./components/ChatMessages";
+import DisclaimerModal from "./components/DisclaimerModal";
+import FeedbackComponent from "./components/UserFeedback";
+import { CitationsSidebar } from "../components/citations-sidebar";
 
-// Define message templates once to avoid duplication
-const INITIAL_GREETING =
-  "Hello! I am a Smart Agent specialized in Fisheries and Oceans Canada (DFO). " +
-  "I can help you with questions related to DFO documents, science advice, and more! " +
-  "Please select the best role below that fits you. We can better answer your questions. " +
-  "Don't include personal details such as your name and private content."
+// Import hooks
+import { useChatSession } from "./hooks/useChatSession";
+import { useChatMessages } from "./hooks/useChatMessages";
+import { useVoiceInput } from "./hooks/useVoiceInput";
+import { useFeedback } from "./hooks/useFeedback";
 
-const ROLE_SELECTION_RESPONSE =
-  "Thank you for selecting your role. How can I help you with your questions about Fisheries and Oceans Canada today?"
+export default function Chat() {
+  // Set up state
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-export default function SmartSearchAssistant() {
-  // Add these state variables to the component
-  const [showFeedback, setShowFeedback] = useState(false)
-  const [feedback, setFeedback] = useState({ rating: 0, description: [] })
-  const [isSendingFeedback, setIsSendingFeedback] = useState(false)
-  const [showDisclaimer, setShowDisclaimer] = useState(false)
+  // Use custom hooks
+  const {
+    fingerprint,
+    session,
+    messages,
+    setMessages,
+    isCreatingSession,
+    showDisclaimer,
+    setShowDisclaimer,
+    resetSession,
+  } = useChatSession();
 
-  // Track active message for source display
-  const [currentMessageId, setCurrentMessageId] = useState(null)
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const {
+    isLoading,
+    userInput,
+    setUserInput,
+    currentMessageId,
+    setCurrentMessageId,
+    sendMessage,
+  } = useChatMessages(session, fingerprint, messages, setMessages);
 
-  // State for the conversation history
-  const [messages, setMessages] = useState([
-    {
-      id: "initial",
-      role: "assistant",
-      content: INITIAL_GREETING,
-      options: ["General Public", "Internal Researcher", "Policy Maker", "External Researcher"],
-      user_role: "",
-    },
-  ])
+  const { isListening, toggleListening } = useVoiceInput(setUserInput);
 
-  // State for fingerprint and session
-  const [fingerprint, setFingerprint] = useState("")
-  const [session, setSession] = useState(null)
-  const [isCreatingSession, setIsCreatingSession] = useState(false)
+  const {
+    showFeedback,
+    setShowFeedback,
+    feedback,
+    setFeedback,
+    isSendingFeedback,
+    submitFeedback,
+  } = useFeedback(fingerprint, session, messages);
 
-  // State for the current user input
-  const [userInput, setUserInput] = useState("")
-
-  // State for loading indicator
-  const [isLoading, setIsLoading] = useState(false)
-
-  // Ref for scrolling to bottom of conversation
-  const messagesEndRef = useRef(null)
-  const textareaRef = useRef(null)
-
-  // State for mobile navigation
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-
-  const router = useRouter()
-
-  // State for voice input
-  const [isListening, setIsListening] = useState(false)
-  const recognitionRef = useRef(null)
-
-  // Function to scroll to bottom of conversation
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [])
-
-  // Scroll to bottom when messages change
-  useEffect(() => {
-    scrollToBottom()
-  }, [scrollToBottom, messages, showFeedback])
-
-  // Close sidebar when screen resizes to mobile
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth < 768) {
-        setIsSidebarOpen(false)
-      }
-    }
-
-    window.addEventListener("resize", handleResize)
-    return () => window.removeEventListener("resize", handleResize)
-  }, [])
-
-  // Initialize fingerprint
-  useEffect(() => {
-    getFingerprint()
-      .then((result) => {
-        setFingerprint(result)
+  // Function to download chat history
+  const downloadChatHistory = useCallback(() => {
+    // Format the chat messages into a readable text format
+    const chatContent = messages
+      .map((message) => {
+        const role = message.role === "user" ? "User" : "Assistant";
+        return `${role}: ${message.content}`;
       })
-      .catch((error) => {
-        console.error("Error getting fingerprint:", error)
-      })
+      .join("\n\n");
 
-    const existingSession = localStorage.getItem("dfoSession")
-    if (existingSession) {
-      const parsedSession = JSON.parse(existingSession)
-      setSession(parsedSession)
-    }
-  }, [])
+    // Create a title with date and time
+    const date = new Date();
+    const formattedDate = date.toLocaleDateString();
+    const formattedTime = date.toLocaleTimeString();
+    const title = `DFO SmartSearch Chat - ${formattedDate} ${formattedTime}`;
 
-  // Create new session when fingerprint is available
-  useEffect(() => {
-    if (!fingerprint || session) return
-    createNewSession(fingerprint)
-  }, [fingerprint, session])
+    // Combine title and content
+    const fullContent = `${title}\n\n${chatContent}`;
 
-  // Fetch messages when session is available
-  useEffect(() => {
-    if (session) {
-      fetchMessages(session)
-    }
-  }, [session])
+    // Create a Blob with the chat content
+    const blob = new Blob([fullContent], { type: "text/plain" });
 
-  // Show disclaimer only when starting a new conversation
-  useEffect(() => {
-    // Start with disclaimer hidden
-    setShowDisclaimer(false)
+    // Create a download link and trigger the download
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `dfo-chat-${date.getTime()}.txt`;
+    document.body.appendChild(a);
+    a.click();
 
-    // Create a timer to check if we should show the disclaimer
-    const disclaimerTimer = setTimeout(() => {
-      // Only show disclaimer if we have just the initial message (no conversation)
-      // or if we're creating a new session
-      if (messages.length <= 1 && !isCreatingSession) {
-        setShowDisclaimer(true)
-      }
-    }, 2000) // 1 second delay to allow messages to load
+    // Clean up
+    URL.revokeObjectURL(url);
+    document.body.removeChild(a);
 
-    return () => clearTimeout(disclaimerTimer)
-  }, [messages, isCreatingSession])
+    toast.success("Chat history downloaded successfully!");
+  }, [messages]);
 
-  const getUserRole = (messageHistory) => {
-    const firstHumanMessage = messageHistory.find((msg) => msg.role === "user" || msg.Type === "human")
-    if (!firstHumanMessage) return ""
-
-    const content = (firstHumanMessage.content || firstHumanMessage.Content || "").toLowerCase()
-    if (content.includes("public")) return "public"
-    if (content.includes("internal researcher")) return "internal_researcher"
-    if (content.includes("policy maker")) return "policy_maker"
-    if (content.includes("external researcher")) return "external_researcher"
-    return ""
-  }
-
-  const createNewSession = async (currentFingerprint) => {
-    if (!currentFingerprint) return
-
-    setIsCreatingSession(true)
-    try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_ENDPOINT}user/create_session?user_info=${encodeURIComponent(
-          currentFingerprint,
-        )}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        },
-      )
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
-      const sessionDataJson = await response.json()
-      const sessionData = sessionDataJson[0].session_id
-      setSession(sessionData)
-      localStorage.setItem("dfoSession", JSON.stringify(sessionData))
-
-      // Initialize with first message
-      setMessages([
-        {
-          id: "initial",
-          role: "assistant",
-          content: INITIAL_GREETING,
-          options: ["General Public", "Internal Researcher", "Policy Maker", "External Researcher"],
-          user_role: "",
-        },
-      ])
-
-      return sessionData
-    } catch (error) {
-      console.error("Error creating session:", error)
-      toast.error("Failed to create session. Please try again.")
-      return null
-    } finally {
-      setIsCreatingSession(false)
-    }
-  }
-
-  const fetchMessages = async (sessionId) => {
-    if (!sessionId) return
-
-    try {
-      setShowDisclaimer(false) // Hide disclaimer when messages are fetched
-
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_ENDPOINT}user/get_messages?session_id=${encodeURIComponent(sessionId)}`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        },
-      )
-
-      if (!response.ok) {
-        setMessages([
-          {
-            id: "initial",
-            role: "assistant",
-            content: INITIAL_GREETING,
-            options: ["General Public", "Internal Researcher", "Policy Maker", "External Researcher"],
-            user_role: "",
-          },
-        ])
-        return
-      }
-
-      const data = await response.json()
-      const messagesList = data.messages || []
-
-      // Convert API message format to our format
-      const convertedMessages = messagesList.map((msg, index) => ({
-        id: index.toString(),
-        role: msg.Type === "human" ? "user" : "assistant",
-        content: msg.Content,
-        options: msg.Options || [],
-        user_role: msg.user_role,
-        tools_used: msg.tools_used || {},
-        feedback: null,
-        submittedFeedback: false,
-        // Keep original properties for compatibility
-        Type: msg.Type,
-        Content: msg.Content,
-        Options: msg.Options,
-      }))
-
-      const hasInitialMessage =
-        convertedMessages.length > 0 &&
-        convertedMessages[0].role === "assistant" &&
-        convertedMessages[0].content.includes("I am a Smart Agent specialized in Fisheries and Oceans Canada")
-
-      if (!hasInitialMessage) {
-        convertedMessages.unshift({
-          id: "initial",
-          role: "assistant",
-          content: INITIAL_GREETING,
-          options: ["General Public", "Internal Researcher", "Policy Maker", "External Researcher"],
-          user_role: "",
-        })
-      }
-
-      setMessages(convertedMessages)
-    } catch (error) {
-      console.error("Error fetching messages:", error)
-      setMessages([
-        {
-          id: "initial",
-          role: "assistant",
-          content: INITIAL_GREETING,
-          options: ["General Public", "Internal Researcher", "Policy Maker", "External Researcher"],
-          user_role: "",
-        },
-      ])
-    }
-  }
-
-  // Handle when a user selects a role option
-  const handleRoleSelection = async (selectedRole) => {
-    if (!session || !fingerprint) return
-
-    // Convert the role to the proper format for later use
-    // const roleValue = selectedRole === "General Public" ? "public" : "researcher"
-
-    let roleValue
-    switch (selectedRole) {
-      case "General Public":
-        roleValue = "public"
-        break
-      case "Internal Researcher":
-        roleValue = "internal_researcher"
-        break
-      case "Policy Maker":
-        roleValue = "policy_maker"
-        break
-      case "External Researcher":
-        roleValue = "external_researcher"
-        break
-      default:
-        roleValue = "public"
-    }
-    // Add the user message showing their selection
-    const userMessage = {
-      id: Date.now().toString(),
-      role: "user",
-      content: selectedRole,
-      Type: "human",
-      Content: selectedRole,
-    }
-
-    // Add the welcome message directly in the frontend
-    const aiResponse = {
-      id: Date.now() + 1,
-      role: "assistant",
-      content: ROLE_SELECTION_RESPONSE,
-      options: [],
-      user_role: roleValue,
-      Type: "ai",
-      Content: ROLE_SELECTION_RESPONSE,
-      Options: [],
-    }
-
-    // Add user messages to the chat history
-    setMessages((prev) => [...prev, userMessage])
-
-    // Sleep for a bit to simulate a delay for user experience
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-
-    // Add the AI response to the chat history
-    setMessages((prev) => [...prev, aiResponse])
-  }
-
-  // Modified sendMessage function to update current message ID for sources display
-  const sendMessage = async (content, isOption = false) => {
-    if (!session || !fingerprint || (!content.trim() && !isOption)) return
-
-    const currentMessages = [...messages]
-    const userRole = getUserRole(currentMessages)
-
-    if (!isOption && currentMessages.length === 1) {
-      toast.error("Please select one of the options first!")
-      return
-    }
-
-    setUserInput("")
-    setIsLoading(true)
-
-    try {
-      // Check if this is a role selection message (first message and is one of the role options)
-      const isRoleSelection =
-        currentMessages.length === 1 && isOption && (content === "General Public" || content === "Internal Researcher" || content === "Policy Maker" || content === "External Researcher")
-
-      // Handle role selection directly in the frontend without calling the backend
-      if (isRoleSelection) {
-        // Add the user message showing their selection
-        await handleRoleSelection(content)
-        setIsLoading(false)
-        return
-      }
-
-      // For all other messages, continue with normal flow
-      const userMessage = {
-        id: Date.now().toString(),
-        role: "user",
-        content: content,
-        Type: "human",
-        Content: content,
-      }
-
-      setMessages((prev) => [...prev, userMessage])
-
-      // Send to backend for LLM processing
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_ENDPOINT}user/text_generation?session_id=${encodeURIComponent(
-          session,
-        )}&user_info=${encodeURIComponent(fingerprint)}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            message_content: content,
-            user_role: userRole || "public", // Default to "public" if no role is set
-          }),
-        },
-      )
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        console.error("API error response:", errorData)
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`)
-      }
-
-      const data = await response.json()
-      const messageId = Date.now() + 1
-
-      // Update current message ID for sources display
-      if (data.tools_used && Object.keys(data.tools_used).length > 0) {
-        setCurrentMessageId(messageId.toString())
-      }
-
-      // Add the AI response to messages
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: messageId.toString(),
-          role: "assistant",
-          content: data.content,
-          options: data.options || [],
-          user_role: data.user_role,
-          tools_used: data.tools_used || {},
-          feedback: null,
-          submittedFeedback: false,
-          Type: "ai",
-          Content: data.content,
-          Options: data.options || [],
-        },
-      ])
-
-      // If tools were used, open sidebar to show sources
-      if (data.tools_used && Object.keys(data.tools_used).length > 0) {
-        setIsSidebarOpen(true)
-      }
-    } catch (error) {
-      console.error("Error sending message:", error.message)
-      toast.error(error.message || "Failed to send message. Please try again.")
-
-      // Add error message
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: (Date.now() + 1).toString(),
-          role: "assistant",
-          content: "I apologize, but I encountered an error processing your request. Please try again.",
-          feedback: null,
-          submittedFeedback: false,
-        },
-      ])
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // Replace the handleFeedback function with a simpler version that just shows the feedback component
-  const handleFeedback = () => {
-    setShowFeedback(true)
-  }
-
-  // Add the handleFeedbackSubmit function
+  // Handle feedback submission
   const handleFeedbackSubmit = async () => {
-    if (!feedback.rating || isSendingFeedback) return
-
-    setIsSendingFeedback(true)
-
-    const userRole = getUserRole(messages) // Ensure this is correctly retrieved
-
-    try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_ENDPOINT}/user/create_feedback?user_info=${encodeURIComponent(
-          fingerprint,
-        )}&session_id=${encodeURIComponent(session)}&user_role=${encodeURIComponent(
-          userRole,
-        )}&feedback_rating=${encodeURIComponent(
-          feedback.rating,
-        )}&feedback_description=${encodeURIComponent(feedback.description?.join(", "))}`,
-        { method: "POST" },
-      )
-
-      console.log("Feedback response:", await response.json()) // Debugging line
-      if (!response.ok) throw new Error("Failed to submit feedback")
-
+    if (await submitFeedback()) {
       setMessages((prev) => [
         ...prev,
         {
@@ -477,136 +101,18 @@ export default function SmartSearchAssistant() {
           content:
             "Thank you! Your feedback will help improve the DFO SmartSearch Assistant. You may continue asking questions or start a new session.",
         },
-      ])
-
-      setShowFeedback(false)
-    } catch (error) {
-      console.error("Error submitting feedback:", error)
-    } finally {
-      setIsSendingFeedback(false)
+      ]);
+      setShowFeedback(false);
     }
-  }
-
-  // Update the handleSessionReset function to also reset feedback
-  const handleSessionReset = () => {
-    setShowFeedback(false)
-    setSession(null)
-    setMessages([
-      {
-        id: "initial",
-        role: "assistant",
-        content: INITIAL_GREETING,
-        options: ["General/Public", "Government employee/Admin"],
-        user_role: "",
-      },
-    ])
-    localStorage.removeItem("dfoSession")
-    setShowDisclaimer(true) // Show disclaimer when resetting session
-    createNewSession(fingerprint)
-  }
-
-  const handleKeyPress = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      if (!isLoading && userInput.trim()) {
-        sendMessage(userInput)
-      }
-    }
-  }
-
-  // Voice input handling
-  const startListening = () => {
-    if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
-      toast.error("Speech recognition is not supported in your browser.")
-      return
-    }
-
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-    recognitionRef.current = new SpeechRecognition()
-    recognitionRef.current.continuous = true
-    recognitionRef.current.interimResults = true
-    recognitionRef.current.lang = "en-US"
-
-    recognitionRef.current.onresult = (event) => {
-      const transcript = Array.from(event.results)
-        .map((result) => result[0])
-        .map((result) => result.transcript)
-        .join("")
-
-      setUserInput(transcript)
-    }
-
-    recognitionRef.current.onerror = (event) => {
-      console.error("Speech recognition error", event.error)
-      setIsListening(false)
-      toast.error("Error with speech recognition. Please try again.")
-    }
-
-    recognitionRef.current.onend = () => {
-      setIsListening(false)
-    }
-
-    recognitionRef.current.start()
-    setIsListening(true)
-  }
-
-  const stopListening = () => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop()
-      setIsListening(false)
-    }
-  }
-
-  const toggleListening = () => {
-    if (isListening) {
-      stopListening()
-    } else {
-      startListening()
-    }
-  }
-
-  // New function to download chat history
-  const downloadChatHistory = () => {
-    // Format the chat messages into a readable text format
-    const chatContent = messages
-      .map((message) => {
-        const role = message.role === "user" ? "User" : "Assistant"
-        return `${role}: ${message.content}`
-      })
-      .join("\n\n")
-
-    // Create a title with date and time
-    const date = new Date()
-    const formattedDate = date.toLocaleDateString()
-    const formattedTime = date.toLocaleTimeString()
-    const title = `DFO SmartSearch Chat - ${formattedDate} ${formattedTime}`
-
-    // Combine title and content
-    const fullContent = `${title}\n\n${chatContent}`
-
-    // Create a Blob with the chat content
-    const blob = new Blob([fullContent], { type: "text/plain" })
-
-    // Create a download link and trigger the download
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `dfo-chat-${date.getTime()}.txt`
-    document.body.appendChild(a)
-    a.click()
-
-    // Clean up
-    URL.revokeObjectURL(url)
-    document.body.removeChild(a)
-
-    toast.success("Chat history downloaded successfully!")
-  }
+  };
 
   return (
     <div
-      className={`min-h-screen bg-white transition-all duration-300 flex flex-col ${isSidebarOpen ? "md:ml-96" : ""}`}
+      className={`min-h-screen bg-white transition-all duration-300 flex flex-col ${
+        isSidebarOpen ? "md:ml-96" : ""
+      }`}
     >
-      {/* This is the key change - add pointer-events-none to the container and pointer-events-auto to the actual sidebar */}
+      {/* Citations Sidebar */}
       <div className={`fixed inset-0 z-40 pointer-events-none ${isSidebarOpen ? "visible" : "invisible"}`}>
         <div
           className={`absolute inset-y-0 left-0 w-96 bg-white shadow-lg transform transition-transform duration-300 pointer-events-auto ${
@@ -633,7 +139,7 @@ export default function SmartSearchAssistant() {
           }`}
           onClick={() => setIsSidebarOpen(false)}
           style={{ pointerEvents: isSidebarOpen ? "auto" : "none" }}
-        ></div>
+        />
       </div>
 
       {/* Main Content */}
@@ -642,229 +148,50 @@ export default function SmartSearchAssistant() {
           <h2 className="text-2xl md:text-3xl font-bold text-center">SmartSearch Assistant</h2>
         </div>
 
-        {/* Conversation */}
-        <div className="space-y-4 md:space-y-6 mb-6 md:mb-8 flex-grow overflow-y-auto">
-          {messages.map((message, index) => (
-            <div key={message.id} className="space-y-2">
-              {message.role === "user" ? (
-                <div className="flex items-start">
-                  <div className="flex-grow flex justify-end">
-                    <div className="inline-block max-w-[85%] sm:max-w-[80%] py-2 px-3 md:px-4 bg-gray-200 rounded-2xl text-gray-800 text-sm md:text-base">
-                      {message.content}
-                    </div>
-                  </div>
-                  <div className="ml-2 mt-1">
-                    <div className="bg-white p-1.5 md:p-2 rounded-full border">
-                      <User className="h-4 w-4 md:h-5 md:w-5" />
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex">
-                  <div className="mr-2 md:mr-3 mt-1">
-                    <div className="maple-leaf-container border rounded p-1 w-8 h-8 md:w-10 md:h-10 flex items-center justify-center cursor-pointer">
-                      <Image
-                        src={mapleLeaf || "/placeholder.svg"}
-                        alt="Maple Leaf"
-                        width={30}
-                        height={30}
-                        className="object-contain relative z-0"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex-grow">
-                    <div className="inline-block bg-gray-200 rounded-2xl py-2 px-3 md:px-4 max-w-[90%] text-sm md:text-base">
-                      <p className="text-gray-800">{message.content}</p>
-                    </div>
+        {/* Chat Messages */}
+        <ChatMessages
+          messages={messages}
+          isLoading={isLoading}
+          isCreatingSession={isCreatingSession}
+          currentMessageId={currentMessageId}
+          setCurrentMessageId={setCurrentMessageId}
+          onShowFeedback={() => setShowFeedback(true)}
+          onOpenSidebar={() => setIsSidebarOpen(true)}
+          sendMessage={sendMessage} // Pass sendMessage function to handle option clicks
+        />
 
-                    {/* Render options if available */}
-                    {message.options && message.options.length > 0 && (
-                      <div className="mt-2 space-y-2">
-                        {message.options.map((option, optIndex) => (
-                          <button
-                            key={`${message.id}-option-${optIndex}`}
-                            onClick={() => !isLoading && sendMessage(option, true)}
-                            className="inline-block bg-blue-100 hover:bg-blue-200 rounded-xl py-1.5 px-3 text-blue-800 text-sm mr-2 mb-2"
-                          >
-                            {option}
-                          </button>
-                        ))}
-                      </div>
-                    )}
+        {/* Feedback Component */}
+        {showFeedback && (
+          <FeedbackComponent
+            feedback={feedback}
+            setFeedback={setFeedback}
+            onSubmit={handleFeedbackSubmit}
+            isSubmitting={isSendingFeedback}
+            onClose={() => setShowFeedback(false)}
+          />
+        )}
 
-                    {index >= 4 && !message.content.includes("Thank you! Your feedback will help improve") && (
-                      <button
-                        onClick={() => setShowFeedback(true)}
-                        className="mt-2 inline-block bg-blue-100 hover:bg-blue-200 rounded-xl py-1.5 px-3 text-blue-800 text-sm"
-                      >
-                        My task is done
-                      </button>
-                    )}
-
-                    {message.role === "assistant" &&
-                      message.tools_used &&
-                      Object.keys(message.tools_used).length > 0 && (
-                        <div className="flex justify-end mt-2">
-                          <button
-                            className="bg-gray-400 hover:bg-gray-500 text-white px-3 py-1 rounded flex items-center w-fit"
-                            onClick={() => {
-                              setCurrentMessageId(message.id)
-                              setIsSidebarOpen(true)
-                            }}
-                          >
-                            <Search className="h-4 w-4 mr-1" />
-                            Sources
-                          </button>
-                        </div>
-                      )}
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-
-          {showFeedback && (
-            <FeedbackComponent
-              feedback={feedback}
-              setFeedback={setFeedback}
-              onSubmit={handleFeedbackSubmit}
-              isSubmitting={isSendingFeedback}
-              onClose={() => setShowFeedback(false)}
-            />
-          )}
-
-          {(isLoading || isCreatingSession) && (
-            <div className="flex">
-              <div className="mr-2 md:mr-3 mt-1">
-                <div className="maple-leaf-container border rounded p-1 w-8 h-8 md:w-10 md:h-10 flex items-center justify-center cursor-pointer">
-                  <Image
-                    src={mapleLeaf || "/placeholder.svg"}
-                    alt="Maple Leaf"
-                    width={30}
-                    height={30}
-                    className="object-contain relative z-0"
-                  />
-                </div>
-              </div>
-              <div className="flex-grow">
-                <div className="inline-block bg-gray-200 rounded-2xl py-2 px-3 md:px-4">
-                  <div className="flex items-center space-x-1">
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" />
-                    <div
-                      className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"
-                      style={{ animationDelay: "0.2s" }}
-                    />
-                    <div
-                      className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"
-                      style={{ animationDelay: "0.4s" }}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div ref={messagesEndRef} />
-        </div>
-
-        {/* Input Area */}
-        <div className="w-full max-w-6xl mx-auto px-4 py-4 space-y-4">
-          <div className="relative flex items-center w-full bg-gray-100 rounded-full px-4 py-2">
-            <div className="flex items-center space-x-2">
-              <button onClick={handleSessionReset} className="p-1.5 hover:bg-gray-200 rounded-full">
-                <RefreshCw size={20} className="text-gray-600" />
-              </button>
-              {messages.length > 1 && (
-                <button
-                  onClick={downloadChatHistory}
-                  className="p-1.5 hover:bg-gray-200 rounded-full text-gray-600"
-                  title="Download Chat"
-                >
-                  <Download size={20} />
-                </button>
-              )}
-              <button
-                onClick={toggleListening}
-                className={`p-1.5 hover:bg-gray-200 rounded-full ${isListening ? "text-red-500" : "text-gray-600"}`}
-              >
-                {isListening ? <MicOff size={20} /> : <Mic size={20} />}
-              </button>
-            </div>
-
-            <textarea
-              ref={textareaRef}
-              value={userInput}
-              onChange={(e) => setUserInput(e.target.value)}
-              onKeyDown={handleKeyPress}
-              className="flex-1 bg-transparent border-none outline-none resize-none px-4 py-2 text-gray-800 placeholder-gray-500"
-              placeholder="Type your query here..."
-              maxLength={2096}
-              rows={1}
-              style={{
-                minHeight: "24px",
-                height: "auto",
-              }}
-              onInput={(e) => {
-                const target = e.target
-                target.style.height = "auto"
-                target.style.height = `${Math.min(Math.max(target.scrollHeight, 24), 120)}px`
-              }}
-            />
-
-            <button
-              onClick={() => !isLoading && userInput.trim() && sendMessage(userInput)}
-              className={`p-2 rounded-full ${
-                isLoading || !userInput.trim()
-                  ? "opacity-50 cursor-not-allowed text-gray-400"
-                  : "text-gray-600 hover:bg-gray-200 cursor-pointer"
-              }`}
-              disabled={isLoading || !userInput.trim()}
-            >
-              <Send size={20} />
-            </button>
-          </div>
-
-          <p className="text-center text-sm text-gray-600">This virtual assistant can make mistakes.</p>
-        </div>
+        {/* Chat Input */}
+        <ChatInput
+          userInput={userInput}
+          setUserInput={setUserInput}
+          sendMessage={async (input) => {
+            const result = await sendMessage(input);
+            if (result?.hasTools) {
+              setIsSidebarOpen(true);
+            }
+          }}
+          isLoading={isLoading}
+          resetSession={resetSession}
+          toggleListening={toggleListening}
+          isListening={isListening}
+          showDownloadButton={messages.length > 1}
+          downloadChatHistory={downloadChatHistory}
+        />
       </main>
 
-      {showDisclaimer && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-lg max-w-md w-full p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Important Notice</h3>
-              <button onClick={() => setShowDisclaimer(false)} className="text-gray-500 hover:text-gray-700">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="mb-6">
-              <p className="text-gray-700 mb-3">
-                Please be advised that all conversations with the SmartSearch Assistant will be recorded for quality
-                assurance and service improvement purposes.
-              </p>
-              <p className="text-gray-700">
-                By continuing to use this service, you acknowledge and consent to the recording of your interactions.
-              </p>
-            </div>
-            <div className="flex justify-end">
-              <button
-                onClick={() => setShowDisclaimer(false)}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-              >
-                I Understand
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Disclaimer Modal */}
+      <DisclaimerModal show={showDisclaimer} onClose={() => setShowDisclaimer(false)} />
 
       <ToastContainer
         position="top-center"
@@ -879,5 +206,5 @@ export default function SmartSearchAssistant() {
         theme="colored"
       />
     </div>
-  )
+  );
 }

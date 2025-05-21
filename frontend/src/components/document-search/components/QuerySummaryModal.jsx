@@ -6,6 +6,7 @@ export default function QuerySummaryModal({
   modalRef,
   loading,
   summaryData,
+  userQuery,
 }) {
   if (!isOpen) return null;
   
@@ -67,8 +68,13 @@ export default function QuerySummaryModal({
         </div>
 
         <div className="p-4 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-700 text-xs text-gray-500 dark:text-gray-400 italic">
-          This summary was generated using AI and may not capture all nuances of the document. Please refer to the
-          original document for complete information.
+          {userQuery ? (
+            <span>Summary generated for user query: "{userQuery}". This summary was generated using AI and may not capture all nuances of the document. Please refer to the
+            original document for complete information.</span>
+          ) : (
+            <span>This summary was generated using AI and may not capture all nuances of the document. Please refer to the
+            original document for complete information.</span>
+          )}
         </div>
       </div>
     </div>

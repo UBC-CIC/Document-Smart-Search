@@ -1,8 +1,7 @@
-import { use } from "react";
 import { allMockResults, filterOptions as defaultFilters } from "../data/defaultData"
 
 // Simple boolean flag to enable/disable mock data
-export const USE_MOCK_DATA = false; // Set to false to disable mock data in development
+export const USE_MOCK_DATA = true; // Set to false to disable mock data in development
 
 // Fetch available filter options from the API
 export async function fetchFilterOptions() {
@@ -12,8 +11,17 @@ export async function fetchFilterOptions() {
   }
 
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}search/filters`)
-    
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/filters`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        filters: ["years", "topics", "mandates", "authors", "documentTypes"],
+      }),
+    })
+
+
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
@@ -22,7 +30,6 @@ export async function fetchFilterOptions() {
     return data
   } catch (error) {
     console.error("Error fetching filter options:", error.message)
-    // Always fall back to default filters if API call fails
     return defaultFilters
   }
 }
@@ -58,14 +65,14 @@ export async function performDocumentSearch(query, filters) {
     // console.log("Transformed filters:", transformedFilters)
     // console.log("JSON SENDING:", JSON.stringify({ query, filters: transformedFilters }, null, 2))
 
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}search/documents`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/hybrid-search`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        query,
-        filters: transformedFilters
+        user_query: query,
+        filters: transformedFilters,
       }),
     })
     
@@ -99,7 +106,7 @@ function filterMockData(query, filters) {
   const filtered = allMockResults.filter((result) => {
     // Check if any year filter is active, if not, show all years
     const anyYearFilterActive = Object.values(yearFilters).some((value) => value)
-    if (anyYearFilterActive && !yearFilters[result.year]) {
+    if (anyYearFilterActive && !yearFilters[result.csasYear || result.year]) {
       return false
     }
 
@@ -121,17 +128,23 @@ function filterMockData(query, filters) {
       }
     }
 
-    // Check if any author filter is active
+    // Check if any author filter is active - could be in csasEvent now
     const anyAuthorFilterActive = Object.values(authorFilters).some((value) => value)
-    if (anyAuthorFilterActive && !authorFilters[result.author]) {
-      return false
+    if (anyAuthorFilterActive) {
+      const resultAuthor = result.author || "";
+      const resultEvent = result.csasEvent || "";
+      // Check both in author field or csasEvent
+      if (!authorFilters[resultAuthor] && !Object.keys(authorFilters).some(author => 
+        resultEvent.toLowerCase().includes(author.toLowerCase()))) {
+        return false;
+      }
     }
     
     // Check if any document type filter is active
     const anyDocTypeFilterActive = documentTypeFilters && Object.values(documentTypeFilters).some((value) => value)
     if (anyDocTypeFilterActive) {
-      // Assume documentType is a property on result, use 'Unknown' if not present
-      const docType = result.documentType || 'Unknown'
+      // Get document type, prioritize documentType over category for backwards compatibility
+      const docType = result.documentType || result.category || 'Unknown'
       if (!documentTypeFilters[docType]) {
         return false
       }
@@ -142,7 +155,8 @@ function filterMockData(query, filters) {
       const queryLower = query.toLowerCase()
       return (
         result.title.toLowerCase().includes(queryLower) ||
-        result.category.toLowerCase().includes(queryLower) ||
+        (result.csasEvent && result.csasEvent.toLowerCase().includes(queryLower)) ||
+        (result.documentType && result.documentType.toLowerCase().includes(queryLower)) ||
         result.highlights.some((highlight) => highlight.toLowerCase().includes(queryLower)) ||
         result.topics.some((topic) => topic.toLowerCase().includes(queryLower)) ||
         result.mandates.some((mandate) => mandate.toLowerCase().includes(queryLower))
