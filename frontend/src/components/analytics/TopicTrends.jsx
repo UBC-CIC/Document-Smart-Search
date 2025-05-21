@@ -89,7 +89,7 @@ export default function TopicTrends() {
       const session = await fetchAuthSession()
       const token = session.tokens.idToken
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_ENDPOINT}user/chart-data?startDate=${dateRange[0].startDate.toISOString()}&endDate=${dateRange[0].endDate.toISOString()}&topics=${selectedTopics.map(topic => topic.value).join(",")}`,
+        `${process.env.NEXT_PUBLIC_API_ENDPOINT}user/chart_data?startDate=${dateRange[0].startDate.toISOString()}&endDate=${dateRange[0].endDate.toISOString()}&topics=${selectedTopics.map(topic => topic.value).join(",")}`,
         {
           method: "GET",
           headers: {

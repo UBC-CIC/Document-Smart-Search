@@ -123,6 +123,73 @@ exports.handler = async (event) => {
           });
         }
         break;
+
+        case "GET /user/chart_data":
+          const mockChartData = [
+            { year: 2010, salmon: 26, "climate-change": 45, aquaculture: 20 },
+            { year: 2011, salmon: 34, "climate-change": 37, aquaculture: 28 },
+            { year: 2012, salmon: 49, "climate-change": 31, aquaculture: 35 },
+            { year: 2013, salmon: 48, "climate-change": 9, aquaculture: 40 },
+            { year: 2014, salmon: 46, "climate-change": 19, aquaculture: 45 },
+            { year: 2015, salmon: 5, "climate-change": 25, aquaculture: 50 },
+            { year: 2016, salmon: 9, "climate-change": 23, aquaculture: 30 },
+            { year: 2017, salmon: 9, "climate-change": 16, aquaculture: 22 },
+            { year: 2018, salmon: 41, "climate-change": 33, aquaculture: 19 },
+            { year: 2019, salmon: 10, "climate-change": 15, aquaculture: 21 },
+            { year: 2020, salmon: 29, "climate-change": 7, aquaculture: 30 },
+            { year: 2021, salmon: 47, "climate-change": 28, aquaculture: 50 },
+            { year: 2022, salmon: 25, "climate-change": 15, aquaculture: 40 },
+            { year: 2023, salmon: 20, "climate-change": 11, aquaculture: 30 }
+          ];
+          
+          exports.handler = async (event) => {
+            const { startDate, endDate, topics } = event.queryStringParameters;
+          
+            // Convert the start and end dates from the query parameters
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            const selectedTopics = topics ? topics.split(',') : [];
+          
+            // Filter the chart data based on the selected date range and topics
+            const filteredData = mockChartData.filter(item => {
+              const year = item.year;
+              return year >= start.getFullYear() && year <= end.getFullYear();
+            }).map(item => {
+              const filteredItem = { year: item.year };
+              selectedTopics.forEach(topic => {
+                if (item[topic]) {
+                  filteredItem[topic] = item[topic];
+                }
+              });
+              return filteredItem;
+            });
+          
+            // Return the filtered data as JSON
+            return {
+              statusCode: 200,
+              body: JSON.stringify(filteredData)
+            };
+          };
+          break;
+
+          case "GET /user/topics":
+            const mockTopics = [
+              { label: "Salmon", value: "salmon" },
+              { label: "Climate Change", value: "climate-change" },
+              { label: "Aquaculture", value: "aquaculture" },
+              { label: "Conservation", value: "conservation" },
+              { label: "Fisheries", value: "fisheries" },
+              { label: "Biodiversity", value: "biodiversity" },
+            ];
+            
+            exports.handler = async (event) => {
+              // Return the list of topics as JSON
+              return {
+                statusCode: 200,
+                body: JSON.stringify(mockTopics)
+              };
+            };
+            break;
       default:
         throw new Error(`Unsupported route: "${pathData}"`);
     }
