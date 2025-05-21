@@ -11,8 +11,17 @@ export async function fetchFilterOptions() {
   }
 
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/filters`)
-    
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/filters`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        filters: ["years", "topics", "mandates", "authors", "documentTypes"],
+      }),
+    })
+
+
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
@@ -21,7 +30,6 @@ export async function fetchFilterOptions() {
     return data
   } catch (error) {
     console.error("Error fetching filter options:", error.message)
-    // Always fall back to default filters if API call fails
     return defaultFilters
   }
 }
@@ -57,7 +65,7 @@ export async function performDocumentSearch(query, filters) {
     // console.log("Transformed filters:", transformedFilters)
     // console.log("JSON SENDING:", JSON.stringify({ query, filters: transformedFilters }, null, 2))
 
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/hybridSearch`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/hybrid-search`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

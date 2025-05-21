@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { fetchDocumentDetail, fetchRelatedDocuments } from "../services/documentDetailService";
+import { fetchDocumentDetail } from "../services/documentDetailService";
 
 export function useDocumentDetail(documentId) {
   const [document, setDocument] = useState(null);
@@ -52,21 +52,18 @@ export function useDocumentDetail(documentId) {
         console.log("Document data received:", documentData ? "Yes" : "No");
         setDocument(documentData);
         
-        // Fetch related documents
-        if (documentData.csasEvent && documentData.csasYear) {
-          const related = await fetchRelatedDocuments(
-            documentData.csasEvent, 
-            documentData.csasYear, 
-            cleanId
-          );
-          
+        // Set related documents directly from the document data
+        if (documentData.relatedDocuments) {
           // Filter out invalid documents
-          const validRelatedDocs = related.filter(doc => 
+          const validRelatedDocs = documentData.relatedDocuments.filter(doc => 
             doc.id !== "unknown" && 
-            doc.title !== "Document Not Found"
+            doc.title !== "Document Not Found" &&
+            doc.id !== cleanId  // Exclude current document
           );
           
           setRelatedDocuments(validRelatedDocs);
+        } else {
+          setRelatedDocuments([]);
         }
       } catch (err) {
         console.error("Error fetching document details:", err);

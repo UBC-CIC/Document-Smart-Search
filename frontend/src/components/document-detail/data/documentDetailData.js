@@ -64,6 +64,18 @@ export const mockDocumentDetails = {
         name: "Fishing Gear Design and Bycatch Reduction",
         semanticScore: 0.65
       }
+    ],
+    // Include related documents directly
+    relatedDocuments: [
+      {
+        id: "6273",
+        title: "Sustainable Aquaculture Practices",
+        type: "Terms of Reference",
+        year: "2021",
+        csasEvent: "Framework for Assessing the Ecological Flow Requirements of Canada's East Coast Salmon",
+        csasYear: "2021",
+        documentUrl: "https://publications.gc.ca/site/eng/9.850192/publication.html"
+      }
     ]
   },
   "6273": {
@@ -112,6 +124,18 @@ export const mockDocumentDetails = {
         name: "Fish Health Monitoring",
         semanticScore: 0.79
       }
+    ],
+    // Include related documents directly
+    relatedDocuments: [
+      {
+        id: "6472",
+        title: "East Coast Salmon Stock Census",
+        type: "Research Document",
+        year: "2021",
+        csasEvent: "Framework for Assessing the Ecological Flow Requirements of Canada's East Coast Salmon",
+        csasYear: "2021",
+        documentUrl: "https://publications.gc.ca/site/archivee-archived.html?url=https://publications.gc.ca/collections/collection_2023/mpo-dfo/fs70-7/Fs70-7-2023-036-eng.pdf"
+      }
     ]
   },
   "default": {
@@ -128,6 +152,7 @@ export const mockDocumentDetails = {
     authors: [],
     relatedMandates: [],
     primaryTopics: [],
-    secondaryTopics: []
+    secondaryTopics: [],
+    relatedDocuments: []  // Empty array for default/error case
   }
 };

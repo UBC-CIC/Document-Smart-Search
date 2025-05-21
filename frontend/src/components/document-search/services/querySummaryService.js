@@ -34,7 +34,7 @@ export async function getQuerySummary(userQuery, documentId) {
 
   try {
     // Single API call to get document summary from backend
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/expert_analysis`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/expert-analysis`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -50,7 +50,6 @@ export async function getQuerySummary(userQuery, documentId) {
     }
 
     const data = await response.json();
-    
     return {
       documentId,
       title: data.title,
