@@ -23,7 +23,7 @@ export function useChatSession() {
       user_role: "",
     },
   ]);
-  const [showDisclaimer, setShowDisclaimer] = useState(false);
+  const [showDisclaimer, setShowDisclaimer] = useState(true); // Always start with disclaimer shown
 
   // Initialize fingerprint
   useEffect(() => {
@@ -39,6 +39,11 @@ export function useChatSession() {
     if (existingSession) {
       const parsedSession = JSON.parse(existingSession);
       setSession(parsedSession);
+      // Don't show disclaimer for existing sessions
+      setShowDisclaimer(false);
+    } else {
+      // Show disclaimer for new sessions
+      setShowDisclaimer(true);
     }
   }, []);
 
@@ -55,28 +60,13 @@ export function useChatSession() {
     }
   }, [session]);
 
-  // Show disclaimer only when starting a new conversation
-  useEffect(() => {
-    // Start with disclaimer hidden
-    setShowDisclaimer(false);
-
-    // Create a timer to check if we should show the disclaimer
-    const disclaimerTimer = setTimeout(() => {
-      // Only show disclaimer if we have just the initial message (no conversation)
-      // or if we're creating a new session
-      if (messages.length <= 1 && !isCreatingSession) {
-        setShowDisclaimer(true);
-      }
-    }, 2000); // 2 seconds delay to allow messages to load
-
-    return () => clearTimeout(disclaimerTimer);
-  }, [messages, isCreatingSession]);
-
   // Initialize a new chat session
   const initializeSession = async (currentFingerprint) => {
     if (!currentFingerprint) return;
 
     setIsCreatingSession(true);
+    setShowDisclaimer(true); // Immediately show disclaimer when creating new session
+    
     try {
       const sessionData = await createChatSession(currentFingerprint);
       setSession(sessionData);
@@ -107,7 +97,7 @@ export function useChatSession() {
     if (!sessionId) return;
 
     try {
-      setShowDisclaimer(false); // Hide disclaimer when messages are fetched
+      setShowDisclaimer(false); // Hide disclaimer when loading existing chat history
 
       const data = await fetchChatMessages(sessionId);
       const messagesList = data.messages || [];
@@ -171,7 +161,7 @@ export function useChatSession() {
       },
     ]);
     localStorage.removeItem("dfoSession");
-    setShowDisclaimer(true);
+    setShowDisclaimer(true); // Show disclaimer when resetting session
     if (fingerprint) {
       initializeSession(fingerprint);
     }
