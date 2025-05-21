@@ -1,0 +1,322 @@
+export const mockRelatedDocuments = {
+  // Mandates
+  "Sustainable Fisheries Framework": [
+    {
+      id: "8001",
+      title: "Integrated Fisheries Management Plans for Atlantic Canada",
+      documentType: "Research Document",
+      year: "2022",
+      semanticScore: 0.95,
+      llmScore: 0.92,
+      csasEvent: "Atlantic Fisheries Management Frameworks",
+      csasYear: "2022"
+    },
+    {
+      id: "8002",
+      title: "Evaluating Harvest Control Rules for Canadian Fisheries",
+      documentType: "Scientific Advice",
+      year: "2021",
+      semanticScore: 0.89,
+      llmScore: 0.87,
+      csasEvent: "National Marine Conservation Workshop",
+      csasYear: "2021"
+    },
+    {
+      id: "6472",
+      title: "Salmon Fishing Impact Assessment",
+      documentType: "Research Document",
+      year: "2021",
+      semanticScore: 0.86,
+      llmScore: 0.82,
+      csasEvent: "National Marine Conservation Workshop",
+      csasYear: "2021"
+    },
+    {
+      id: "6273",
+      title: "Sustainable Aquaculture Practices",
+      documentType: "Terms of Reference",
+      year: "2021",
+      semanticScore: 0.84,
+      llmScore: 0.80,
+      csasEvent: "National Marine Conservation Workshop",
+      csasYear: "2021"
+    },
+    {
+      id: "8003",
+      title: "Stock Assessment Guidelines for Canadian Waters",
+      documentType: "Research Document",
+      year: "2020",
+      semanticScore: 0.79,
+      llmScore: 0.81,
+      csasEvent: "National Marine Conservation Workshop",
+      csasYear: "2021"
+    },
+    {
+      id: "8004",
+      title: "Analysis of Fishing Effort and Stock Rebuilding Strategies",
+      documentType: "Scientific Advice",
+      year: "2019",
+      semanticScore: 0.76,
+      llmScore: 0.78,
+      csasEvent: "National Marine Conservation Workshop",
+      csasYear: "2021"
+    },
+    {
+      id: "8005",
+      title: "Ecosystem Approach to Fisheries Management in Canada",
+      documentType: "Policy",
+      year: "2020",
+      semanticScore: 0.72,
+      llmScore: 0.74,
+      csasEvent: "National Marine Conservation Workshop",
+      csasYear: "2021"
+    }
+  ],
+  "Species at Risk Act Implementation": [
+    {
+      id: "8010",
+      title: "Status Assessment for Endangered Marine Species",
+      documentType: "Research Document",
+      year: "2022",
+      semanticScore: 0.96,
+      llmScore: 0.94,
+      csasEvent: "National Marine Conservation Workshop",
+      csasYear: "2021"
+    },
+    {
+      id: "8011",
+      title: "Recovery Strategies for Atlantic Salmon Populations",
+      documentType: "Scientific Advice",
+      year: "2021",
+      semanticScore: 0.93,
+      llmScore: 0.91,
+      csasEvent: "National Marine Conservation Workshop",
+      csasYear: "2021"
+    }
+  ],
+  
+  // DFO Topics
+  "Salmon Population Assessment": [
+    {
+      id: "8010",
+      title: "Status of Atlantic Salmon in Canadian Waters",
+      documentType: "Research Document",
+      year: "2022",
+      semanticScore: 0.98,
+      llmScore: 0.96,
+      csasEvent: "Framework for Assessing the Ecological Flow Requirements of Canada's East Coast Salmon",
+      csasYear: "2022"
+    },
+    {
+      id: "8011",
+      title: "Salmon Migration Timing and Climate Change",
+      documentType: "Scientific Advice",
+      year: "2021",
+      semanticScore: 0.93,
+      llmScore: 0.91,
+      csasEvent: "Climate Change Effects on Marine Resources",
+      csasYear: "2021"
+    },
+    {
+      id: "6472",
+      title: "Salmon Fishing Impact Assessment",
+      documentType: "Research Document",
+      year: "2021",
+      semanticScore: 0.91,
+      llmScore: 0.89,
+      csasEvent: "National Marine Conservation Workshop",
+      csasYear: "2021"
+    },
+    {
+      id: "8012",
+      title: "Recovery Potential Assessment for Inner Bay of Fundy Salmon",
+      documentType: "Research Document",
+      year: "2020",
+      semanticScore: 0.87,
+      llmScore: 0.85,
+      csasEvent: "National Marine Conservation Workshop",
+      csasYear: "2021"
+    },
+    {
+      id: "8013",
+      title: "Monitoring Design for Salmon Population Estimates",
+      documentType: "Terms of Reference",
+      year: "2019",
+      semanticScore: 0.82,
+      llmScore: 0.80,
+      csasEvent: "National Marine Conservation Workshop",
+      csasYear: "2021"
+    }
+  ],
+  
+  // Derived Topics
+  "Sustainable Seafood Production": [
+    {
+      id: "8020",
+      title: "Sustainability Certification Programs for Canadian Fisheries",
+      documentType: "Research Document", 
+      year: "2022",
+      semanticScore: 0.88,
+      csasEvent: "Sustainable Fisheries Certification Review",
+      csasYear: "2022"
+    },
+    {
+      id: "8021",
+      title: "Market Analysis of Sustainable Seafood Products",
+      documentType: "Scientific Advice",
+      year: "2021",
+      semanticScore: 0.83,
+      csasEvent: "Economics of Sustainable Fishing Practices",
+      csasYear: "2021"
+    },
+    {
+      id: "6273",
+      title: "Sustainable Aquaculture Practices",
+      documentType: "Terms of Reference",
+      year: "2021",
+      semanticScore: 0.79,
+      csasEvent: "National Marine Conservation Workshop",
+      csasYear: "2021"
+    },
+    {
+      id: "8022",
+      title: "Ecological Footprint of Seafood Production Methods",
+      documentType: "Research Document",
+      year: "2020",
+      semanticScore: 0.76,
+      csasEvent: "National Marine Conservation Workshop",
+      csasYear: "2021"
+    },
+    {
+      id: "8023",
+      title: "Consumer Trends in Sustainable Seafood Consumption",
+      documentType: "Policy",
+      year: "2019",
+      semanticScore: 0.71,
+      csasEvent: "National Marine Conservation Workshop",
+      csasYear: "2021"
+    }
+  ]
+};
+
+// Metadata about topics - includes total related document count (beyond just what's displayed)
+export const topicMetadata = {
+  "Sustainable Fisheries Framework": {
+    totalDocuments: 124,
+    documentsByType: {
+      "Research Document": 45,
+      "Scientific Advice": 32,
+      "Terms of Reference": 28,
+      "Policy": 19
+    },
+    documentsByYear: {
+      "2022": 18,
+      "2021": 23,
+      "2020": 25,
+      "2019": 30,
+      "2018": 28
+    }
+  },
+  "Species at Risk Act Implementation": {
+    totalDocuments: 87,
+    documentsByType: {
+      "Research Document": 39,
+      "Scientific Advice": 22,
+      "Terms of Reference": 15,
+      "Policy": 11
+    },
+    documentsByYear: {
+      "2022": 15,
+      "2021": 19,
+      "2020": 21,
+      "2019": 17,
+      "2018": 15
+    }
+  },
+  "Salmon Population Assessment": {
+    totalDocuments: 76,
+    documentsByType: {
+      "Research Document": 32,
+      "Scientific Advice": 18,
+      "Terms of Reference": 16,
+      "Policy": 10
+    },
+    documentsByYear: {
+      "2022": 14,
+      "2021": 17,
+      "2020": 20,
+      "2019": 15,
+      "2018": 10
+    }
+  },
+  "Sustainable Seafood Production": {
+    totalDocuments: 59,
+    documentsByType: {
+      "Research Document": 24,
+      "Scientific Advice": 14,
+      "Terms of Reference": 12,
+      "Policy": 9
+    },
+    documentsByYear: {
+      "2022": 11,
+      "2021": 13,
+      "2020": 15,
+      "2019": 12,
+      "2018": 8
+    }
+  }
+};
+
+// Default metadata for topics not explicitly defined
+export const defaultTopicMetadata = {
+  totalDocuments: 35,
+  documentsByType: {
+    "Research Document": 15,
+    "Scientific Advice": 10,
+    "Terms of Reference": 6,
+    "Policy": 4
+  },
+  documentsByYear: {
+    "2022": 8,
+    "2021": 9,
+    "2020": 7,
+    "2019": 6,
+    "2018": 5
+  }
+};
+
+// Default documents for topics not explicitly defined
+export const getDefaultMockData = (topicName, topicType) => {
+  return [
+    {
+      id: "9001",
+      title: `Recent Research on ${topicName}`,
+      documentType: "Research Document",
+      year: "2022",
+      semanticScore: 0.90,
+      llmScore: topicType !== 'derived' ? 0.88 : undefined,
+      csasEvent: "Annual Science Workshop",
+      csasYear: "2022"
+    },
+    {
+      id: "9002",
+      title: `Policy Analysis Related to ${topicName}`,
+      documentType: "Policy",
+      year: "2021",
+      semanticScore: 0.84,
+      llmScore: topicType !== 'derived' ? 0.82 : undefined,
+      csasEvent: "Policy Framework Development",
+      csasYear: "2021"
+    },
+    {
+      id: "9003",
+      title: `Scientific Evaluation of ${topicName}`,
+      documentType: "Scientific Advice",
+      year: "2020",
+      semanticScore: 0.79,
+      llmScore: topicType !== 'derived' ? 0.77 : undefined,
+      csasEvent: "Technical Review Meeting",
+      csasYear: "2020"
+    }
+  ];
+};
