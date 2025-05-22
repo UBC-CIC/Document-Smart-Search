@@ -229,7 +229,7 @@ def generate_topic_labels(
     model_id=LLM_MODEL,
     num_words=10, 
     num_docs=3, 
-    temperature=0
+    temperature=0.4 # 0 is deterministic
 ):
     """
     Generate coherent topic labels using LLaMA via Amazon Bedrock for each topic in a BERTopic model.
@@ -248,8 +248,9 @@ def generate_topic_labels(
         Number of top words to include in the prompt.
     num_docs : int, default=3
         Number of representative documents to include in the prompt.
-    temperature : float, default=0.3
+    temperature : float, default=0.4
         Temperature setting for LLaMA generation.
+        Temperature 0 is deterministic, but may be too rigid and make the model less creative, copying the top words and representative documents verbatimly.
 
     Returns
     -------
@@ -269,17 +270,32 @@ def generate_topic_labels(
 
         prompt = f"""
         <|begin_of_text|><|start_header_id|>system<|end_header_id|>
-        You are generating topic labels for research documents related to Fisheries and Oceans Canada. 
-        Given top words and representative documents from a BERTopic topic, generate a short, coherent, and descriptive label.
-        Ignore superficial phrasing like "stock assessment" or "status report" in the representative documents - focus on species, issues, and themes discussed in the content.
-        Top words may be noisy — use best judgment.
+        You are labeling research topics for Fisheries and Oceans Canada using BERTopic clusters.
 
+        Each topic is defined by:
+        - A set of top words (which may be noisy)
+        - A small sample of representative documents from the cluster
+
+        Your task:
+        Generate a **short, general, and meaningful topic label** that accurately captures the **overall theme** of the cluster — not just the sample documents.
+
+        Instructions:
+        - Do **not copy titles or phrases verbatim** from the representative documents.
+        - **Ignore boilerplate terms** like “stock assessment”, “status report”, or other administrative jargon.
+        - Focus on the **main species, ecological issues, scientific questions, or environmental themes**.
+        - The label should be specific enough to convey meaning, but broad enough to represent the full cluster — including **documents not shown**.
+
+        Examples of good labels:
+        - “Arctic Cetaceans and Climate Stressors”
+        - “Seafloor Mapping and Habitat Classification”
+        - “Fisheries Bycatch in Atlantic Canada”
+
+        Data for this topic:
         - Top words: {', '.join(top_words)}
-
         - Representative documents:
         {"\n\n".join(docs)}
 
-        Respond with the topic label ONLY.
+        Respond with the **topic label only** — no explanations.
         <|eot_id|><|start_header_id|>assistant<|end_header_id|>
         """
 
@@ -663,12 +679,13 @@ def main(dryrun=False, debug=False):
     if args['topic_modelling_mode'] == 'retrain':
         print("BERTopic modelling mode: retrain")
         # Purge existing data
-        with psycopg.connect(**conn_info) as conn:
-            with conn.cursor() as cur:
-                cur.execute("TRUNCATE TABLE documents_derived_topic CASCADE")
-                cur.execute("TRUNCATE TABLE derived_topics CASCADE")
-            conn.commit()
-            print("Purged existing derived topics and documents derived topics data")
+        if not dryrun:
+            with psycopg.connect(**conn_info) as conn:
+                with conn.cursor() as cur:
+                    cur.execute("TRUNCATE TABLE documents_derived_topic CASCADE")
+                    cur.execute("TRUNCATE TABLE derived_topics CASCADE")
+                conn.commit()
+                print("Purged existing derived topics and documents derived topics data")
         
         # Fetch all documents and train new model
         docs_df = fetch_and_prepare_documents()
