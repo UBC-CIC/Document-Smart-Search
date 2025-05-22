@@ -46,7 +46,10 @@ session = aws.session
 #     'dfo_html_full_index_name',
 #     'dfo_topic_full_index_name',
 #     'dfo_mandate_full_index_name',
-#     'pipeline_mode'
+#     'pipeline_mode',
+#     'sm_method',
+#     'topic_modelling_mode',
+#     'llm_model'
 # ])
 
 args = {
@@ -64,6 +67,7 @@ args = {
     'pipeline_mode': 'full_update', # or 'topics_only', 'html_only'
     'sm_method': 'numpy', # 'numpy', 'opensearch'
     'topic_modelling_mode': 'retrain', # or 'predict'
+    'llm_model': 'us.meta.llama3-3-70b-instruct-v1:0'
 }
 
 # Index Names
@@ -242,7 +246,7 @@ async def download_html(url: str, error_dump: List[dict], redirects: List[dict],
 
                     if status == 302 or 'moved temporarily' in html_content.lower():
                         redirect_url = response.headers.get('Location')
-                        print(f"The page has been moved temporarily to a new location. Redirecting to: {redirect_url}")
+                        # print(f"The page has been moved temporarily to a new location. Redirecting to: {redirect_url}")
                         # Log the redirect
                         redirects.append({
                             'original_url': url,
@@ -310,9 +314,9 @@ def save_html_content(url: str, content: str) -> None:
         f.write(content)
 
 
-def normalize_author_name(name: str) -> str:
+def normalize_string(name: str) -> str:
     """
-    Normalize author name by:
+    Normalize string by:
     - Normalizing Unicode (e.g., é → e)
     - Removing non-breaking spaces and stripping
     - Collapsing multiple spaces
@@ -320,7 +324,7 @@ def normalize_author_name(name: str) -> str:
     - Removing diacritics
     
     Args:
-        name: The author name to normalize
+        name: The string to normalize
         
     Returns:
         The normalized author name
@@ -417,6 +421,7 @@ def extract_document_info(page: BeautifulSoup) -> Dict[str, Optional[str]]:
                 # Clean up the subject text
                 subject = re.sub(r'\s\s+', ' ', subject)
                 subject = subject.replace(u'\xa0', u' ')
+                subject = normalize_string(subject)
             
             # Extract authors
             authors = []
@@ -424,13 +429,19 @@ def extract_document_info(page: BeautifulSoup) -> Dict[str, Optional[str]]:
             if authors_h3 and authors_h3.get_text().strip().startswith('By'):
                 # Get the text and remove 'By' prefix
                 authors_text = authors_h3.get_text().strip()[3:].strip()
+                if " and " in authors_text: # the string ' and ' is not preceded by a comma
+                    # Handle the ' and ' case by inserting a comma before it (but only when not already preceded by one)
+                    authors_text = re.sub(r'(?<![,]) and ', ', ', authors_text)
+                # Normalize the full author name string
+                authors_text = normalize_string(authors_text)
                 # Replace &nbsp; with space and clean up
                 authors_text = authors_text.replace(u'\xa0', u' ')
                 # Split by comma and clean up each author name
                 authors = []
                 for author in authors_text.split(','):
                     author = author.strip()
-                    author = normalize_author_name(author)
+                    # Normalize the individual author name
+                    author = normalize_string(author)
                     # Remove 'and' from the beginning of the last author
                     if author.startswith('and '):
                         author = author[4:]
@@ -498,7 +509,7 @@ def extract_document_info(page: BeautifulSoup) -> Dict[str, Optional[str]]:
         "title": title,
         "language": language,
         "subject": subject,
-        "authors": cleaned_authors
+        "authors": cleaned_authors,
     }
 
 def extract_doc_type(html_page_title):
@@ -525,17 +536,6 @@ def extract_document_year_from_title(html_page_title):
     else:
         return None
 
-def normalize_author_name(name: str) -> str:
-    # Normalize Unicode (e.g., é → e)
-    name = unicodedata.normalize("NFKC", name)
-    # Remove non-breaking spaces and strip
-    name = name.replace("\u00A0", " ").strip()
-    # Collapse multiple spaces
-    name = re.sub(r"\s+", " ", name)
-    # Fix common OCR punctuation issues (optional)
-    name = name.replace("“", '"').replace("”", '"').replace("’", "'")
-    return name
-
 def extract_doc_information(html_docs, pages):
     docs = []
     unloaded_docs = []
@@ -561,7 +561,7 @@ def extract_doc_information(html_docs, pages):
         metadata['html_language'] = info['language']
         metadata['html_page_title'] = info['title']
         metadata['html_subject'] = info['subject']
-        metadata['html_authors'] = [normalize_author_name(author) for author in info['authors']]
+        metadata['html_authors'] = info['authors']
         metadata['html_year'] = extract_document_year_from_title(info['title'])
         metadata['html_doc_type'] = extract_doc_type(info['title'])
 
@@ -632,20 +632,20 @@ def is_valid_document(doc, debug=False) -> bool:
     """
     # Ensure the document has the required fields.
     if "html_doc_type" not in doc:
-        if debug:
-            print(f"Document {doc['Document URL']} does not have an 'html_doc_type' field")
+        # if debug:
+        #     print(f"Document {doc['Document URL']} does not have an 'html_doc_type' field")
         return False
 
     # The document should have a 'pdf_url' unless it's a 'Terms of Reference'.
     if "pdf_url" not in doc and doc.get("html_doc_type") != "Terms of Reference":
-        if debug:
-            print(f"Document {doc['Document URL']} does not have a 'pdf_url' field")
+        # if debug:
+        #     print(f"Document {doc['Document URL']} does not have a 'pdf_url' field")
         return False
 
     # The document must have an 'html_language' field.
     if "html_language" not in doc:
-        if debug:
-            print(f"Document {doc['Document URL']} does not have an 'html_language' field")
+        # if debug:
+        #     print(f"Document {doc['Document URL']} does not have an 'html_language' field")
         return False
 
     # Check for non-English/French documents based on heuristics in URL or title.
@@ -653,8 +653,8 @@ def is_valid_document(doc, debug=False) -> bool:
     csas_title = doc.get("csas_html_title", "").lower()
     if "inu" in html_url or "inukititut" in csas_title:
         if doc.get("language", "").lower() == "inuktitut":
-            if debug:
-                print(f"Document {doc['Document URL']} is in Inuktitut")
+            # if debug:
+            #     print(f"Document {doc['Document URL']} is in Inuktitut")
             return False
 
     return True
@@ -681,8 +681,8 @@ def existing_document_is_valid(doc, client, index, enable_override=False, debug=
 
     # Check if the document exists in the index.
     if not client.exists(index=index, id=doc_id):
-        if debug:
-            print(f"Document {doc_id} does not exist in index {index}")
+        # if debug:
+        #     print(f"Document {doc_id} does not exist in index {index}")
         return False
 
     # Fetch the existing document.
@@ -738,8 +738,8 @@ async def process_html_docs(html_docs, enable_override=False, dryrun=False, debu
         if check:
             docs_already_processed += 1
         elif is_english_document(doc["Document URL"], debug):
-            if debug:
-                print(f"Document {doc['Document URL']} is English")
+            # if debug:
+                # print(f"Document {doc['Document URL']} is English")
             docs_to_process.append(doc)
         else:
             continue
@@ -823,7 +823,7 @@ async def process_events(html_event_to_html_documents, enable_override=False, dr
 
     ingested_docs = [] # list of all ingested documents
     for i, (csas_event, html_docs) in enumerate(html_event_to_html_documents.items(), start=1):
-        print(f"{i}/{total_events} Processing CSAS Event: {csas_event}")
+        # print(f"{i}/{total_events} Processing CSAS Event: {csas_event}")
 
         # Process the HTML documents for the current event.
         stats = await process_html_docs(

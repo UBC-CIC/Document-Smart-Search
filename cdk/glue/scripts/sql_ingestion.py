@@ -32,7 +32,8 @@ import src.pgsql as pgsql
 #     'dfo_html_full_index_name',
 #     'dfo_topic_full_index_name',
 #     'dfo_mandate_full_index_name',
-#     'pipeline_mode'
+#     'pipeline_mode',
+#     'llm_model'
 # ])
 
 args = {
@@ -50,6 +51,7 @@ args = {
     'pipeline_mode': 'full_update', # or 'topics_only', 'html_only'
     'sm_method': 'numpy', # 'numpy', 'opensearch'
     'topic_modelling_mode': 'retrain', # or 'predict'
+    'llm_model': 'us.meta.llama3-3-70b-instruct-v1:0'
 }
 
 REGION_NAME = args['region_name']

@@ -45,7 +45,8 @@ import src.pgsql as pgsql
 #     'dfo_html_full_index_name',
 #     'dfo_topic_full_index_name',
 #     'dfo_mandate_full_index_name',
-#     'pipeline_mode'
+#     'pipeline_mode',
+#     'llm_model'
 # ])
 
 args = {
@@ -63,6 +64,7 @@ args = {
     'pipeline_mode': 'full_update', # or 'topics_only', 'html_only'
     'sm_method': 'numpy', # 'numpy', 'opensearch'
     'topic_modelling_mode': 'retrain', # or 'predict'
+    'llm_model': 'us.meta.llama3-3-70b-instruct-v1:0'
 }
 
 # Index Names
@@ -76,6 +78,7 @@ EMBEDDING_MODEL = args['embedding_model']
 # OpenSearch Configuration
 OPENSEARCH_SEC = args['opensearch_secret']
 OPENSEARCH_HOST = args['opensearch_host']
+LLM_MODEL = args.get('llm_model', 'us.meta.llama3-3-70b-instruct-v1:0')
 
 # Runtime Variables
 CURRENT_DATETIME = datetime.now().strftime(r"%Y-%m-%d %H:%M:%S")
@@ -323,7 +326,7 @@ def parse_json_with_retries(json_string: str, max_attempts=3, verbose = True):
     # Create the ChatBedrockConverse LLM instance using the existing session
     llm = ChatBedrockConverse(
         client=bedrock_client,  # Use the existing bedrock client
-        model_id="us.meta.llama3-3-70b-instruct-v1:0",
+        model_id=LLM_MODEL,
         temperature=0,
     )
 
@@ -736,7 +739,7 @@ async def query_model(prompt):
     """
     llm = BedrockLLM(
         client=bedrock_client,
-        model_id="us.meta.llama3-3-70b-instruct-v1:0",
+        model_id=LLM_MODEL,
         model_kwargs={"temperature": 0, "top_p": 0.9},
         streaming=True
     )
@@ -971,6 +974,7 @@ async def main(dryrun=False, debug=False):
     mandate_categorizations = {}
     for doc_url, group in mandate_results.groupby('Document URL'):
         # Only include mandates where LLM says it belongs
+        mandate_categorizations[doc_url] = []
         valid_mandates = group[group['LLM Belongs'] == 'Yes']['Mandate'].tolist()
         if valid_mandates:
             mandate_categorizations[doc_url] = valid_mandates
@@ -979,6 +983,7 @@ async def main(dryrun=False, debug=False):
     topic_categorizations = {}
     for doc_url, group in topic_results.groupby('Document URL'):
         # Only include topics where LLM says it belongs
+        topic_categorizations[doc_url] = []
         valid_topics = group[group['LLM Belongs'] == 'Yes']['Topic'].tolist()
         if valid_topics:
             topic_categorizations[doc_url] = valid_topics

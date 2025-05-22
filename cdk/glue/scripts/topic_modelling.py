@@ -43,7 +43,8 @@ session = aws.session # always use this session for all AWS calls
 #     'dfo_html_full_index_name',
 #     'dfo_topic_full_index_name',
 #     'dfo_mandate_full_index_name',
-#     'pipeline_mode'
+#     'pipeline_mode',
+#     'llm_model'
 # ])
 
 args = {
@@ -61,12 +62,13 @@ args = {
     'pipeline_mode': 'full_update', # or 'topics_only', 'html_only'
     'sm_method': 'numpy', # 'numpy', 'opensearch'
     'topic_modelling_mode': 'retrain', # or 'predict'
+    'llm_model': 'us.meta.llama3-3-70b-instruct-v1:0'
 }
 
 REGION_NAME = args['region_name']
 DFO_HTML_FULL_INDEX_NAME = args['dfo_html_full_index_name']
 CURRENT_DATETIME = datetime.now().strftime(r"%Y-%m-%d %H:%M:%S")
-
+LLM_MODEL = args.get('llm_model', 'us.meta.llama3-3-70b-instruct-v1:0')
 
 def init_opensearch_client(host: str, region: str, secret_name: str) -> Tuple[OpenSearch, Any]:
     """
@@ -224,7 +226,7 @@ def generate_topic_labels(
     topic_info_df, 
     topic_model, 
     region="us-west-2", 
-    model_id="us.meta.llama3-3-70b-instruct-v1:0",
+    model_id=LLM_MODEL,
     num_words=10, 
     num_docs=3, 
     temperature=0
@@ -785,7 +787,9 @@ def main(dryrun=False, debug=False):
             # Update OpenSearch with derived topic categorizations
             derived_topic_categorizations = {}
             for doc_url, group in documents_derived_topic_table.groupby('html_url'):
-                valid_topics = group['topic_name'].tolist()
+                # Only include topics with confidence score > 0
+                derived_topic_categorizations[doc_url] = []
+                valid_topics = group[group['confidence_score'] > 0]['topic_name'].tolist()
                 if valid_topics:
                     derived_topic_categorizations[doc_url] = valid_topics
 
@@ -829,6 +833,7 @@ def main(dryrun=False, debug=False):
         derived_topic_categorizations = {}
         for doc_url, group in documents_derived_topic_table.groupby('html_url'):
             # Only include topics with confidence score > 0
+            derived_topic_categorizations[doc_url] = []
             valid_topics = group[group['confidence_score'] > 0]['topic_name'].tolist()
             if valid_topics:
                 derived_topic_categorizations[doc_url] = valid_topics
