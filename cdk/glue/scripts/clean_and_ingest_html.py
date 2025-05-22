@@ -708,8 +708,8 @@ def is_english_document(url: str, debug=False) -> bool:
     invalid_extensions = ['-fra.html', '-fra.htm', '-inu.html', '-inu.htm']
     for ext in invalid_extensions:
         if url.endswith(ext):
-            if debug:
-                print(f"Document {url} is {ext[1:3]}")
+            # if debug:
+                # print(f"Document {url} is {ext[1:3]}")
             return False
     return True
 
