@@ -1,182 +1,408 @@
-import os
-import re
 import json
 import boto3
-import torch
-import boto3
-from opensearchpy import OpenSearch, RequestsHttpConnection, AWSV4SignerAuth
-from pathlib import Path
-from pprint import pprint
+import logging
+from typing import Dict, List, Any, Tuple
 from opensearchpy import OpenSearch
-from langchain_community.document_loaders import JSONLoader, DirectoryLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.vectorstores import OpenSearchVectorSearch
-from langchain_aws.embeddings import BedrockEmbeddings  # ✅ CHANGED
-from langchain import __version__ as langchain_version
+import psycopg
 
-import src.aws_utils as aws
-import src.opensearch_utils as op
+# Set up basic logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger()
 
-with open(Path("configs.json"), "r") as f:
-    configs = json.load(f)
+# Hardcoded constants (for now)
+OPENSEARCH_SEC = "opensearch-masteruser-test-glue"
+OPENSEARCH_HOST = "opensearch-host-test-glue"
+REGION_NAME = "us-west-2"
+INDEX_NAME = "dfo-html-full-index"
+EMBEDDING_MODEL_PARAM = "amazon.titan-embed-text-v2:0"
+RDS_SEC = "rds/dfo-db-glue-test"
 
-REGION_NAME = configs['aws']['region_name']
-OPENSEARCH_SEC = configs['aws']['secrets']['opensearch']
-INDEX_NAME = "dfo-langchain-vector-index"
-BUCKET_NAME = "dfo-documents"
-FOLDER_NAME = "documents"
-LOCAL_DIR = "s3_data"
+# Map of frontend filter names to OpenSearch field names
+FILTER_FIELD_MAPPING = {
+    "years": "csas_html_year",
+    "topics": "topic_categorization", 
+    "mandates": "mandate_categorization",
+    "authors": "html_authors",
+    "documentTypes": "html_doc_type",
+}
 
-def set_secrets():
-    global SECRETS
-    SECRETS = aws.get_secret(secret_name=OPENSEARCH_SEC, region_name=REGION_NAME)
+# AWS Clients
+secrets_manager_client = boto3.client("secretsmanager", region_name=REGION_NAME)
+ssm_client = boto3.client("ssm", region_name=REGION_NAME)
 
-def clean_text(text: str) -> str:
-    text = re.sub(r'[^\x00-\x7F]+', ' ', text)
-    text = re.sub(r'\n\s*\n+', '\n', text)
-    return text
+def get_parameter(param_name: str):
+    """Get parameter from SSM parameter store with caching."""
+    try:
+        response = ssm_client.get_parameter(Name=param_name, WithDecryption=True)
+        return response["Parameter"]["Value"]
+    except Exception as e:
+        logger.error(f"Error fetching parameter {param_name}: {e}")
+        raise
 
-def metadata_func(record: dict, metadata: dict) -> dict:
-    metadata["url"] = record.get("url")
-    metadata["publicationYear"] = record.get("publicationYear")
-    metadata["key"] = metadata["publicationYear"] + "/" + record.get("name")
-    return metadata
+def get_secret(secret_name: str) -> Dict:
+    try:
+        response = secrets_manager_client.get_secret_value(SecretId=secret_name)["SecretString"]
+        return json.loads(response)
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to decode JSON for secret {secret_name}: {e}")
+        raise ValueError(f"Secret {secret_name} is not properly formatted as JSON.")
+    except Exception as e:
+        logger.error(f"Error fetching secret {secret_name}: {e}")
+        raise
 
-def get_opensearch_client():
-    return OpenSearch(
-        hosts=[{'host': 'search-test-dfo-yevtcwsp7i4vjzy4kdvalwpxgm.aos.ca-central-1.on.aws', 'port': 443}],
-        http_compress=True,
-        http_auth=(SECRETS['username'], SECRETS['passwords']),
-        use_ssl=True,
-        verify_certs=True
+def rename_result_fields(results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Rename fields in search results to match frontend expectations."""
+    field_mapping = {
+        "csas_html_title": "title",
+        "html_year": "year",
+        "csas_html_year": "csasYear",
+        "csas_event": "csasEvent",
+        "html_doc_type": "documentType",
+    }
+    
+    transformed_results = []
+    for result in results:
+        # Copy the result to avoid modifying the original
+        transformed_result = result.copy()
+        
+        # Rename fields directly at the top level of the result
+        for old_name, new_name in field_mapping.items():
+            if old_name in transformed_result:
+                transformed_result[new_name] = transformed_result.pop(old_name)
+        
+        transformed_results.append(transformed_result)
+        
+    return transformed_results
+
+# Helper functions for document detail view
+def _build_os_query_by_id(document_id: str) -> Dict[str, Any]:
+    return {
+        "size": 1,
+        "_source": [
+            "csas_html_title",
+            "csas_event",
+            "csas_html_year",
+            "html_year",
+            "html_doc_type",
+            "pdf_url",
+            "html_url",
+            "html_subject",
+            "html_language",
+            "html_authors",
+            "manually_verified"
+        ],
+        "query": {
+            "ids": {
+                "values": [document_id]
+            }
+        }
+    }
+
+# New function to fetch last_updated from PostgreSQL
+def _fetch_last_updated(*, pgsql, conn_info: Dict[str, Any], doc_id: str) -> str:
+    sql = f"""
+    SELECT last_updated 
+    FROM documents 
+    WHERE doc_id = '{doc_id}'
+    """
+    
+    results = pgsql.execute_query(sql, conn_info)
+    if results and len(results) > 0 and results[0][0]:
+        return results[0][0]
+    return "N/A"
+
+def _fetch_related_documents(
+    *, pgsql, conn_info: Dict[str, Any], csas_event: str, csas_year: int, language: str, current_url: str
+) -> List[Dict[str, str]]:
+    sql = f"""
+    SELECT d.doc_id,
+           d.html_url,
+           d.title,
+           d.doc_type
+    FROM documents AS d
+    JOIN csas_events AS e
+      ON d.event_year   = e.event_year
+     AND d.event_subject = e.event_subject
+    WHERE e.event_year   = {csas_year}
+      AND e.event_subject = '{csas_event}'
+      AND d.doc_language  = '{language}'
+      AND d.html_url     != '{current_url}'
+    """
+    
+    results = pgsql.execute_query(sql, conn_info)
+    return [{"doc_id": doc_id, "html_url": url, "title": title, "doc_type": doc_type} 
+            for doc_id, url, title, doc_type in results]
+
+def _fetch_document_metadata(*, op_client, index_name: str, document_id: str) -> Dict[str, Any]:
+    resp = op_client.search(index=index_name, body=_build_os_query_by_id(document_id))
+    if resp["hits"]["hits"]:
+        src = resp["hits"]["hits"][0]["_source"]
+        return {
+            "document_name": src["csas_html_title"],
+            "csas_event_name": src["csas_event"],
+            "csas_event_year": src["csas_html_year"],
+            "publish_date": src["html_year"],
+            "document_type": src["html_doc_type"],
+            "html_url": src["html_url"],
+            "pdf_url": src["pdf_url"],
+            "html_language": src["html_language"],
+            "document_subject": src.get("html_subject", ""),
+            "manually_verified": src.get("manually_verified", False),
+            "html_authors": src.get("html_authors", []),
+        }
+    return {"error": "Document not found in OpenSearch"}
+
+def _classification_sql(url: str) -> str:
+    return f"""
+    SELECT *
+    FROM (
+        SELECT 'mandate' AS entity_type,
+               m.mandate_name  AS entity_name,
+               dm.semantic_score,
+               dm.llm_score,
+               dm.llm_explanation
+        FROM documents_mandates dm
+        JOIN mandates m ON dm.mandate_name = m.mandate_name
+        WHERE dm.html_url = '{url}' AND dm.llm_score >= 4
+
+        UNION ALL
+
+        SELECT 'dfo_topic',
+               t.topic_name,
+               dt.semantic_score,
+               dt.llm_score,
+               dt.llm_explanation
+        FROM documents_topics dt
+        JOIN topics t ON dt.topic_name = t.topic_name
+        WHERE dt.html_url = '{url}' AND dt.llm_score >= 4
+
+        UNION ALL
+
+        SELECT 'non_dfo_topic',
+               ddt.topic_name,
+               ddt.confidence_score,
+               NULL::numeric,
+               NULL::text
+        FROM documents_derived_topic ddt
+        WHERE ddt.html_url = '{url}'
+    ) AS combined_results
+    ORDER BY llm_score DESC;
+    """
+
+def _fetch_classifications(
+    *, pgsql, conn_info: Dict[str, Any], url: str
+) -> Tuple[List[Dict], List[Dict], List[Dict]]:
+    rows = pgsql.execute_query(_classification_sql(url), conn_info)
+
+    mandates, dfo_topics, non_dfo = [], [], []
+    for entity_type, name, sem_score, llm_score, explain in rows:
+        if entity_type == "mandate":
+            mandates.append(
+                {"name": name, "semanticScore": float(sem_score), "llmScore": float(llm_score) / 10.0, "explanation": explain}
+            )
+        elif entity_type == "dfo_topic":
+            dfo_topics.append(
+                {"name": name, "semanticScore": float(sem_score), "llmScore": float(llm_score) / 10.0, "explanation": explain}
+            )
+        else:  # non_dfo_topic (No need to divide by 10)
+            non_dfo.append({"name": name, "semanticScore": float(sem_score)})
+    return mandates, dfo_topics, non_dfo
+
+def get_document_categorization(
+    payload: dict,
+    *,
+    op_client,
+    index_name: str,
+    pgsql_conn,
+    conn_info: Dict[str, Any],
+) -> Dict[str, Any]:
+    doc_id = payload.get("document_id", "").strip()
+    base = _fetch_document_metadata(op_client=op_client, index_name=index_name, document_id=doc_id)
+
+    if "error" in base:
+        return base
+
+    url = base["html_url"]
+    
+    # Fetch last_updated from PostgreSQL
+    last_updated = _fetch_last_updated(
+        pgsql=pgsql_conn, 
+        conn_info=conn_info, 
+        doc_id=doc_id
+    )
+    if last_updated is not None or last_updated != "N/A":
+        base["last_updated"] = last_updated.isoformat()
+    else:
+        base["last_updated"] = "N/A"
+    
+    mandates, dfo_topics, other_topics = _fetch_classifications(
+        pgsql=pgsql_conn, conn_info=conn_info, url=url
     )
 
-def process_documents():
-    loader = DirectoryLoader(
-        "./s3_data/ParsedPublications/2001/", glob="*.json",
-        loader_cls=JSONLoader,
-        loader_kwargs={
-            'jq_schema': '.',
-            'content_key': 'text',
-            "metadata_func": metadata_func
-        },
+    related_docs = _fetch_related_documents(
+        pgsql=pgsql_conn,
+        conn_info=conn_info,
+        csas_event=base["csas_event_name"],
+        csas_year=base["csas_event_year"],
+        language=base["html_language"],
+        current_url=url
     )
-    docs = loader.load()
-    for doc in docs:
-        doc.page_content = clean_text(doc.page_content)
-        doc.metadata.pop("source", None)
 
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,
-        chunk_overlap=200,
-        length_function=len
+    base.update(
+        {
+            "dfo_mandates": mandates,
+            "dfo_topics": dfo_topics,
+            "other_topics": other_topics,
+            "related_documents": related_docs,
+        }
     )
-    docs = text_splitter.split_documents(docs)
-    return docs
+    return base
+
+def format_document_for_frontend(doc_id: str, doc_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Format document data to match frontend expectations"""
+    # Handle error case
+    if "error" in doc_data:
+        return {
+            "id": "unknown",
+            "title": "Document Not Found",
+            "lastUpdated": "N/A",
+            "verified": False,
+            "type": "Unknown",
+            "year": "N/A",
+            "subject": "This document could not be found in our system",
+            "csasEvent": "N/A",
+            "csasYear": "N/A",
+            "documentUrl": "#",
+            "authors": [],
+            "relatedMandates": [],
+            "primaryTopics": [],
+            "secondaryTopics": [],
+            "relatedDocuments": []
+        }
+    
+    # Format related documents
+    related_documents = []
+    for doc in doc_data.get("related_documents", []):
+        related_documents.append({
+            "id": doc["doc_id"],
+            "title": doc["title"],
+            "type": doc["doc_type"],
+            "year": doc_data.get("publish_date", "N/A"),
+            "csasEvent": doc_data.get("csas_event_name", "N/A"),
+            "csasYear": doc_data.get("csas_event_year", "N/A"),
+            "documentUrl": doc["html_url"],
+        })
+    
+    # Format the result
+    result = {
+        "id": doc_id,
+        "title": doc_data.get("document_name", "Untitled"),
+        "lastUpdated": doc_data.get("last_updated", "N/A"),  # Use the last_updated field from the database
+        "verified": doc_data.get("manually_verified", False),
+        "type": doc_data.get("document_type", "Unknown"),
+        "year": doc_data.get("publish_date", "N/A"),
+        "subject": doc_data.get("document_subject", ""),
+        "csasEvent": doc_data.get("csas_event_name", "N/A"),
+        "csasYear": doc_data.get("csas_event_year", "N/A"),
+        "documentUrl": doc_data.get("pdf_url", doc_data.get("html_url", "#")),
+        "authors": doc_data.get("html_authors", []),
+        "relatedMandates": doc_data.get("dfo_mandates", []),
+        "primaryTopics": doc_data.get("dfo_topics", []),
+        "secondaryTopics": doc_data.get("other_topics", []),
+        "relatedDocuments": related_documents
+    }
+    
+    return result
 
 def handler(event, context):
     try:
+        body = {} if event.get("body") is None else json.loads(event.get("body"))
         
-        with open(Path("ingestion_configs.json"), "r") as file:
-            app_configs = json.load(file)
-
-
-
-        REGION_NAME = app_configs['aws']['region_name']
-
-        INDEX_NAME = "dfo-langchain-vector-index"
-
-        set_secrets()
-
-
-        aws_region = "us-west-2"
-     
-
-        session = boto3.Session()
-        credentials = session.get_credentials()
-        awsauth = AWSV4SignerAuth(credentials, aws_region)
-
-        opensearch_host = "vpc-opensearchdomai-0r7i2aikcuqk-fuzzpdmexnrpq66hoze57vhqcq.us-west-2.es.amazonaws.com"
-
-
-
-        op_client = OpenSearch(
-            hosts=[{'host': opensearch_host, 'port': 443}],
-            http_auth=awsauth,
-            use_ssl=True,
-            verify_certs=True,
-            connection_class=RequestsHttpConnection,
-            http_compress=True
-        )
-
-
-        op.create_knn_index(
-            client=op_client,
-            index_name=INDEX_NAME,
-            dimension=1024  # depending on embedding size
-        )
+        # Check if this is a document detail request
+        document_id = body.get("document_id", "")
         
-
-        op.create_hybrid_search_pipeline(
-            client=op_client,
-            pipeline_name="html_hybrid_search",
-            keyword_weight=0.3,
-            vector_weight=0.7
-        )
-
-        # Step 1: Parse input query
-        body = json.loads(event.get("body", "{}"))
-        query = body.get("query", "")
-        if not query:
+        if not document_id:
             return {
                 "statusCode": 400,
-                "body": json.dumps({"error": "Missing 'query'"})
+                "body": json.dumps({"error": "Missing document ID"}),
+                "headers": {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*"
+                }
             }
-
-        # Step 2: Embed the query using Bedrock
-        bedrock_client = boto3.client("bedrock-runtime", region_name=REGION_NAME)
-        embedder = BedrockEmbeddings(
-            client=bedrock_client,
-            model_id=configs['embeddings']['embedding_model']
+        
+        # Set up OpenSearch client
+        secrets = get_secret(OPENSEARCH_SEC)
+        opensearch_host = get_parameter(OPENSEARCH_HOST)
+        op_client = OpenSearch(
+            hosts=[{'host': opensearch_host, 'port': 443}],
+            http_compress=True,
+            http_auth=(secrets['username'], secrets['password']),
+            use_ssl=True,
+            verify_certs=True
         )
-
-        # Step 3: Call OpenSearch hybrid similarity search
-        opensearch_client = op_client # get_opensearch_client()
-
-        results = op.hybrid_similarity_search_with_score(
-            query=query,
-            embedding_function=embedder,
-            client=opensearch_client,
+        
+        # Set up RDS connection
+        rds_secret = get_secret(RDS_SEC)
+        rds_conn_info = {
+            "host": rds_secret['host'],
+            "port": rds_secret['port'],
+            "dbname": rds_secret['dbname'],
+            "user": rds_secret['username'],
+            "password": rds_secret['password']
+        }
+        
+        rds_conn = psycopg.connect(**rds_conn_info)
+        
+        # Create a simple Postgres query executor compatible with the helper functions
+        class PgExecutor:
+            def execute_query(self, sql, conn_info):
+                with rds_conn.cursor() as cursor:
+                    cursor.execute(sql)
+                    return cursor.fetchall()
+        
+        pgsql_executor = PgExecutor()
+        
+        # Get document data
+        doc_data = get_document_categorization(
+            {"document_id": document_id},
+            op_client=op_client,
             index_name=INDEX_NAME,
-            k=3,
-            search_pipeline="html_hybrid_search",  # <- confirm this matches your pipeline name
-            text_field="page_content",
-            vector_field="chunk_embedding"
+            pgsql_conn=pgsql_executor,
+            conn_info=rds_conn_info
         )
-
+        
+        # Format data for frontend
+        formatted_document = format_document_for_frontend(document_id, doc_data)
+        
+        # Return the formatted document
         return {
             "statusCode": 200,
-            "body": json.dumps({
-                "query": query,
-                "results": [
-                    {
-                        "score": score,
-                        "metadata": doc
-                    }
-                    for doc, score in results
-                ],
-                "langchain": langchain_version
-            })
+            "body": json.dumps(formatted_document),
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*"
+            }
         }
 
     except Exception as e:
         import traceback
-        import traceback
+        error_trace = traceback.format_exc()
         return {
             "statusCode": 500,
             "body": json.dumps({
                 "error": str(e),
-                "trace": traceback.format_exc()
-            })
+                "trace": error_trace
+            }),
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*"
+            }
         }
-
+    finally:
+        # Close the RDS connection if it was opened
+        if 'rds_conn' in locals():
+            rds_conn.close()
+        # Close the OpenSearch client if it was opened
+        if 'op_client' in locals():
+            op_client.close()

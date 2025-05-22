@@ -64,18 +64,20 @@ def rename_result_fields(results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     transformed_results = []
     for result in results:
         # Copy the result to avoid modifying the original
-        transformed_result = result.copy()
+        transformed_result = result[0].copy()
         
         # Rename fields directly at the top level of the result
         for old_name, new_name in field_mapping.items():
             if old_name in transformed_result:
                 transformed_result[new_name] = transformed_result.pop(old_name)
         
+        transformed_result["semanticScore"] = result[1]
         transformed_results.append(transformed_result)
         
     return transformed_results
 
 def _build_post_filter(filters: dict | None) -> dict | None:
+    """Build OpenSearch post filter from frontend filters."""
     if not filters:
         return None
 
@@ -98,12 +100,69 @@ def _build_post_filter(filters: dict | None) -> dict | None:
             
     return {"bool": {"filter": clauses}} if clauses else None
 
+def get_document_text_by_id(op_client, document_id: str) -> str:
+    """Fetch document text by ID from OpenSearch."""
+    try:
+        query = {
+            "size": 1,
+            "_source": ["page_content", "csas_html_title"],
+            "query": {
+                "ids": {
+                    "values": [document_id]
+                }
+            }
+        }
+        
+        resp = op_client.search(index=INDEX_NAME, body=query)
+        
+        if resp["hits"]["total"]["value"] == 0:
+            logger.error(f"Document with ID {document_id} not found")
+            return ""
+            
+        doc = resp["hits"]["hits"][0]["_source"]
+        doc_title = doc.get("csas_html_title", "Untitled Document")
+        doc_content = doc.get("page_content", "")
+        
+        logger.info(f"Found document: {doc_title} with {len(doc_content)} characters")
+        
+        # Return the document content for similarity search
+        return doc_content
+    except Exception as e:
+        logger.error(f"Error fetching document content: {e}")
+        return ""
+
+def format_results_for_frontend(results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Format results for the frontend similarity documents service."""
+    formatted_results = []
+    
+    for result in results:
+        # Extract the document ID from metadata
+        doc_id = result.get("id", "unknown")
+        
+        # Format document for frontend
+        formatted_doc = {
+            "id": doc_id,
+            "title": result.get("title", "Unknown Title"),
+            "documentType": result.get("documentType", "Unknown Type"),
+            "year": result.get("year", "N/A"),
+            "semanticScore": result.get("_score", 0.0),
+            "csasEvent": result.get("csasEvent", ""),
+            "csasYear": result.get("csasYear", "")
+        }
+        
+        formatted_results.append(formatted_doc)
+    
+    return formatted_results
+
 def handler(event, context):
     try:
         body = {} if event.get("body") is None else json.loads(event.get("body"))
-        query = body.get("user_query", "")
+        
+        # Check if this is a document-based similarity search
+        document_id = body.get("documentId", "")
         filters = body.get("filters", {})
-
+        
+        # Set up API clients
         secrets = get_secret(OPENSEARCH_SEC)
         opensearch_host = get_parameter(OPENSEARCH_HOST)
         op_client = OpenSearch(
@@ -123,16 +182,6 @@ def handler(event, context):
             overwrite=False
         )
 
-        if not query:
-            return {
-                "statusCode": 400,
-                "body": json.dumps({"error": "Missing search query."}),
-                "headers": {
-                    "Content-Type": "application/json",
-                    "Access-Control-Allow-Origin": "*"
-                }
-            }
-
         # Configure bedrock for embeddings
         bedrock_client = boto3.client("bedrock-runtime", region_name=REGION_NAME)
         embedder = BedrockEmbeddings(
@@ -140,25 +189,52 @@ def handler(event, context):
             model_id=EMBEDDING_MODEL_PARAM
         )
 
-        # Configure search parameters
-        highlight_cfg = {
-            "fields": {"page_content": {}},
-            "pre_tags": ["<em>"],
-            "post_tags": ["</em>"],
-        }
-        
+        # Check if document ID is provided for similarity search
+        if document_id:
+            # Get document text for similarity search
+            document_text = get_document_text_by_id(op_client, document_id)
+            
+            if not document_text:
+                return {
+                    "statusCode": 404,
+                    "body": json.dumps({
+                        "error": f"Document with ID {document_id} not found or has no content"
+                    }),
+                    "headers": {
+                        "Content-Type": "application/json",
+                        "Access-Control-Allow-Origin": "*"
+                    }
+                }
+                
+            # Use document text as query
+            query = document_text
+        else:
+            # Fall back to direct text query if no document ID
+            query = body.get("user_query", "")
+            
+            if not query:
+                return {
+                    "statusCode": 400,
+                    "body": json.dumps({"error": "Missing document ID or search query."}),
+                    "headers": {
+                        "Content-Type": "application/json",
+                        "Access-Control-Allow-Origin": "*"
+                    }
+                }
+
+        # Streamlined source configuration with only fields needed by the frontend
         source_cfg = {
             "include": [
-                "csas_html_title",
-                "csas_html_year",
-                "csas_event",
-                "html_url",
-                "html_language",
-                "html_doc_type",
-                "html_year",
-                "html_subject",
+                "csas_html_title",  # -> title
+                "csas_html_year",   # -> csasYear
+                "csas_event",       # -> csasEvent
+                "html_doc_type",    # -> documentType
+                "html_year",        # -> year
             ]
         }
+
+        # Build post filter from frontend filters
+        post_filter = _build_post_filter(filters)
 
         # Perform search
         results = op.hybrid_similarity_search_with_score(
@@ -166,19 +242,38 @@ def handler(event, context):
             embedding_function=embedder,
             client=op_client,
             index_name=INDEX_NAME,
-            k=50,
+            k=50,  # Return top 50 results as per frontend requirements
             search_pipeline="html_hybrid_search",
-            post_filter=_build_post_filter(filters),
+            post_filter=post_filter,
             text_field="page_content",
             vector_field="chunk_embedding",
             source=source_cfg,
-            highlight=highlight_cfg,
         )
 
         # Transform result field names for frontend compatibility
         transformed_results = rename_result_fields(results)
+        
+        # Further format results for the frontend if this is a document similarity search
+        if document_id:
+            formatted_documents = format_results_for_frontend(transformed_results)
+            
+            # Exclude the original document from results
+            formatted_documents = [doc for doc in formatted_documents if doc["id"] != document_id]
+            
+            # Return response in format expected by frontend similarDocumentsService
+            return {
+                "statusCode": 200,
+                "body": json.dumps({
+                    "documents": formatted_documents,
+                    "totalCount": len(formatted_documents)
+                }),
+                "headers": {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*"
+                }
+            }
 
-        # Return formatted response
+        # Return standard search response for text queries
         return {
             "statusCode": 200,
             "body": json.dumps({
