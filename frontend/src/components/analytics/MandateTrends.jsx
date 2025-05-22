@@ -15,22 +15,23 @@ export default function MandateTrends() {
   const [showCalendar, setShowCalendar] = useState(false);
   const calendarRef = useRef(null);
   const [editingField, setEditingField] = useState(null); // 'start' or 'end'
-  const chartData = [
-    { year: 2010, salmon: 26, "climate-change": 45 },
-    { year: 2011, salmon: 34, "climate-change": 37 },
-    { year: 2012, salmon: 49, "climate-change": 31 },
-    { year: 2013, salmon: 48, "climate-change": 9 },
-    { year: 2014, salmon: 46, "climate-change": 19 },
-    { year: 2015, salmon: 5, "climate-change": 25 },
-    { year: 2016, salmon: 9, "climate-change": 23 },
-    { year: 2017, salmon: 9, "climate-change": 16 },
-    { year: 2018, salmon: 41, "climate-change": 33 },
-    { year: 2019, salmon: 10, "climate-change": 15 },
-    { year: 2020, salmon: 29, "climate-change": 7 },
-    { year: 2021, salmon: 47, "climate-change": 28 },
-    { year: 2022, salmon: 25, "climate-change": 15 },
-    { year: 2023, salmon: 20, "climate-change": 11 }
-  ];
+const chartData = [
+  { year: 2010, "Sustainable Fisheries": 26, "Aquatic Ecosystem": 45, "Species at Risk": 12, "Indigenous Fisheries": 8 },
+  { year: 2011, "Sustainable Fisheries": 34, "Aquatic Ecosystem": 37, "Species at Risk": 14, "Indigenous Fisheries": 10 },
+  { year: 2012, "Sustainable Fisheries": 49, "Aquatic Ecosystem": 31, "Species at Risk": 18, "Indigenous Fisheries": 12 },
+  { year: 2013, "Sustainable Fisheries": 48, "Aquatic Ecosystem": 9,  "Species at Risk": 20, "Indigenous Fisheries": 13 },
+  { year: 2014, "Sustainable Fisheries": 46, "Aquatic Ecosystem": 19, "Species at Risk": 17, "Indigenous Fisheries": 9 },
+  { year: 2015, "Sustainable Fisheries": 5,  "Aquatic Ecosystem": 25, "Species at Risk": 22, "Indigenous Fisheries": 14 },
+  { year: 2016, "Sustainable Fisheries": 9,  "Aquatic Ecosystem": 23, "Species at Risk": 26, "Indigenous Fisheries": 15 },
+  { year: 2017, "Sustainable Fisheries": 9,  "Aquatic Ecosystem": 16, "Species at Risk": 19, "Indigenous Fisheries": 11 },
+  { year: 2018, "Sustainable Fisheries": 41, "Aquatic Ecosystem": 33, "Species at Risk": 13, "Indigenous Fisheries": 17 },
+  { year: 2019, "Sustainable Fisheries": 10, "Aquatic Ecosystem": 15, "Species at Risk": 15, "Indigenous Fisheries": 18 },
+  { year: 2020, "Sustainable Fisheries": 29, "Aquatic Ecosystem": 7,  "Species at Risk": 18, "Indigenous Fisheries": 22 },
+  { year: 2021, "Sustainable Fisheries": 47, "Aquatic Ecosystem": 28, "Species at Risk": 21, "Indigenous Fisheries": 25 },
+  { year: 2022, "Sustainable Fisheries": 25, "Aquatic Ecosystem": 15, "Species at Risk": 14, "Indigenous Fisheries": 20 },
+  { year: 2023, "Sustainable Fisheries": 20, "Aquatic Ecosystem": 11, "Species at Risk": 12, "Indigenous Fisheries": 16 },
+];
+
 
   const colorPalette = [
     "#1f77b4", // blue
@@ -52,13 +53,10 @@ export default function MandateTrends() {
   ];
   
   const [allMandates, setAllMandates] = useState([
-    { label: "Salmon", value: "salmon" },
-    { label: "Conservation", value: "conservation" },
-    { label: "Climate Change", value: "climate-change" },
-    { label: "Aquaculture", value: "aquaculture" },
-    { label: "Fisheries", value: "fisheries" },
-    { label: "Biodiversity", value: "biodiversity" },
-    // ... add more if needed
+    { label: "Sustainable Fisheries", value: "Sustainable Fisheries" },
+    { label: "Species at Risk", value: "Species at Risk" },
+    { label: "Aquatic Ecosystem", value: "Aquatic Ecosystem" },
+    { label: "Indigenous Fisheries", value: "Indigenous Fisheries" },
   ]);
 
 
@@ -80,15 +78,12 @@ export default function MandateTrends() {
 
 
   const handleMandateSearch = async (inputValue) => {
-    const allMandates = [
-      { label: "Salmon", value: "salmon" },
-      { label: "Conservation", value: "conservation" },
-      { label: "Climate Change", value: "climate-change" },
-      { label: "Aquaculture", value: "aquaculture" },
-      { label: "Fisheries", value: "fisheries" },
-      { label: "Biodiversity", value: "biodiversity" },
-      // ... add more if needed
-    ];
+  const allMandates = [
+    { label: "Sustainable Fisheries", value: "Sustainable Fisheries" },
+    { label: "Species at Risk", value: "Species at Risk" },
+    { label: "Aquatic Ecosystem", value: "Aquatic Ecosystem" },
+    { label: "Indigenous Fisheries", value: "Indigenous Fisheries" },
+  ];
   
     if (!inputValue) return allMandates; // return all on empty search
   

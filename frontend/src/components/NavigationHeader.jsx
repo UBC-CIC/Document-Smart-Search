@@ -83,6 +83,16 @@ export default function NavigationHeader() {
             >
               Analytics
             </button>
+            <button
+              onClick={() => handleNavigation("/graph")}
+              className={
+                isActive("/graph")
+                  ? `text-blue-600 border-b-2 border-blue-600 ${baseDesktopClasses}`
+                  : `text-gray-500 ${baseDesktopClasses}`
+              }
+            >
+              Graph
+            </button>
           </nav>
 
           {/* Mobile Navigation Toggle */}
