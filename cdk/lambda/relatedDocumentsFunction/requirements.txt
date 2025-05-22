@@ -1,0 +1,6 @@
+boto3
+botocore
+psycopg[binary,pool]
+psycopg2-binary
+python-dotenv
+opensearch-py
