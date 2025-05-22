@@ -686,29 +686,23 @@ paths:
             statusCode: "200"
             responseParameters:
               method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key'"
-              method.response.header.Access-Control-Allow-Methods: "'OPTIONS,POST'"
+              method.response.header.Access-Control-Allow-Methods: "'OPTIONS,GET'"
               method.response.header.Access-Control-Allow-Origin: "'*'"
             responseTemplates:
               application/json: "{}"
 
-    post:
+    get:
       tags:
         - User
       summary: Get available filters
       operationId: get_user_filters
-      requestBody:
-        description: Filter categories to retrieve
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                filters:
-                  type: array
-                  items:
-                    type: string
-                  example: ["years", "topics", "mandates"]
+      parameters:
+        - name: filters
+          in: query
+          required: false
+          description: Comma-separated list of filter categories (e.g., years,topics)
+          schema:
+            type: string
       responses:
         "200":
           description: Successfully retrieved filters
@@ -733,9 +727,8 @@ paths:
         uri:
           Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${userFiltersDockerFunction.Arn}/invocations
         passthroughBehavior: when_no_match
-        httpMethod: POST
+        httpMethod: GET
         type: aws_proxy
-
   /user/chart_data:
     options:
       summary: CORS support
