@@ -18,6 +18,15 @@ REGION_NAME = "us-west-2"
 INDEX_NAME = "dfo-html-full-index"
 EMBEDDING_MODEL_PARAM = "amazon.titan-embed-text-v2:0"
 
+# Map of frontend filter names to OpenSearch field names
+FILTER_FIELD_MAPPING = {
+    "years": "csas_html_year",
+    "topics": "topic_categorization", 
+    "mandates": "mandate_categorization",
+    "authors": "html_authors",
+    "documentTypes": "html_doc_type",
+}
+
 # AWS Clients
 secrets_manager_client = boto3.client("secretsmanager", region_name=REGION_NAME)
 ssm_client = boto3.client("ssm", region_name=REGION_NAME)
@@ -66,14 +75,37 @@ def rename_result_fields(results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         
     return transformed_results
 
+def _build_post_filter(filters: dict | None) -> dict | None:
+    if not filters:
+        return None
+
+    clauses: list[dict] = []
+    for field, values in filters.items():
+        if not values:
+            continue
+            
+        # Map the frontend field name to OpenSearch field name
+        opensearch_field = FILTER_FIELD_MAPPING.get(field)
+        if not opensearch_field:
+            # Skip unknown fields
+            logger.warning(f"Skipping unknown filter field: {field}")
+            continue
+
+        if isinstance(values, (list, tuple, set)):
+            clauses.append({"terms": {opensearch_field: list(values)}})
+        else:
+            clauses.append({"term": {opensearch_field: values}})
+            
+    return {"bool": {"filter": clauses}} if clauses else None
+
 def handler(event, context):
     try:
         body = {} if event.get("body") is None else json.loads(event.get("body"))
         query = body.get("user_query", "")
         filters = body.get("filters", {})
 
-        secrets = get_secret(secret_name=OPENSEARCH_SEC)
-        opensearch_host = get_parameter(parameter_name=OPENSEARCH_HOST)
+        secrets = get_secret(OPENSEARCH_SEC)
+        opensearch_host = get_parameter(OPENSEARCH_HOST)
         op_client = OpenSearch(
             hosts=[{'host': opensearch_host, 'port': 443}],
             http_compress=True,
@@ -136,7 +168,7 @@ def handler(event, context):
             index_name=INDEX_NAME,
             k=50,
             search_pipeline="html_hybrid_search",
-            post_filter=filters,
+            post_filter=_build_post_filter(filters),
             text_field="page_content",
             vector_field="chunk_embedding",
             source=source_cfg,

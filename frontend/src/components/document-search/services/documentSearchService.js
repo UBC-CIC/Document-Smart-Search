@@ -11,16 +11,19 @@ export async function fetchFilterOptions() {
   }
 
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/filters`, {
-      method: "POST",
+    // Define filters to request
+    const filtersToRequest = ["years", "topics", "mandates", "authors", "document_types"];
+    
+    // Build the URL with query parameters
+    const url = new URL(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/filters`);
+    url.searchParams.append("filters", filtersToRequest.join(","));
+
+    const response = await fetch(url, {
+      method: "GET",
       headers: {
         "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        filters: ["years", "topics", "mandates", "authors", "documentTypes"],
-      }),
-    })
-
+      }
+    });
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)

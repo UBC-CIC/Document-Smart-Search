@@ -1,64 +1,53 @@
-import os
 import json
+from typing import Dict
 import boto3
 import logging
-from opensearchpy import OpenSearch, RequestsHttpConnection
-from requests_aws4auth import AWS4Auth
+from opensearchpy import OpenSearch
+import psycopg
 
 # Set up basic logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
 
 # Environment variables
-ENDPOINT = os.environ["OPENSEARCH_ENDPOINT"]
-DOCUMENTS_INDEX = os.environ.get("DOCUMENTS_INDEX_NAME", "dfo-html-documents")
-TOPIC_IDX = os.environ.get("TOPIC_INDEX_NAME", "dfo-topics")
-MANDATE_IDX = os.environ.get("MANDATE_INDEX_NAME", "dfo-mandates")
+# Hardcoded constants (for now)
+OPENSEARCH_SEC = "opensearch-masteruser-test-glue"
+OPENSEARCH_HOST = "opensearch-host-test-glue"
+RDS_SEC = "rds/dfo-db-glue-test"
+REGION_NAME = "us-west-2"
 
-# AWS credentials and region
-session = boto3.Session()
-creds = session.get_credentials().get_frozen_credentials()
-region = session.region_name or os.environ.get("AWS_REGION", "us-west-2")
-awsauth = AWS4Auth(
-    creds.access_key,
-    creds.secret_key,
-    region,
-    "es",
-    session_token=creds.token
-)
+# AWS Clients
+secrets_manager_client = boto3.client("secretsmanager", region_name=REGION_NAME)
+ssm_client = boto3.client("ssm", region_name=REGION_NAME)
 
-# OpenSearch client
-client = OpenSearch(
-    hosts=[{"host": ENDPOINT, "port": 443}],
-    http_auth=awsauth,
-    use_ssl=True,
-    verify_certs=True,
-    connection_class=RequestsHttpConnection
-)
-
-def get_filter_values(index, field, size=1000):
-    """Fetch unique filter values for a given index and field"""
-    query = {
-        "size": 0,  # We don't need document results, just aggregations
-        "aggs": {
-            "unique_values": {
-                "terms": {
-                    "field": field,
-                    "size": size,
-                    "order": {"_count": "desc"}  # Sort by document count (most frequent first)
-                }
-            }
-        }
-    }
-    
+def get_parameter(param_name: str):
+    """Get parameter from SSM parameter store with caching."""
     try:
-        response = client.search(index=index, body=query)
-        # Extract unique values from the aggregation
-        unique_values = [bucket['key'] for bucket in response['aggregations']['unique_values']['buckets']]
-        return unique_values
+        response = ssm_client.get_parameter(Name=param_name, WithDecryption=True)
+        return response["Parameter"]["Value"]
     except Exception as e:
-        logger.error(f"Error querying {index} for {field}: {str(e)}")
-        return []
+        logger.error(f"Error fetching parameter {param_name}: {e}")
+        raise
+
+def get_secret(secret_name: str) -> Dict:
+    try:
+        response = secrets_manager_client.get_secret_value(SecretId=secret_name)["SecretString"]
+        return json.loads(response)
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to decode JSON for secret {secret_name}: {e}")
+        raise ValueError(f"Secret {secret_name} is not properly formatted as JSON.")
+    except Exception as e:
+        logger.error(f"Error fetching secret {secret_name}: {e}")
+        raise
+
+def execute_rds_query(rds_conn, q: str, verbose: bool = False):
+    with rds_conn.cursor() as cursor:
+        cursor.execute(q)
+        if "select" in q.lower():
+            return cursor.fetchall()
+        if verbose:
+            print("Query executed!")
+        return None
 
 def handler(event, context):
     try:
@@ -72,39 +61,109 @@ def handler(event, context):
             # Validate and sanitize requested filters
             allowed_filters = ["years", "topics", "mandates", "authors", "document_types"]
             requested_filters = [f for f in requested_filters if f in allowed_filters]
-        
+
         # If no valid filters requested, return all
         if not requested_filters:
             requested_filters = ["years", "topics", "mandates", "authors", "document_types"]
         
         # Initialize empty results dictionary
         filters = {}
-        
-        # Only fetch the requested filters
-        if "years" in requested_filters:
-            filters["years"] = get_filter_values(DOCUMENTS_INDEX, "csas_html_year")
-            if not filters["years"]:
-                filters["years"] = ["2023", "2022", "2021", "2020", "2019"]
-        
-        if "topics" in requested_filters:
-            filters["topics"] = get_filter_values(TOPIC_IDX, "name.keyword")
-            if not filters["topics"]:
-                filters["topics"] = ["Ocean Science", "Environmental Protection", "Marine Conservation", "Fisheries Management"]
-        
-        if "mandates" in requested_filters:
-            filters["mandates"] = get_filter_values(MANDATE_IDX, "name.keyword")
-            if not filters["mandates"]:
-                filters["mandates"] = ["Ocean Protection", "Sustainable Fishing", "Research", "Coastal Management"]
-        
-        if "authors" in requested_filters:
-            filters["authors"] = get_filter_values(DOCUMENTS_INDEX, "author.keyword")
-            if not filters["authors"]:
-                filters["authors"] = ["DFO Research Team", "Canadian Coast Guard", "Marine Science Division", "Policy Unit"]
-        
-        if "document_types" in requested_filters:
-            filters["documentTypes"] = get_filter_values(DOCUMENTS_INDEX, "html_doc_type.keyword")
-            if not filters["documentTypes"]:
-                filters["documentTypes"] = ["Research Document", "Terms of Reference", "Scientific Advice", "Policy", "Unknown"]
+
+        secrets = get_secret(OPENSEARCH_SEC)
+        opensearch_host = get_parameter(OPENSEARCH_HOST)
+        op_client = OpenSearch(
+            hosts=[{'host': opensearch_host, 'port': 443}],
+            http_compress=True,
+            http_auth=(secrets['username'], secrets['password']),
+            use_ssl=True,
+            verify_certs=True
+        )
+
+        rds_secret = get_secret(RDS_SEC)
+        rds_conn_info = {
+            "host": rds_secret['host'],
+            "port": rds_secret['port'],
+            "dbname": rds_secret['dbname'],
+            "user": rds_secret['username'],
+            "password": rds_secret['password']
+        }
+
+        rds_conn = psycopg.connect(**rds_conn_info)
+
+        # Fetch filter values from RDS and OpenSearch
+        for f in requested_filters:
+            if f == "years":
+                # Fetch years from RDS
+                try:
+                    sql = """
+                    SELECT DISTINCT event_year
+                    FROM csas_events
+                    """
+                    results = execute_rds_query(rds_conn, sql)
+                    filters["years"] = [str(x[0]) for x in results if x[0] is not None]
+                except Exception as e:
+                    logger.error(f"Error querying RDS for years: {str(e)}")
+                    filters["years"] = []  # Empty list fallback on error
+                
+            elif f == "topics":
+                # Fetch topics from RDS
+                try:
+                    sql = """
+                    SELECT topic_name
+                    FROM topics
+                    """
+                    results = execute_rds_query(rds_conn, sql)
+                    filters["topics"] = [x[0] for x in results if x[0] is not None]
+                except Exception as e:
+                    logger.error(f"Error querying RDS for topics: {str(e)}")
+                    filters["topics"] = []  # Empty list fallback on error
+                
+            elif f == "mandates":
+                # Fetch mandates from RDS
+                try:
+                    sql = """
+                    SELECT mandate_name
+                    FROM mandates
+                    """
+                    results = execute_rds_query(rds_conn, sql)
+                    filters["mandates"] = [x[0] for x in results if x[0] is not None]
+                except Exception as e:
+                    logger.error(f"Error querying RDS for mandates: {str(e)}")
+                    filters["mandates"] = []  # Empty list fallback on error
+                
+            elif f == "document_types":
+                # Fetch document types from RDS
+                try:
+                    sql = """
+                    SELECT DISTINCT doc_type
+                    FROM documents
+                    """
+                    results = execute_rds_query(rds_conn, sql)
+                    filters["documentTypes"] = [x[0] for x in results if x[0] is not None]
+                except Exception as e:
+                    logger.error(f"Error querying RDS for document types: {str(e)}")
+                    filters["documentTypes"] = []  # Empty list fallback on error
+                
+            elif f == "authors":
+                # Fetch authors from OpenSearch using aggregation
+                authors_query = {
+                    "size": 0,
+                    "aggs": {
+                        "author_terms": {
+                            "terms": {
+                                "field": "html_authors.keyword",
+                                "size": 1000
+                            }
+                        }
+                    }
+                }
+                
+                try:
+                    response = op_client.search(index="dfo-html-full-index", body=authors_query)
+                    filters["authors"] = [bucket['key'] for bucket in response['aggregations']['author_terms']['buckets']]
+                except Exception as e:
+                    logger.error(f"Error querying OpenSearch for authors: {str(e)}")
+                    filters["authors"] = []  # Empty list if an error occurs
         
         # Sort years in descending order if present
         if "years" in filters:
@@ -135,3 +194,10 @@ def handler(event, context):
             },
             'body': json.dumps(f'Error processing request: {str(e)}')
         }
+    finally:
+        # Close the RDS connection if it was opened
+        if 'rds_conn' in locals():
+            rds_conn.close()
+        # Close the OpenSearch client if it was opened
+        if 'op_client' in locals():
+            op_client.close()
