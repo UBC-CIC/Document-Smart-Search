@@ -64,13 +64,14 @@ def rename_result_fields(results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     transformed_results = []
     for result in results:
         # Copy the result to avoid modifying the original
-        transformed_result = result.copy()
+        transformed_result = result[0].copy()
         
         # Rename fields directly at the top level of the result
         for old_name, new_name in field_mapping.items():
             if old_name in transformed_result:
                 transformed_result[new_name] = transformed_result.pop(old_name)
         
+        transformed_result["semanticScore"] = result[1]
         transformed_results.append(transformed_result)
         
     return transformed_results

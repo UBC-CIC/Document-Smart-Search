@@ -82,13 +82,10 @@ export async function fetchRelatedDocumentsByTopic(
       // Limit to 50 results maximum
       const limitedResults = filteredDocuments.slice(0, 50);
       
-      // Get metadata for this topic
-      const metadata = topicMetadata[topicName] || defaultTopicMetadata;
-      
+      // Simplified response without detailed metadata
       return {
         documents: limitedResults,
-        totalCount: filteredDocuments.length,
-        metadata: metadata
+        totalCount: filteredDocuments.length
       };
     } catch (error) {
       console.error("Error processing mock data for topic:", error);
@@ -122,11 +119,10 @@ export async function fetchRelatedDocumentsByTopic(
     // Get response data
     const responseData = await response.json();
     
-    // Return documents and metadata without pagination or sorting
+    // Return documents and total count without detailed metadata
     return {
       documents: responseData.documents || [],
-      totalCount: responseData.totalCount || 0,
-      metadata: responseData.metadata || {}
+      totalCount: responseData.totalCount || 0
     };
   } catch (error) {
     console.error("Error fetching related documents for topic:", error);

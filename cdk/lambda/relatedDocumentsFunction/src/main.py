@@ -1,8 +1,7 @@
 import json
 import boto3
 import logging
-from typing import Dict, List, Any, Tuple
-from opensearchpy import OpenSearch
+from typing import Dict, List, Any
 import psycopg
 
 # Set up basic logging
@@ -10,21 +9,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
 
 # Hardcoded constants (for now)
-OPENSEARCH_SEC = "opensearch-masteruser-test-glue"
-OPENSEARCH_HOST = "opensearch-host-test-glue"
 REGION_NAME = "us-west-2"
-INDEX_NAME = "dfo-html-full-index"
-EMBEDDING_MODEL_PARAM = "amazon.titan-embed-text-v2:0"
 RDS_SEC = "rds/dfo-db-glue-test"
-
-# Map of frontend filter names to OpenSearch field names
-FILTER_FIELD_MAPPING = {
-    "years": "csas_html_year",
-    "topics": "topic_categorization", 
-    "mandates": "mandate_categorization",
-    "authors": "html_authors",
-    "documentTypes": "html_doc_type",
-}
 
 # AWS Clients
 secrets_manager_client = boto3.client("secretsmanager", region_name=REGION_NAME)
@@ -51,7 +37,7 @@ def get_secret(secret_name: str) -> Dict:
         raise
 
 # Query builders for different topic types
-def build_mandate_query(name: str, language: str = "English", exclude_urls: List[str] = None, 
+def build_mandate_query(name: str, language: str = "English", exclude_doc_id: str = None, 
                         year_filters: List[str] = None, doc_type_filters: List[str] = None, 
                         limit: int = 50) -> str:
     """Build SQL query for documents related to a mandate."""
@@ -62,7 +48,7 @@ def build_mandate_query(name: str, language: str = "English", exclude_urls: List
            d.html_url,
            d.title,
            d.doc_type,
-           d.html_year,
+           d.year,
            dm.semantic_score,
            dm.llm_score,
            dm.llm_explanation
@@ -73,15 +59,14 @@ def build_mandate_query(name: str, language: str = "English", exclude_urls: List
       AND dm.llm_score >= 4
     """
     
-    # Add exclude condition if provided
-    if exclude_urls and len(exclude_urls) > 0:
-        urls_str = "', '".join(exclude_urls)
-        query += f"\n  AND d.html_url NOT IN ('{urls_str}')"
+    # Add exclude condition if provided - directly exclude by doc_id
+    if exclude_doc_id:
+        query += f"\n  AND d.doc_id != '{exclude_doc_id}'"
     
-    # Add year filters if provided
+    # Add year filters if provided - using event_year from schema
     if year_filters and len(year_filters) > 0:
         years_str = "', '".join(year_filters)
-        query += f"\n  AND d.html_year IN ('{years_str}')"
+        query += f"\n  AND d.event_year IN ('{years_str}')"
     
     # Add document type filters if provided
     if doc_type_filters and len(doc_type_filters) > 0:
@@ -93,7 +78,7 @@ def build_mandate_query(name: str, language: str = "English", exclude_urls: List
     
     return query
 
-def build_dfo_topic_query(name: str, language: str = "English", exclude_urls: List[str] = None,
+def build_dfo_topic_query(name: str, language: str = "English", exclude_doc_id: str = None,
                          year_filters: List[str] = None, doc_type_filters: List[str] = None,
                          limit: int = 50) -> str:
     """Build SQL query for documents related to a DFO topic."""
@@ -104,7 +89,7 @@ def build_dfo_topic_query(name: str, language: str = "English", exclude_urls: Li
            d.html_url,
            d.title,
            d.doc_type,
-           d.html_year,
+           d.year,
            dt.semantic_score,
            dt.llm_score,
            dt.llm_explanation
@@ -115,15 +100,14 @@ def build_dfo_topic_query(name: str, language: str = "English", exclude_urls: Li
       AND dt.llm_score >= 4
     """
     
-    # Add exclude condition if provided
-    if exclude_urls and len(exclude_urls) > 0:
-        urls_str = "', '".join(exclude_urls)
-        query += f"\n  AND d.html_url NOT IN ('{urls_str}')"
+    # Add exclude condition if provided - directly exclude by doc_id
+    if exclude_doc_id:
+        query += f"\n  AND d.doc_id != '{exclude_doc_id}'"
     
-    # Add year filters if provided
+    # Add year filters if provided - using event_year from schema
     if year_filters and len(year_filters) > 0:
         years_str = "', '".join(year_filters)
-        query += f"\n  AND d.html_year IN ('{years_str}')"
+        query += f"\n  AND d.event_year IN ('{years_str}')"
     
     # Add document type filters if provided
     if doc_type_filters and len(doc_type_filters) > 0:
@@ -135,7 +119,7 @@ def build_dfo_topic_query(name: str, language: str = "English", exclude_urls: Li
     
     return query
 
-def build_derived_topic_query(name: str, language: str = "English", exclude_urls: List[str] = None,
+def build_derived_topic_query(name: str, language: str = "English", exclude_doc_id: str = None,
                              year_filters: List[str] = None, doc_type_filters: List[str] = None,
                              limit: int = 50) -> str:
     """Build SQL query for documents related to a derived topic."""
@@ -146,7 +130,7 @@ def build_derived_topic_query(name: str, language: str = "English", exclude_urls
            d.html_url,
            d.title,
            d.doc_type,
-           d.html_year,
+           d.year,
            ddt.confidence_score AS semantic_score,
            NULL AS llm_score,
            NULL AS llm_explanation
@@ -156,15 +140,14 @@ def build_derived_topic_query(name: str, language: str = "English", exclude_urls
     WHERE ddt.topic_name = '{name}' AND d.doc_language = '{language}'
     """
     
-    # Add exclude condition if provided
-    if exclude_urls and len(exclude_urls) > 0:
-        urls_str = "', '".join(exclude_urls)
-        query += f"\n  AND d.html_url NOT IN ('{urls_str}')"
+    # Add exclude condition if provided - directly exclude by doc_id
+    if exclude_doc_id:
+        query += f"\n  AND d.doc_id != '{exclude_doc_id}'"
     
-    # Add year filters if provided
+    # Add year filters if provided - using event_year from schema
     if year_filters and len(year_filters) > 0:
         years_str = "', '".join(year_filters)
-        query += f"\n  AND d.html_year IN ('{years_str}')"
+        query += f"\n  AND d.event_year IN ('{years_str}')"
     
     # Add document type filters if provided
     if doc_type_filters and len(doc_type_filters) > 0:
@@ -212,10 +195,10 @@ def build_count_query(topic_type: str, name: str, language: str = "English",
     else:
         raise ValueError(f"Unknown topic type: {topic_type}")
     
-    # Add year filters if provided
+    # Add year filters if provided - using event_year from schema
     if year_filters and len(year_filters) > 0:
         years_str = "', '".join(year_filters)
-        query += f"\n  AND d.html_year IN ('{years_str}')"
+        query += f"\n  AND d.event_year IN ('{years_str}')"
     
     # Add document type filters if provided
     if doc_type_filters and len(doc_type_filters) > 0:
@@ -223,79 +206,6 @@ def build_count_query(topic_type: str, name: str, language: str = "English",
         query += f"\n  AND d.doc_type IN ('{doc_types_str}')"
     
     return query
-
-def build_metadata_query(topic_type: str, name: str, language: str = "English") -> Dict[str, str]:
-    """Build queries to get metadata about document distribution."""
-    
-    metadata_queries = {}
-    
-    # By document type
-    if topic_type == "mandate":
-        metadata_queries["by_type"] = f"""
-        SELECT d.doc_type, COUNT(*)
-        FROM documents d
-        INNER JOIN documents_mandates dm
-          ON d.html_url = dm.html_url
-        WHERE dm.mandate_name = '{name}' AND d.doc_language = '{language}'
-          AND dm.llm_score >= 4
-        GROUP BY d.doc_type
-        ORDER BY COUNT(*) DESC
-        """
-        
-        metadata_queries["by_year"] = f"""
-        SELECT d.html_year, COUNT(*)
-        FROM documents d
-        INNER JOIN documents_mandates dm
-          ON d.html_url = dm.html_url
-        WHERE dm.mandate_name = '{name}' AND d.doc_language = '{language}'
-          AND dm.llm_score >= 4
-        GROUP BY d.html_year
-        ORDER BY d.html_year DESC
-        """
-    elif topic_type == "dfo_topic":
-        metadata_queries["by_type"] = f"""
-        SELECT d.doc_type, COUNT(*)
-        FROM documents d
-        INNER JOIN documents_topics dt
-          ON d.html_url = dt.html_url
-        WHERE dt.topic_name = '{name}' AND d.doc_language = '{language}'
-          AND dt.llm_score >= 4
-        GROUP BY d.doc_type
-        ORDER BY COUNT(*) DESC
-        """
-        
-        metadata_queries["by_year"] = f"""
-        SELECT d.html_year, COUNT(*)
-        FROM documents d
-        INNER JOIN documents_topics dt
-          ON d.html_url = dt.html_url
-        WHERE dt.topic_name = '{name}' AND d.doc_language = '{language}'
-          AND dt.llm_score >= 4
-        GROUP BY d.html_year
-        ORDER BY d.html_year DESC
-        """
-    else:  # derived_topic
-        metadata_queries["by_type"] = f"""
-        SELECT d.doc_type, COUNT(*)
-        FROM documents d
-        INNER JOIN documents_derived_topic ddt
-          ON d.html_url = ddt.html_url
-        WHERE ddt.topic_name = '{name}' AND d.doc_language = '{language}'
-        GROUP BY d.doc_type
-        ORDER BY COUNT(*) DESC
-        """
-        
-        metadata_queries["by_year"] = f"""
-        SELECT d.html_year, COUNT(*)
-        FROM documents d
-        INNER JOIN documents_derived_topic ddt
-          ON d.html_url = ddt.html_url
-        WHERE ddt.topic_name = '{name}' AND d.doc_language = '{language}'
-        GROUP BY d.html_year
-        ORDER BY d.html_year DESC
-        """
-    
-    return metadata_queries
 
 def get_related_documents(
     *, pgsql_conn, conn_info: Dict[str, Any], 
@@ -307,32 +217,22 @@ def get_related_documents(
     limit: int = 50
 ) -> Dict[str, Any]:
     """
-    Get documents related to a topic or mandate, with additional metadata.
+    Get documents related to a topic or mandate.
     """
     logger.info(f"Getting related documents for {topic_type}: {topic_name}")
     
-    # If we have a document ID to exclude, first get its URL
-    exclude_urls = []
-    if exclude_doc_id:
-        doc_url_query = f"""
-        SELECT html_url FROM documents WHERE doc_id = '{exclude_doc_id}'
-        """
-        doc_url_result = pgsql_conn.execute_query(doc_url_query, conn_info)
-        if doc_url_result and len(doc_url_result) > 0:
-            exclude_urls = [doc_url_result[0][0]]
-    
-    # Build the appropriate query based on topic type
+    # Build the appropriate query based on topic type - passing exclude_doc_id directly
     if topic_type == "mandate":
         query = build_mandate_query(
-            topic_name, language, exclude_urls, year_filters, doc_type_filters, limit
+            topic_name, language, exclude_doc_id, year_filters, doc_type_filters, limit
         )
     elif topic_type == "dfo_topic":
         query = build_dfo_topic_query(
-            topic_name, language, exclude_urls, year_filters, doc_type_filters, limit
+            topic_name, language, exclude_doc_id, year_filters, doc_type_filters, limit
         )
     elif topic_type == "derived_topic":
         query = build_derived_topic_query(
-            topic_name, language, exclude_urls, year_filters, doc_type_filters, limit
+            topic_name, language, exclude_doc_id, year_filters, doc_type_filters, limit
         )
     else:
         raise ValueError(f"Unknown topic type: {topic_type}")
@@ -347,16 +247,6 @@ def get_related_documents(
     )
     count_result = pgsql_conn.execute_query(count_query, conn_info)
     total_count = count_result[0][0] if count_result else 0
-    
-    # Get metadata
-    metadata_queries = build_metadata_query(topic_type, topic_name, language)
-    
-    by_type_results = pgsql_conn.execute_query(metadata_queries["by_type"], conn_info)
-    by_year_results = pgsql_conn.execute_query(metadata_queries["by_year"], conn_info)
-    
-    # Format metadata
-    documents_by_type = {doc_type: count for doc_type, count in by_type_results}
-    documents_by_year = {str(year): count for year, count in by_year_results}
     
     # Format documents based on the simplified query results
     documents = []
@@ -394,15 +284,10 @@ def get_related_documents(
         
         documents.append(doc)
     
-    # Return the results
+    # Return the simplified results (no detailed metadata by type)
     return {
         "documents": documents,
-        "totalCount": total_count,
-        "metadata": {
-            "totalDocuments": total_count,
-            "documentsByType": documents_by_type,
-            "documentsByYear": documents_by_year
-        }
+        "totalCount": total_count
     }
 
 class PgExecutor:
@@ -418,45 +303,29 @@ class PgExecutor:
 
 def handler(event, context):
     try:
-        # First check query string parameters (for GET requests)
-        query_params = event.get("queryStringParameters", {}) or {}
-        
-        # Get parameters from query string if present
-        topic_name = query_params.get("name")
-        topic_type = query_params.get("type", "").lower()
-        current_doc_id = query_params.get("currentDocID")
-        
-        # If not in query parameters, try to get from body (for POST requests)
-        if not topic_name and event.get("body"):
+        # Parse body if present
+        if event.get("body"):
             body = json.loads(event.get("body"))
-            topic_name = body.get("name")
-            topic_type = (body.get("type", "") or "").lower()
-            filters = body.get("filters", {})
-            current_doc_id = body.get("currentDocID")
-            limit = body.get("limit", 50)
-            language = body.get("language", "English")
         else:
-            # Handle filter parameters from query string
-            filters = {}
-            if "years" in query_params:
-                filters["years"] = query_params["years"].split(",") if query_params.get("years") else []
-            if "documentTypes" in query_params:
-                filters["documentTypes"] = query_params["documentTypes"].split(",") if query_params.get("documentTypes") else []
-            limit = int(query_params.get("limit", 50))
-            language = query_params.get("language", "English")
+            body = {}
         
-        # Map API parameter type to internal type
-        type_mapping = {
-            "mandate": "mandate",
-            "dfo": "dfo_topic",
-            "derived": "derived_topic",
-            "dfo_topic": "dfo_topic", 
-            "derived_topic": "derived_topic"
-        }
+        # Get parameters matching exactly the frontend API call format
+        topic_name = body.get("name")
+        topic_type = event.get("queryStringParameters", {}).get("type", "")
         
-        # Validate and map the topic type
-        internal_topic_type = type_mapping.get(topic_type)
-        if not internal_topic_type:
+        # The rest should be in the body
+        filters = body.get("filters", {})
+        current_doc_id = body.get("currentDocID")
+        language = body.get("language", "English")
+        
+        # Direct mapping of topic type to internal type without additional complexity
+        if topic_type == "mandate":
+            internal_topic_type = "mandate"
+        elif topic_type == "dfo":
+            internal_topic_type = "dfo_topic"
+        elif topic_type == "derived":
+            internal_topic_type = "derived_topic"
+        else:
             return {
                 "statusCode": 400,
                 "body": json.dumps({"error": f"Invalid topic type: {topic_type}. Expected one of: mandate, dfo, derived"}),
@@ -476,15 +345,11 @@ def handler(event, context):
                 }
             }
         
-        # Extract specific filters
+        # Extract specific filters - these are already arrays in the input format
         year_filters = filters.get("years", [])
         doc_type_filters = filters.get("documentTypes", [])
         
-        # Set up API clients
-        secrets = get_secret(OPENSEARCH_SEC)
-        opensearch_host = get_parameter(OPENSEARCH_HOST)
-        
-        # Set up RDS connection
+        # Set up database connection
         rds_secret = get_secret(RDS_SEC)
         rds_conn_info = {
             "host": rds_secret['host'],
@@ -497,7 +362,7 @@ def handler(event, context):
         rds_conn = psycopg.connect(**rds_conn_info)
         pgsql_executor = PgExecutor(rds_conn)
         
-        # Get related documents
+        # Get related documents with hardcoded limit of 50
         result = get_related_documents(
             pgsql_conn=pgsql_executor,
             conn_info=rds_conn_info,
@@ -507,7 +372,7 @@ def handler(event, context):
             exclude_doc_id=current_doc_id,
             year_filters=year_filters,
             doc_type_filters=doc_type_filters,
-            limit=limit
+            limit=50  # Hardcoded limit (For now, can be changed later)
         )
         
         # Return the formatted response
@@ -519,7 +384,7 @@ def handler(event, context):
                 "Access-Control-Allow-Origin": "*"
             }
         }
-        
+    
     except ValueError as ve:
         return {
             "statusCode": 400,

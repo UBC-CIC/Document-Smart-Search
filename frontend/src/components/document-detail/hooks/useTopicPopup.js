@@ -92,7 +92,8 @@ export function useTopicPopup() {
       );
       
       setAllDocuments(result.documents || []);
-      setMetadata(result.metadata || {});
+      // No metadata is needed anymore
+      setMetadata({}); // Just set to empty object
     } catch (error) {
       console.error("Failed to load related documents:", error);
     } finally {
@@ -147,7 +148,7 @@ export function useTopicPopup() {
   return {
     popupState,
     documents: displayedDocuments, // Return the paginated documents
-    metadata,
+    metadata: {}, // Just return an empty object since we're not using it anymore
     isLoading,
     currentPage,
     totalPages,
