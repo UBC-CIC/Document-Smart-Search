@@ -30,6 +30,8 @@ export async function fetchFilterOptions() {
     }
     
     const data = await response.json()
+
+    console.log("Filter options fetched successfully:", data)
     return data
   } catch (error) {
     console.error("Error fetching filter options:", error.message)
@@ -84,6 +86,10 @@ export async function performDocumentSearch(query, filters) {
     }
     
     const data = await response.json()
+
+
+    // Log the highlights and results for debugging
+    console.log("data:", data.results[1])
     return data.results || []
   } catch (error) {
     console.error("Error performing document search:", error.message)

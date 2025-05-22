@@ -24,13 +24,32 @@ export async function fetchDocumentDetail(documentId) {
   }
 
   try {
-    // In the real API implementation, we expect related documents to be included in the response
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/document-details?document_id=${encodeURIComponent(documentId)}`);
+    // // In the real API implementation, we expect related documents to be included in the response
+    // const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/document-details?document_id=${encodeURIComponent(documentId)}`);
 
+    // if (!response.ok) {
+    //   throw new Error(`HTTP error! status: ${response.status}`);
+    // }
+    // return await response.json();
+
+    // Fetch with POST method (Need to determine which one is better)
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/document-details`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        document_id: documentId
+      }),
+    })
+
+    
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     return await response.json();
+
+
   } catch (error) {
     console.error("Error fetching document details:", error);
     // Fallback to mock data on error
