@@ -159,8 +159,6 @@ def handler(event, context):
     # Handle role selection - respond directly without calling the LLM
     if is_role_selection:
         logger.info(f"User selected role: {user_role}")
-        # Store the selection in DynamoDB or other storage if needed
-        # ...
         
         return {
             "statusCode": 200,

@@ -1,185 +1,212 @@
-import os
 import re
 import json
 import boto3
-import torch
-import boto3
-from opensearchpy import OpenSearch, RequestsHttpConnection, AWSV4SignerAuth
-from pathlib import Path
-from pprint import pprint
+import logging
+from typing import Dict, List, Any
+
 from opensearchpy import OpenSearch
-from langchain_community.document_loaders import JSONLoader, DirectoryLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.vectorstores import OpenSearchVectorSearch
-from langchain_aws.embeddings import BedrockEmbeddings  # ✅ CHANGED
-from langchain import __version__ as langchain_version
 
-import src.aws_utils as aws
-import src.opensearch_utils as op
+# Set up basic logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger()
 
-with open(Path("configs.json"), "r") as f:
-    configs = json.load(f)
+# Hardcoded constants (for now)
+OPENSEARCH_SEC = "opensearch-masteruser-test-glue"
+OPENSEARCH_HOST = "opensearch-host-test-glue"
+REGION_NAME = "us-west-2"
+INDEX_NAME = "dfo-html-full-index"
+EMBEDDING_MODEL_PARAM = "amazon.titan-embed-text-v2:0"
+BEDROCK_MODEL_PARAM = "us.meta.llama3-3-70b-instruct-v1:0"
 
-REGION_NAME = configs['aws']['region_name']
-OPENSEARCH_SEC = configs['aws']['secrets']['opensearch']
-INDEX_NAME = "dfo-langchain-vector-index"
-BUCKET_NAME = "dfo-documents"
-FOLDER_NAME = "documents"
-LOCAL_DIR = "s3_data"
+# AWS Clients
+secrets_manager_client = boto3.client("secretsmanager", region_name=REGION_NAME)
+ssm_client = boto3.client("ssm", region_name=REGION_NAME)
 
-def set_secrets():
-    global SECRETS
-    SECRETS = aws.get_secret(secret_name=OPENSEARCH_SEC, region_name=REGION_NAME)
+def get_parameter(param_name: str):
+    """Get parameter from SSM parameter store with caching."""
+    try:
+        response = ssm_client.get_parameter(Name=param_name, WithDecryption=True)
+        return response["Parameter"]["Value"]
+    except Exception as e:
+        logger.error(f"Error fetching parameter {param_name}: {e}")
+        raise
 
-def clean_text(text: str) -> str:
-    text = re.sub(r'[^\x00-\x7F]+', ' ', text)
-    text = re.sub(r'\n\s*\n+', '\n', text)
-    return text
+def get_secret(secret_name: str) -> Dict:
+    try:
+        response = secrets_manager_client.get_secret_value(SecretId=secret_name)["SecretString"]
+        return json.loads(response)
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to decode JSON for secret {secret_name}: {e}")
+        raise ValueError(f"Secret {secret_name} is not properly formatted as JSON.")
+    except Exception as e:
+        logger.error(f"Error fetching secret {secret_name}: {e}")
+        raise
 
-def metadata_func(record: dict, metadata: dict) -> dict:
-    metadata["url"] = record.get("url")
-    metadata["publicationYear"] = record.get("publicationYear")
-    metadata["key"] = metadata["publicationYear"] + "/" + record.get("name")
-    return metadata
+def extract_key_insights(analysis_text: str) -> List[str]:
+    """Extract key insights from the LLM analysis text."""
+    insights = []
+    
+    # Look for key findings section
+    key_findings_match = re.search(r'Key Findings[:\n]+(.*?)(?:Relevance to User Query|\Z)', 
+                                 analysis_text, re.DOTALL | re.IGNORECASE)
+    
+    if key_findings_match:
+        findings_text = key_findings_match.group(1).strip()
+        # Extract bullet points or numbered insights
+        bullet_points = re.findall(r'(?:^|\n)[•\-\*\d+\.]\s*([^\n]+)', findings_text)
+        
+        if bullet_points:
+            insights = [point.strip() for point in bullet_points if point.strip()]
+        else:
+            # If no bullet points found, split by newlines and filter empty lines
+            insights = [line.strip() for line in findings_text.split('\n') if line.strip()]
+    
+    # If no insights found, provide a generic one to avoid empty list
+    if not insights:
+        insights = ["Document contains relevant information to your query"]
+    
+    return insights
 
-def get_opensearch_client():
-    return OpenSearch(
-        hosts=[{'host': 'search-test-dfo-yevtcwsp7i4vjzy4kdvalwpxgm.aos.ca-central-1.on.aws', 'port': 443}],
-        http_compress=True,
-        http_auth=(SECRETS['username'], SECRETS['passwords']),
-        use_ssl=True,
-        verify_certs=True
-    )
+def _get_document_by_id(
+    *,
+    op_client,
+    index_name: str,
+    document_id: str,
+) -> Dict[str, Any]:
+    """Return document metadata and content (empty strings if not found)."""
+    try:
+        resp = op_client.get(index=index_name, 
+                             id=document_id,
+                            _source=[
+                                "html_subject",
+                                "csas_html_title",
+                                "csas_event",
+                                "csas_html_year",
+                                "html_url",
+                                "page_content",
+                                "html_doc_type"
+                            ])
+        src = resp["_source"]
+        title = src.get("html_subject") or src.get("csas_html_title") or "Unknown"
 
-def process_documents():
-    loader = DirectoryLoader(
-        "./s3_data/ParsedPublications/2001/", glob="*.json",
-        loader_cls=JSONLoader,
-        loader_kwargs={
-            'jq_schema': '.',
-            'content_key': 'text',
-            "metadata_func": metadata_func
-        },
-    )
-    docs = loader.load()
-    for doc in docs:
-        doc.page_content = clean_text(doc.page_content)
-        doc.metadata.pop("source", None)
-
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,
-        chunk_overlap=200,
-        length_function=len
-    )
-    docs = text_splitter.split_documents(docs)
-    return docs
+        return {
+            "title": title,
+            "document_type": src.get("html_doc_type", "Unknown"),
+            "document_subject": src.get("html_subject", "Unknown"),
+            "csas_event": src.get("csas_event", "Unknown"),
+            "csas_event_year": src.get("csas_html_year", "Unknown"),
+            "document_url": src.get("html_url", "Unknown"),
+            "text": src.get("page_content", ""),
+        }
+    except Exception as e:
+        logger.error(f"Error fetching document {document_id}: {e}")
+        return {"title": "Document not found", "text": ""}
 
 def handler(event, context):
     try:
         # Parse the input body
-        body = json.loads(event.get("body", "{}"))
+        body = {} if event.get("body") is None else json.loads(event.get("body"))
         
-        # Check if this is a document summary request
-        if body.get("message_content"):
-            # This is a request for document summary generation
-            message_content = body.get("message_content")
-            
-            # Process the prompt and generate a response
-            # In a real implementation, this would call Bedrock or another LLM service
-            # Here we'll generate a mock response based on the prompt
-            
-            # Extract document title from the prompt if possible
-            title_match = re.search(r'document titled "(.*?)"', message_content)
-            title = title_match.group(1) if title_match else "Unknown Document"
-            
-            # Generate mock summary
-            summary = (
-                f"This comprehensive document focuses on key aspects related to marine conservation "
-                f"and environmental protection strategies. The document provides detailed analysis of "
-                f"current challenges facing ocean ecosystems and proposes several solutions."
-            )
-            
-            # Add some detail based on any topics mentioned in the prompt
-            topic_matches = re.search(r'about (.*?) and was', message_content)
-            if topic_matches:
-                topics = topic_matches.group(1)
-                summary += f" Specifically addressing {topics}, the document outlines policy recommendations "
-                summary += "and scientific findings that support sustainable management practices."
-            
-            # Add bullet points for a more comprehensive response
-            summary += "\n\n• Key finding: Ocean acidification is increasing at a rate of 5% annually in coastal regions\n"
-            summary += "• Recommendation: Implement protected marine zones in critical habitat areas\n"
-            summary += "• Data indicates that sustainable fishing practices have shown a 12% increase in fish populations\n"
-            summary += "• Future research should focus on climate change impacts on marine biodiversity"
-            
-            return {
-                "statusCode": 200,
-                "body": json.dumps({
-                    "content": summary
-                }),
-                "headers": {
-                    "Content-Type": "application/json",
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Methods": "POST, OPTIONS"
-                }
-            }
-            
-        # If not a document summary request, handle as a standard query
-        query = body.get("query", "")
-        if not query:
+        # Check if this is a document summary request by checking if BOTH the documentId and userQuery are present
+        if not body.get("documentId", "") or not body.get("userQuery", ""):
+            # If neither is present, return an error
             return {
                 "statusCode": 400,
-                "body": json.dumps({"error": "Missing 'query'"})
+                "body": json.dumps({"error": "documentId and userQuery are required"}),
+                "headers": {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*"
+                }
             }
 
-        # # Step 2: Embed the query using Bedrock
-        # bedrock_client = boto3.client("bedrock-runtime", region_name=REGION_NAME)
-        # embedder = BedrockEmbeddings(
-        #     client=bedrock_client,
-        #     model_id=configs['embeddings']['embedding_model']
-        # )
+        # This is a request for document analysis/summary
+        document_id = body.get("documentId")
+        user_query = body.get("userQuery", "")
 
-        # # Step 3: Call OpenSearch hybrid similarity search
-        # opensearch_client = op_client # get_opensearch_client()
+        secrets = get_secret(secret_name=OPENSEARCH_SEC)
+        opensearch_host = get_parameter(param_name=OPENSEARCH_HOST)
+        op_client = OpenSearch(
+            hosts=[{'host': opensearch_host, 'port': 443}],
+            http_compress=True,
+            http_auth=(secrets['username'], secrets['password']),
+            use_ssl=True,
+            verify_certs=True
+        )
 
-        # results = op.hybrid_similarity_search_with_score(
-        #     query=query,
-        #     embedding_function=embedder,
-        #     client=opensearch_client,
-        #     index_name=INDEX_NAME,
-        #     k=3,
-        #     search_pipeline="html_hybrid_search",
-        #     text_field="page_content",
-        #     vector_field="chunk_embedding"
-        # )
-        results = [("doc1", 0.95), ("doc2", 0.90), ("doc3", 0.85)]  # Mock results for testing
+        # Fetch document from OpenSearch
+        doc = _get_document_by_id(
+            op_client=op_client,
+            index_name=INDEX_NAME,
+            document_id=document_id
+        )
+        
+        if not doc["text"]:
+            return {
+                "statusCode": 404,
+                "body": json.dumps({"error": "Document not found"}),
+                "headers": {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*"
+                }
+            }
+        
+        # Create the prompt for Bedrock
+        llm_prompt = f"""
+        Please analyze this document in relation to the user's query.
+        
+        Format your response with clear sections:
+        
+        # Key Findings
+        - List 3-5 bullet points of the most important insights from the document
+        
+        # Summary
+        Provide a concise summary of the document's content and its relevance to the query
+        
+        User Query:
+        {user_query}
 
-        # Return modified results in the format expected by the frontend
+        Document:
+        Title: {doc['title']}
+        Alternative Title: {doc['document_subject']}
+        Document type: {doc['document_type']}
+        
+        Canadian Science Advisory Secretariat (CSAS) Event Name: {doc['csas_event']}
+        CSAS Event Year: {doc['csas_event_year']}
+        
+        Text:
+        {doc['text']}
+        """
+        
+        # Call Bedrock for LLM analysis
+        bedrock_client = boto3.client("bedrock-runtime", region_name=REGION_NAME)
+        
+        response = bedrock_client.invoke_model(
+            modelId=BEDROCK_MODEL_PARAM,
+            contentType="application/json",
+            accept="application/json",
+            body=json.dumps({
+                "prompt": llm_prompt,
+                "temperature": 0.7
+            })
+        )
+        
+        response_body = json.loads(response.get("body").read())
+        analysis = response_body.get("generation", "")
+        
+        # Extract summary - assume everything after the Summary header and before any other header
+        summary_match = re.search(r'# Summary\s+(.*?)(?:#|\Z)', analysis, re.DOTALL)
+        summary = summary_match.group(1).strip() if summary_match else analysis
+        
+        # Extract key insights as a list
+        key_insights = extract_key_insights(analysis)
+        
+        # Return only what the frontend expects
         return {
             "statusCode": 200,
             "body": json.dumps({
-                "query": query,
-                "results": [
-                    {
-                        "score": score,
-                        "id": f"doc-{i+1}",
-                        "title": f"Document about {query.title() if query else 'Marine Conservation'} - Part {i+1}",
-                        "year": str(2020 + i % 4),
-                        "author": ["DFO Research Team", "Canadian Coast Guard", "Marine Science Division"][i % 3],
-                        "category": ["Report", "Policy Document", "Research Paper"][i % 3],
-                        "documentType": ["Report", "Policy Document", "Research Paper"][i % 3],
-                        "topics": ["Ocean Science", "Environmental Protection", "Marine Conservation"][:2+i%2],
-                        "mandates": ["Ocean Protection", "Sustainable Fishing"][:1+i%2],
-                        "highlights": [
-                            f"Important finding related to {query}" if query else "Important finding related to marine ecosystems",
-                            f"Key data on {query}" if query else "Key data on conservation efforts",
-                            f"Recommendation regarding {query}" if query else "Recommendation regarding sustainable practices"
-                        ],
-                        "metadata": doc
-                    }
-                    for i, (doc, score) in enumerate(results)
-                ],
-                "langchain": langchain_version
+                "title": doc["title"],
+                "summary": summary.strip(),
+                "keyInsights": key_insights
             }),
             "headers": {
                 "Content-Type": "application/json",
@@ -187,7 +214,6 @@ def handler(event, context):
                 "Access-Control-Allow-Methods": "POST, OPTIONS"
             }
         }
-
     except Exception as e:
         import traceback
         return {
