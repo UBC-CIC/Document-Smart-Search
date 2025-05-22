@@ -1,11 +1,10 @@
 import json
 import boto3
 import logging
-from typing import Dict
+from typing import Dict, List, Any
 from langchain_aws.embeddings import BedrockEmbeddings
 from opensearchpy import OpenSearch
 
-import helpers.aws_utils as aws
 import helpers.opensearch_utils as op
 
 # Set up basic logging
@@ -43,14 +42,38 @@ def get_secret(secret_name: str) -> Dict:
         logger.error(f"Error fetching secret {secret_name}: {e}")
         raise
 
+def rename_result_fields(results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Rename fields in search results to match frontend expectations."""
+    field_mapping = {
+        "csas_html_title": "title",
+        "html_year": "year",
+        "csas_html_year": "csasYear",
+        "csas_event": "csasEvent",
+        "html_doc_type": "documentType",
+    }
+    
+    transformed_results = []
+    for result in results:
+        # Copy the result to avoid modifying the original
+        transformed_result = result.copy()
+        
+        # Rename fields directly at the top level of the result
+        for old_name, new_name in field_mapping.items():
+            if old_name in transformed_result:
+                transformed_result[new_name] = transformed_result.pop(old_name)
+        
+        transformed_results.append(transformed_result)
+        
+    return transformed_results
+
 def handler(event, context):
     try:
         body = {} if event.get("body") is None else json.loads(event.get("body"))
         query = body.get("user_query", "")
         filters = body.get("filters", {})
 
-        secrets = aws.get_secret(secret_name=OPENSEARCH_SEC, region_name=REGION_NAME)
-        opensearch_host = aws.get_parameter_ssm(parameter_name=OPENSEARCH_HOST, region_name=REGION_NAME)
+        secrets = get_secret(secret_name=OPENSEARCH_SEC)
+        opensearch_host = get_parameter(parameter_name=OPENSEARCH_HOST)
         op_client = OpenSearch(
             hosts=[{'host': opensearch_host, 'port': 443}],
             http_compress=True,
@@ -120,12 +143,15 @@ def handler(event, context):
             highlight=highlight_cfg,
         )
 
+        # Transform result field names for frontend compatibility
+        transformed_results = rename_result_fields(results)
+
         # Return formatted response
         return {
             "statusCode": 200,
             "body": json.dumps({
                 "query": query,
-                "results": results,
+                "results": transformed_results,
             }),
             "headers": {
                 "Content-Type": "application/json",
