@@ -22,6 +22,15 @@ export default function ResultsList({
           <div className="ml-2 flex items-center bg-gray-200 dark:bg-gray-700 rounded-full p-1">
             <button
               className={`px-3 py-1 rounded-full text-sm font-medium ${
+                sortBy === "relevance" ? "bg-white dark:bg-gray-600 shadow-sm" : "dark:text-gray-300"
+              }`}
+              onClick={() => handleSortChange("relevance")}
+              disabled={isLoading || !hasSearched}
+            >
+              Relevance
+            </button>
+            <button
+              className={`px-3 py-1 rounded-full text-sm font-medium ${
                 sortBy === "recent" ? "bg-white dark:bg-gray-600 shadow-sm" : "dark:text-gray-300"
               }`}
               onClick={() => handleSortChange("recent")}

@@ -2,12 +2,42 @@ import Link from "next/link"
 import { ChevronRight } from "lucide-react"
 
 export default function ResultItem({ result, openQuerySummary }) {
+  // Function to determine the background color based on score
+  const getScoreColor = (score) => {
+    if (!score) return "bg-gray-300";
+    
+    const percentage = score * 100;
+    
+    if (percentage < 40) {
+      return "bg-red-500";
+    } else if (percentage < 70) {
+      return "bg-yellow-400";
+    } else {
+      return "bg-green-500";
+    }
+  };
+
+  // Calculate the score percentage
+  const scorePercentage = result.semanticScore 
+    ? Math.round(result.semanticScore * 100) 
+    : null;
+    
   return (
     <>
       <style jsx global>{`
         .highlight-container em {
           font-style: normal;
           font-weight: bold;
+        }
+        
+        .score-badge {
+          padding: 3px 8px;
+          border-radius: 12px;
+          color: white;
+          font-weight: 500;
+          display: inline-flex;
+          align-items: center;
+          transition: background-color 0.3s ease;
         }
       `}</style>
       
@@ -57,7 +87,13 @@ export default function ResultItem({ result, openQuerySummary }) {
           </div>
         </div>
 
-        <div className="flex justify-end mt-2">
+        <div className="flex justify-between items-center mt-2">
+          <div className="text-xs md:text-sm">
+            <span className="text-gray-500 dark:text-gray-400 mr-2">Similarity Score:</span>
+            <span className={`score-badge ${getScoreColor(result.semanticScore)}`}>
+              {scorePercentage !== null ? `${scorePercentage}%` : 'N/A'}
+            </span>
+          </div>
           <a
             href={result.html_url || ""}
             target="_blank"

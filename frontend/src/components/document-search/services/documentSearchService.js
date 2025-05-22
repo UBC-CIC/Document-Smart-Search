@@ -87,6 +87,15 @@ export async function performDocumentSearch(query, filters) {
     
     const data = await response.json()
 
+    // Sort results by semanticScore in descending order
+    if (data.results && data.results.length > 0) {
+      data.results.sort((a, b) => {
+        // Handle cases where semanticScore might not exist
+        const scoreA = a.semanticScore !== undefined ? a.semanticScore : 0;
+        const scoreB = b.semanticScore !== undefined ? b.semanticScore : 0;
+        return scoreB - scoreA; // Descending order
+      });
+    }
 
     // Log the highlights and results for debugging
     console.log("data:", data.results[1])
@@ -112,7 +121,7 @@ function filterMockData(query, filters) {
     documentTypeFilters 
   } = filters
   
-  const filtered = allMockResults.filter((result) => {
+  let filtered = allMockResults.filter((result) => {
     // Check if any year filter is active, if not, show all years
     const anyYearFilterActive = Object.values(yearFilters).some((value) => value)
     if (anyYearFilterActive && !yearFilters[result.csasYear || result.year]) {
@@ -174,6 +183,13 @@ function filterMockData(query, filters) {
 
     return true
   })
+
+  // Sort mock results by semanticScore if available
+  filtered.sort((a, b) => {
+    const scoreA = a.semanticScore !== undefined ? a.semanticScore : 0;
+    const scoreB = b.semanticScore !== undefined ? b.semanticScore : 0;
+    return scoreB - scoreA; // Descending order
+  });
 
   return filtered
 }
