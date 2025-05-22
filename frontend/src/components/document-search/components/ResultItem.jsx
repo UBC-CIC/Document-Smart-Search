@@ -59,7 +59,7 @@ export default function ResultItem({ result, openQuerySummary }) {
         <div className="mt-3 md:mt-4 mb-2">
           <div className="flex flex-col sm:flex-row sm:justify-between gap-2 mb-2">
             <div className="font-medium dark:text-white text-sm md:text-base">{
-            result.title.length > 20 ? `${result.title.substring(0, 35)}...` : result.title
+            result.title.length > 20 ? `${result.title.substring(0, 70)}...` : result.title
             }</div>
             <div className="flex space-x-2 text-xs md:text-sm">
               <Link href={`/documents/${result.id}`} className="text-blue-600 dark:text-blue-400">
