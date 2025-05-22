@@ -1,7 +1,7 @@
 import { mockDocumentDetails } from "../data/documentDetailData"
 
 // Always enable mock data for now to ensure it works
-export const USE_MOCK_DATA = true;
+export const USE_MOCK_DATA = false;
 
 /**
  * Fetches document details by ID, including related documents
