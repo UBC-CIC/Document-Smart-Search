@@ -67,6 +67,7 @@ export class DBFlowStack extends Stack {
       code:   lambda.Code.fromAsset("lambda/initializer"),
       layers: [ psycopgLambdaLayer ],
       role:   lambdaRole,
+      executeOnHandlerChange: true
     });
 
     // OpenSearch initializer (runs once on deploy)
@@ -90,6 +91,7 @@ export class DBFlowStack extends Stack {
       code:  lambda.Code.fromAsset("lambda/opensearch-initializer"),
       role:  lambdaRole,
       layers: [ osPythonLayer ],  // only the 3.11 layer
+      executeOnHandlerChange: true
     });
 
     // allow the initializer to read/write your domain
