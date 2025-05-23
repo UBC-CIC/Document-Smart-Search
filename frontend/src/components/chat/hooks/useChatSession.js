@@ -8,7 +8,7 @@ const INITIAL_GREETING =
   "Hello! I am a Smart Agent specialized in Fisheries and Oceans Canada (DFO). " +
   "I can help you with questions related to DFO documents, science advice, and more! " +
   "Please select the best role below that fits you. We can better answer your questions. " +
-  "Don't include personal details such as your name and private content.";
+  "Do not include personal details such as your name and private content.";
 
 export function useChatSession() {
   const [fingerprint, setFingerprint] = useState("");
