@@ -89,7 +89,7 @@ export async function sendChatMessage(session, fingerprint, content, userRole) {
 export async function submitFeedback(fingerprint, session, userRole, rating, description) {
   try {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_ENDPOINT}/user/create_feedback?user_info=${encodeURIComponent(
+      `${process.env.NEXT_PUBLIC_API_ENDPOINT}user/create_feedback?user_info=${encodeURIComponent(
         fingerprint
       )}&session_id=${encodeURIComponent(session)}&user_role=${encodeURIComponent(
         userRole
