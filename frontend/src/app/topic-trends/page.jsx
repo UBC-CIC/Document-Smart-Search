@@ -3,7 +3,7 @@
 import { useState } from "react";
 import TopicTrends from "@/components/analytics/TopicTrends";
 import MandateTrends from "@/components/analytics/MandateTrends";
-import GraphPage from "@/components/analytics/GraphPage";
+
 
 export default function TopicTrendsPage() {
   const [activeTab, setActiveTab] = useState("Topic");
@@ -14,8 +14,6 @@ export default function TopicTrendsPage() {
         return <TopicTrends />;
       case "Mandate":
         return <MandateTrends />;
-      case "Graph":
-        return <GraphPage />;
       default:
         return null;
     }
@@ -24,7 +22,7 @@ export default function TopicTrendsPage() {
   return (
     <div className="w-full max-w-5xl mx-auto p-4">
       <div className="flex border-b mb-4">
-        {["Topic", "Mandate", "Graph"].map((tab) => (
+        {["Topic", "Mandate"].map((tab) => (
           <button
             key={tab}
             className={`px-4 py-2 font-medium ${

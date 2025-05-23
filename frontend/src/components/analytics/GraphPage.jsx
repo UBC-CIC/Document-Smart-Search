@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useMemo } from "react";
 import CytoscapeComponent from "react-cytoscapejs";
 
@@ -14,9 +16,19 @@ export default function GraphPage() {
   ]);
 
   const [documents] = useState([
-    { id: "d1", label: "Document X", parentId: "t1" },
-    { id: "d2", label: "Document Y", parentId: "t2" },
-    { id: "d3", label: "Document Z", parentId: "t3" },
+    { id: "d1", label: "Document X", parentIds: ["t1", "t2"] }, // Multiple topic parents
+    { id: "d2", label: "Document Y", parentIds: ["t2"] },
+    { id: "d3", label: "Document Z", parentIds: ["t3"] },
+  ]);
+
+  const [csasEvents] = useState([
+    { id: "e1", label: "CSAS Event 1", parentIds: ["d1", "d2"] },
+    { id: "e2", label: "CSAS Event 2", parentIds: ["d2", "d3"] },
+  ]);
+
+  const [generatedTopics] = useState([
+    { id: "g1", label: "Generated Topic Alpha", parentId: "d1" },
+    { id: "g2", label: "Generated Topic Beta", parentId: "d3" },
   ]);
 
   const elements = useMemo(() => {
@@ -25,21 +37,29 @@ export default function GraphPage() {
       ...mandates.map((m) => ({ data: { id: m.id, label: m.label } })),
       ...topics.map((t) => ({ data: { id: t.id, label: t.label } })),
       ...documents.map((d) => ({ data: { id: d.id, label: d.label } })),
+      ...csasEvents.map((e) => ({ data: { id: e.id, label: e.label } })),
+      ...generatedTopics.map((g) => ({ data: { id: g.id, label: g.label } })),
     ];
 
     const edges = [
       ...mandates.map((m) => ({ data: { source: "DFO", target: m.id } })),
       ...topics.map((t) => ({ data: { source: t.parentId, target: t.id } })),
-      ...documents.map((d) => ({ data: { source: d.parentId, target: d.id } })),
+      ...documents.flatMap((d) =>
+        d.parentIds.map((pid) => ({ data: { source: pid, target: d.id } }))
+      ),
+      ...csasEvents.flatMap((e) =>
+        e.parentIds.map((pid) => ({ data: { source: pid, target: e.id } }))
+      ),
+      ...generatedTopics.map((g) => ({ data: { source: g.parentId, target: g.id } })),
     ];
 
     return [...nodes, ...edges];
-  }, [mandates, topics, documents]);
+  }, [mandates, topics, documents, csasEvents, generatedTopics]);
 
   return (
     <CytoscapeComponent
       elements={elements}
-      style={{ width: "100%", height: "600px" }}
+      style={{ width: "100%", height: "875px" }}
       layout={{
         name: "cose",
         animate: true,
@@ -57,7 +77,7 @@ export default function GraphPage() {
         {
           selector: 'node[id = "DFO"]',
           style: {
-            backgroundColor: "#4C6EF5",
+            backgroundColor: "#6d85ff",
           },
         },
         {
@@ -79,6 +99,18 @@ export default function GraphPage() {
           },
         },
         {
+          selector: 'node[id ^= "e"]',
+          style: {
+            backgroundColor: "#A78BFA", // Purple for CSAS Events
+          },
+        },
+        {
+          selector: 'node[id ^= "g"]',
+          style: {
+            backgroundColor: "#00B8D9", // Blue for Generated Topics
+          },
+        },
+        {
           selector: "node",
           style: {
             label: "data(label)",
@@ -90,13 +122,10 @@ export default function GraphPage() {
             textHalign: "center",
             width: "label",
             height: "label",
-            padding: 10,
+            padding: 20,
             shape: "roundrectangle",
             borderColor: "#e0e0e0",
             borderWidth: 1,
-            // shadowBlur: 4,
-            // shadowColor: "#999",
-            // shadowOpacity: 0.2,
           },
         },
         {

@@ -88,9 +88,17 @@ export function useDocumentSearch() {
     const resultsToSort = [...results] // Create a copy to avoid mutating the original
     
     if (sortOption === "recent") {
-      return resultsToSort.sort((a, b) => Number.parseInt(b.year) - Number.parseInt(a.year))
+      return resultsToSort.sort((a, b) => {
+        const yearA = a.year || a.csasYear || 0;
+        const yearB = b.year || b.csasYear || 0;
+        return Number.parseInt(yearB) - Number.parseInt(yearA);
+      });
     } else if (sortOption === "oldest") {
-      return resultsToSort.sort((a, b) => Number.parseInt(a.year) - Number.parseInt(b.year))
+      return resultsToSort.sort((a, b) => {
+        const yearA = a.year || a.csasYear || 0;
+        const yearB = b.year || b.csasYear || 0;
+        return Number.parseInt(yearA) - Number.parseInt(yearB);
+      });
     } else if (sortOption === "a-z") {
       return resultsToSort.sort((a, b) => a.title.localeCompare(b.title))
     }

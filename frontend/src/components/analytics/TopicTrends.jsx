@@ -15,24 +15,179 @@ export default function TopicTrends() {
   const [showCalendar, setShowCalendar] = useState(false);
   const [loading, setLoading] = useState(true);
   const calendarRef = useRef(null);
-  const [chartData, setChartData] = useState([]);
+  // const [chartData, setChartData] = useState([]);
   const [editingField, setEditingField] = useState(null); // 'start' or 'end'
-  // const chartData = [
-  //   { year: 2010, salmon: 26, "climate-change": 45 },
-  //   { year: 2011, salmon: 34, "climate-change": 37 },
-  //   { year: 2012, salmon: 49, "climate-change": 31 },
-  //   { year: 2013, salmon: 48, "climate-change": 9 },
-  //   { year: 2014, salmon: 46, "climate-change": 19 },
-  //   { year: 2015, salmon: 5, "climate-change": 25 },
-  //   { year: 2016, salmon: 9, "climate-change": 23 },
-  //   { year: 2017, salmon: 9, "climate-change": 16 },
-  //   { year: 2018, salmon: 41, "climate-change": 33 },
-  //   { year: 2019, salmon: 10, "climate-change": 15 },
-  //   { year: 2020, salmon: 29, "climate-change": 7 },
-  //   { year: 2021, salmon: 47, "climate-change": 28 },
-  //   { year: 2022, salmon: 25, "climate-change": 15 },
-  //   { year: 2023, salmon: 20, "climate-change": 11 }
-  // ];
+const chartData = [
+  {
+    year: 2010,
+    "Stock Assessments": 12,
+    "Biomass Estimation": 8,
+    "Harvest Strategies & TAC (Total Allowable Catch)": 15,
+    "Fisheries Monitoring & Compliance": 10,
+    "Bycatch Reduction": 7,
+    "Indigenous & Community-Based Fisheries": 5,
+    "Sustainable Practices": 14,
+    "Regulatory Compliance": 9,
+    "Innovation in Aquaculture Technologies": 6,
+  },
+  {
+    year: 2011,
+    "Stock Assessments": 14,
+    "Biomass Estimation": 10,
+    "Harvest Strategies & TAC (Total Allowable Catch)": 17,
+    "Fisheries Monitoring & Compliance": 12,
+    "Bycatch Reduction": 6,
+    "Indigenous & Community-Based Fisheries": 8,
+    "Sustainable Practices": 13,
+    "Regulatory Compliance": 10,
+    "Innovation in Aquaculture Technologies": 5,
+  },
+  {
+    year: 2012,
+    "Stock Assessments": 16,
+    "Biomass Estimation": 11,
+    "Harvest Strategies & TAC (Total Allowable Catch)": 19,
+    "Fisheries Monitoring & Compliance": 14,
+    "Bycatch Reduction": 9,
+    "Indigenous & Community-Based Fisheries": 6,
+    "Sustainable Practices": 15,
+    "Regulatory Compliance": 12,
+    "Innovation in Aquaculture Technologies": 7,
+  },
+  {
+    year: 2013,
+    "Stock Assessments": 18,
+    "Biomass Estimation": 13,
+    "Harvest Strategies & TAC (Total Allowable Catch)": 16,
+    "Fisheries Monitoring & Compliance": 15,
+    "Bycatch Reduction": 8,
+    "Indigenous & Community-Based Fisheries": 9,
+    "Sustainable Practices": 14,
+    "Regulatory Compliance": 11,
+    "Innovation in Aquaculture Technologies": 9,
+  },
+  {
+    year: 2014,
+    "Stock Assessments": 20,
+    "Biomass Estimation": 12,
+    "Harvest Strategies & TAC (Total Allowable Catch)": 18,
+    "Fisheries Monitoring & Compliance": 16,
+    "Bycatch Reduction": 10,
+    "Indigenous & Community-Based Fisheries": 7,
+    "Sustainable Practices": 13,
+    "Regulatory Compliance": 13,
+    "Innovation in Aquaculture Technologies": 11,
+  },
+  {
+    year: 2015,
+    "Stock Assessments": 22,
+    "Biomass Estimation": 14,
+    "Harvest Strategies & TAC (Total Allowable Catch)": 20,
+    "Fisheries Monitoring & Compliance": 17,
+    "Bycatch Reduction": 11,
+    "Indigenous & Community-Based Fisheries": 8,
+    "Sustainable Practices": 16,
+    "Regulatory Compliance": 14,
+    "Innovation in Aquaculture Technologies": 10,
+  },
+  {
+    year: 2016,
+    "Stock Assessments": 24,
+    "Biomass Estimation": 15,
+    "Harvest Strategies & TAC (Total Allowable Catch)": 21,
+    "Fisheries Monitoring & Compliance": 18,
+    "Bycatch Reduction": 13,
+    "Indigenous & Community-Based Fisheries": 9,
+    "Sustainable Practices": 17,
+    "Regulatory Compliance": 16,
+    "Innovation in Aquaculture Technologies": 13,
+  },
+  {
+    year: 2017,
+    "Stock Assessments": 26,
+    "Biomass Estimation": 16,
+    "Harvest Strategies & TAC (Total Allowable Catch)": 23,
+    "Fisheries Monitoring & Compliance": 19,
+    "Bycatch Reduction": 14,
+    "Indigenous & Community-Based Fisheries": 10,
+    "Sustainable Practices": 18,
+    "Regulatory Compliance": 15,
+    "Innovation in Aquaculture Technologies": 12,
+  },
+  {
+    year: 2018,
+    "Stock Assessments": 28,
+    "Biomass Estimation": 18,
+    "Harvest Strategies & TAC (Total Allowable Catch)": 24,
+    "Fisheries Monitoring & Compliance": 21,
+    "Bycatch Reduction": 12,
+    "Indigenous & Community-Based Fisheries": 11,
+    "Sustainable Practices": 20,
+    "Regulatory Compliance": 17,
+    "Innovation in Aquaculture Technologies": 14,
+  },
+  {
+    year: 2019,
+    "Stock Assessments": 30,
+    "Biomass Estimation": 19,
+    "Harvest Strategies & TAC (Total Allowable Catch)": 26,
+    "Fisheries Monitoring & Compliance": 22,
+    "Bycatch Reduction": 15,
+    "Indigenous & Community-Based Fisheries": 12,
+    "Sustainable Practices": 21,
+    "Regulatory Compliance": 18,
+    "Innovation in Aquaculture Technologies": 15,
+  },
+  {
+    year: 2020,
+    "Stock Assessments": 31,
+    "Biomass Estimation": 21,
+    "Harvest Strategies & TAC (Total Allowable Catch)": 27,
+    "Fisheries Monitoring & Compliance": 23,
+    "Bycatch Reduction": 16,
+    "Indigenous & Community-Based Fisheries": 14,
+    "Sustainable Practices": 22,
+    "Regulatory Compliance": 19,
+    "Innovation in Aquaculture Technologies": 17,
+  },
+  {
+    year: 2021,
+    "Stock Assessments": 33,
+    "Biomass Estimation": 22,
+    "Harvest Strategies & TAC (Total Allowable Catch)": 28,
+    "Fisheries Monitoring & Compliance": 24,
+    "Bycatch Reduction": 17,
+    "Indigenous & Community-Based Fisheries": 13,
+    "Sustainable Practices": 24,
+    "Regulatory Compliance": 20,
+    "Innovation in Aquaculture Technologies": 18,
+  },
+  {
+    year: 2022,
+    "Stock Assessments": 32,
+    "Biomass Estimation": 20,
+    "Harvest Strategies & TAC (Total Allowable Catch)": 29,
+    "Fisheries Monitoring & Compliance": 25,
+    "Bycatch Reduction": 18,
+    "Indigenous & Community-Based Fisheries": 15,
+    "Sustainable Practices": 25,
+    "Regulatory Compliance": 21,
+    "Innovation in Aquaculture Technologies": 19,
+  },
+  {
+    year: 2023,
+    "Stock Assessments": 35,
+    "Biomass Estimation": 23,
+    "Harvest Strategies & TAC (Total Allowable Catch)": 31,
+    "Fisheries Monitoring & Compliance": 26,
+    "Bycatch Reduction": 20,
+    "Indigenous & Community-Based Fisheries": 16,
+    "Sustainable Practices": 27,
+    "Regulatory Compliance": 22,
+    "Innovation in Aquaculture Technologies": 21,
+  },
+];
+
 
   const colorPalette = [
     "#1f77b4", // blue
@@ -53,15 +208,17 @@ export default function TopicTrends() {
     "#9c9ede"  // lavender blue
   ];
   
-  const [allTopics, setAllTopics] = useState([
-    { label: "Salmon", value: "salmon" },
-    { label: "Conservation", value: "conservation" },
-    { label: "Climate Change", value: "climate-change" },
-    { label: "Aquaculture", value: "aquaculture" },
-    { label: "Fisheries", value: "fisheries" },
-    { label: "Biodiversity", value: "biodiversity" },
-    // ... add more if needed
-  ]);
+const [allTopics, setAllTopics] = useState([
+  { label: "Stock Assessments", value: "Stock Assessments" },
+  { label: "Biomass Estimation", value: "Biomass Estimation" },
+  { label: "Harvest Strategies & TAC (Total Allowable Catch)", value: "Harvest Strategies & TAC (Total Allowable Catch)" },
+  { label: "Fisheries Monitoring & Compliance", value: "Fisheries Monitoring & Compliance" },
+  { label: "Bycatch Reduction", value: "Bycatch Reduction" },
+  { label: "Indigenous & Community-Based Fisheries", value: "Indigenous & Community-Based Fisheries" },
+  { label: "Sustainable Practices", value: "Sustainable Practices" },
+  { label: "Regulatory Compliance", value: "Regulatory Compliance" },
+  { label: "Innovation in Aquaculture Technologies", value: "Innovation in Aquaculture Technologies" },
+]);
 
 
   useClickAway(calendarRef, () => {
@@ -106,7 +263,7 @@ export default function TopicTrends() {
       const data = await response.json()
 
       // Update state with the fetched data
-      setChartData(data);
+      // setChartData(data);
 
       // Dynamically calculate min and max dates based on the fetched chart data
       const dates = data.map(item => item.year);
@@ -122,7 +279,7 @@ export default function TopicTrends() {
     } catch (error) {
       console.error(`Error fetching min/max dates:`, error)
       setDateRange([{ startDate: new Date(2000, 0, 1), endDate: new Date(), key: "selection" }]);
-      setChartData([]); // Reset chart data on error
+      // setChartData([]); // Reset chart data on error
     } finally {
       setLoading(false)
     }
@@ -296,6 +453,7 @@ export default function TopicTrends() {
                     stroke={colorPalette[index % colorPalette.length]}
                     strokeWidth={2}
                     dot={false}
+                    isAnimationActive={true}
                   />
                 ))}
               </LineChart>

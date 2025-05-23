@@ -1,3 +1,4 @@
+from datetime import datetime
 import json
 import boto3
 import logging
@@ -118,7 +119,8 @@ def _fetch_related_documents(
     SELECT d.doc_id,
            d.html_url,
            d.title,
-           d.doc_type
+           d.doc_type,
+           d.year
     FROM documents AS d
     JOIN csas_events AS e
       ON d.event_year   = e.event_year
@@ -130,8 +132,8 @@ def _fetch_related_documents(
     """
     
     results = pgsql.execute_query(sql, conn_info)
-    return [{"doc_id": doc_id, "html_url": url, "title": title, "doc_type": doc_type} 
-            for doc_id, url, title, doc_type in results]
+    return [{"doc_id": doc_id, "html_url": url, "title": title, "doc_type": doc_type, "year": year} 
+            for doc_id, url, title, doc_type, year in results]
 
 def _fetch_document_metadata(*, op_client, index_name: str, document_id: str) -> Dict[str, Any]:
     resp = op_client.search(index=index_name, body=_build_os_query_by_id(document_id))
@@ -230,10 +232,11 @@ def get_document_categorization(
         conn_info=conn_info, 
         doc_id=doc_id
     )
-    if last_updated is not None or last_updated != "N/A":
+    # Only convert last_updated to isoformat if it's a datetime object
+    if isinstance(last_updated, datetime):
         base["last_updated"] = last_updated.isoformat()
     else:
-        base["last_updated"] = "N/A"
+        base["last_updated"] = last_updated
     
     mandates, dfo_topics, other_topics = _fetch_classifications(
         pgsql=pgsql_conn, conn_info=conn_info, url=url
@@ -287,7 +290,7 @@ def format_document_for_frontend(doc_id: str, doc_data: Dict[str, Any]) -> Dict[
             "id": doc["doc_id"],
             "title": doc["title"],
             "type": doc["doc_type"],
-            "year": doc_data.get("publish_date", "N/A"),
+            "year": doc.get("year", "N/A"),  # Use each document's own year
             "csasEvent": doc_data.get("csas_event_name", "N/A"),
             "csasYear": doc_data.get("csas_event_year", "N/A"),
             "documentUrl": doc["html_url"],
@@ -304,7 +307,8 @@ def format_document_for_frontend(doc_id: str, doc_data: Dict[str, Any]) -> Dict[
         "subject": doc_data.get("document_subject", ""),
         "csasEvent": doc_data.get("csas_event_name", "N/A"),
         "csasYear": doc_data.get("csas_event_year", "N/A"),
-        "documentUrl": doc_data.get("pdf_url", doc_data.get("html_url", "#")),
+        "htmlUrl": doc_data.get("html_url", "#"),
+        "documentUrl": doc_data.get("pdf_url", "#"),
         "authors": doc_data.get("html_authors", []),
         "relatedMandates": doc_data.get("dfo_mandates", []),
         "primaryTopics": doc_data.get("dfo_topics", []),
@@ -316,10 +320,10 @@ def format_document_for_frontend(doc_id: str, doc_data: Dict[str, Any]) -> Dict[
 
 def handler(event, context):
     try:
-        body = {} if event.get("body") is None else json.loads(event.get("body"))
-        
-        # Check if this is a document detail request
-        document_id = body.get("document_id", "")
+        query_params = event.get("queryStringParameters", {}) or {}
+
+        # Fetch the document ID from query parameters
+        document_id = query_params.get("document_id", "")
         
         if not document_id:
             return {

@@ -6,7 +6,18 @@ export default function MetadataSidebar({ document, relatedDocumentsCount = 0, o
   return (
     <div className="w-full md:w-64">
       <div className="bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden">
-        {document.documentUrl && (
+        {document.htmlUrl && (
+          <a
+            href={document.htmlUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block w-full text-center py-2 bg-green-500 hover:bg-green-600 text-white font-medium dark:text-white text-sm transition-colors"
+          >
+            View Web Page
+          </a>
+        )}
+
+        {document.documentUrl && document.documentUrl !== '#' && (
           <a
             href={document.documentUrl}
             target="_blank"
@@ -57,16 +68,23 @@ export default function MetadataSidebar({ document, relatedDocumentsCount = 0, o
                 </div>
               </div>
               <div className="space-y-2">
-                {document.authors.map((author, index) => (
-                  <div key={index} className="text-sm text-center dark:text-gray-300">
-                    <div className="font-medium">{author.name}</div>
-                    {author.department && (
-                      <div className="text-xs text-center text-gray-500 dark:text-gray-400 mt-0.5">
-                        {author.department}
+                {document.authors.map((author, index) => {
+                  // Check if author is a string or an object
+                  const isAuthorObject = typeof author === 'object' && author !== null;
+                  
+                  return (
+                    <div key={index} className="text-sm text-center dark:text-gray-300">
+                      <div className="font-medium">
+                        {isAuthorObject ? author.name : author}
                       </div>
-                    )}
-                  </div>
-                ))}
+                      {isAuthorObject && author.department && (
+                        <div className="text-xs text-center text-gray-500 dark:text-gray-400 mt-0.5">
+                          {author.department}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -75,7 +93,9 @@ export default function MetadataSidebar({ document, relatedDocumentsCount = 0, o
         <div className="grid grid-cols-2 gap-2 p-2">
           <div className="bg-gray-200 dark:bg-gray-700 p-2 rounded text-center">
             <div className="text-xs font-medium dark:text-gray-300">Year:</div>
-            <div className="text-sm dark:text-gray-300">{document.year}</div>
+            <div className="text-sm dark:text-gray-300">
+              {document.year || (document.csasYear ? `${document.csasYear}*` : "N/A")}
+            </div>
           </div>
 
           <div className="bg-gray-200 dark:bg-gray-700 p-2 rounded text-center">

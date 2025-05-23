@@ -686,29 +686,23 @@ paths:
             statusCode: "200"
             responseParameters:
               method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key'"
-              method.response.header.Access-Control-Allow-Methods: "'OPTIONS,POST'"
+              method.response.header.Access-Control-Allow-Methods: "'OPTIONS,GET'"
               method.response.header.Access-Control-Allow-Origin: "'*'"
             responseTemplates:
               application/json: "{}"
 
-    post:
+    get:
       tags:
         - User
       summary: Get available filters
       operationId: get_user_filters
-      requestBody:
-        description: Filter categories to retrieve
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                filters:
-                  type: array
-                  items:
-                    type: string
-                  example: ["years", "topics", "mandates"]
+      parameters:
+        - name: filters
+          in: query
+          required: false
+          description: Comma-separated list of filter categories (e.g., years,topics)
+          schema:
+            type: string
       responses:
         "200":
           description: Successfully retrieved filters
@@ -735,7 +729,6 @@ paths:
         passthroughBehavior: when_no_match
         httpMethod: POST
         type: aws_proxy
-
   /user/chart_data:
     options:
       summary: CORS support
@@ -855,11 +848,36 @@ paths:
             responseTemplates:
               application/json: |
                 {}
-    get:
+    post:
       tags:
         - User
-      summary: Get a list of available topics
-      operationId: get_topics_GET
+      summary: Get a list of available topics or Mandates
+      operationId: get_topics_post
+      parameters:
+        - in: query
+          name: type
+          required: true
+          description: dfo topic, derived topic, or mandate selection 
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                topicName:
+                  type: string
+                  description: Name of the topic or mandate to search for
+                currentDocID:
+                  type: string
+                  description: The current document ID to exclude from the search
+                filters:
+                  type: array
+                  items:
+                    type: string
+                  description: Filters to apply to the search
       responses:
         "200":
           description: Successfully fetched topics list

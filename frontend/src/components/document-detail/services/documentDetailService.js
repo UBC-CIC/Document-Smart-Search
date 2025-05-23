@@ -30,7 +30,24 @@ export async function fetchDocumentDetail(documentId) {
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    return await response.json();
+
+    const data = await response.json();
+
+    // console.log("Document details fetched successfully:", data);
+
+    return data;
+
+    // // Fetch with POST method (Need to determine which one is better)
+    // const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/document-details`, {
+    //   method: "POST",
+    //   headers: {
+    //     "Content-Type": "application/json",
+    //   },
+    //   body: JSON.stringify({
+    //     document_id: documentId
+    //   }),
+    // })
+
   } catch (error) {
     console.error("Error fetching document details:", error);
     // Fallback to mock data on error

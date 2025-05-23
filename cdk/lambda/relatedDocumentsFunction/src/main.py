@@ -49,6 +49,8 @@ def build_mandate_query(name: str, language: str = "English", exclude_doc_id: st
            d.title,
            d.doc_type,
            d.year,
+           d.event_year,
+           d.event_subject,
            dm.semantic_score,
            dm.llm_score,
            dm.llm_explanation
@@ -90,6 +92,8 @@ def build_dfo_topic_query(name: str, language: str = "English", exclude_doc_id: 
            d.title,
            d.doc_type,
            d.year,
+           d.event_year,
+           d.event_subject,
            dt.semantic_score,
            dt.llm_score,
            dt.llm_explanation
@@ -131,6 +135,8 @@ def build_derived_topic_query(name: str, language: str = "English", exclude_doc_
            d.title,
            d.doc_type,
            d.year,
+           d.event_year,
+           d.event_subject,
            ddt.confidence_score AS semantic_score,
            NULL AS llm_score,
            NULL AS llm_explanation
@@ -253,13 +259,15 @@ def get_related_documents(
     for row in results:
         # Parse results based on the query structure
         if topic_type in ["mandate", "dfo_topic"]:
-            doc_id, html_url, title, doc_type, year, semantic_score, llm_score, llm_explanation = row
+            doc_id, html_url, title, doc_type, year, event_year, event_subject, semantic_score, llm_score, llm_explanation = row
             
             doc = {
                 "id": doc_id,
                 "title": title,
                 "documentType": doc_type,
                 "year": year,
+                "csasYear": event_year,
+                "csasEvent": event_subject,
                 "semanticScore": float(semantic_score) if semantic_score is not None else None,
             }
             
@@ -272,13 +280,15 @@ def get_related_documents(
                 doc["explanation"] = llm_explanation
                 
         else:  # derived_topic
-            doc_id, html_url, title, doc_type, year, semantic_score, _, _ = row
+            doc_id, html_url, title, doc_type, year, event_year, event_subject, semantic_score, _, _ = row
             
             doc = {
                 "id": doc_id,
                 "title": title,
                 "documentType": doc_type,
                 "year": year,
+                "csasYear": event_year,
+                "csasEvent": event_subject,
                 "semanticScore": float(semantic_score) if semantic_score is not None else None,
             }
         
