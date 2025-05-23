@@ -764,7 +764,7 @@ exports.handler = async (event) => {
                 FROM feedback f
                 INNER JOIN user_engagement_log uel
                 ON f.session_id = uel.session_id
-                WHERE uel.user_role IN ('admin', 'public', 'educator', 'policy_maker', 'external_researcher')
+                WHERE uel.user_role IN ('admin', 'public', 'internal_researcher', 'educator', 'policy_maker', 'external_researcher')
               )
               SELECT 
                 user_role,

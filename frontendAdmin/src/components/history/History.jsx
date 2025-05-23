@@ -15,8 +15,8 @@ const RoleView = ({ role, sessions, onSessionClick }) => {
     switch (role) {
       case "public":
         return <Users className="mr-2" />
-      case "admin":
-        return <ShieldCheck className="mr-2" />
+      // case "admin":
+      //   return <ShieldCheck className="mr-2" />
       case "internal_researcher":
         return <BookOpen className="mr-2" />
       case "external_researcher":
@@ -32,8 +32,8 @@ const RoleView = ({ role, sessions, onSessionClick }) => {
     switch (role) {
       case "public":
         return "General Public"
-      case "admin":
-        return "Admin"
+      // case "admin":
+      //   return "Admin"
       case "internal_researcher":
         return "Internal Researcher"
       case "external_researcher":
@@ -98,7 +98,7 @@ const RoleView = ({ role, sessions, onSessionClick }) => {
 
 export default function History() {
   const [publicSessions, setPublicSessions] = useState([])
-  const [adminSessions, setAdminSessions] = useState([])
+  // const [adminSessions, setAdminSessions] = useState([])
   const [internalResearcherSessions, setInternalResearcherSessions] = useState([])
   const [externalResearcherSessions, setExternalResearcherSessions] = useState([])
   const [policyMakerSessions, setPolicyMakerSessions] = useState([])
@@ -145,7 +145,7 @@ export default function History() {
         setLoading(true)
         await Promise.all([
           fetchSessions("public", setPublicSessions), 
-          fetchSessions("admin", setAdminSessions),
+          // fetchSessions("admin", setAdminSessions),
           fetchSessions("internal_researcher", setInternalResearcherSessions),
           fetchSessions("external_researcher", setExternalResearcherSessions),
           fetchSessions("policy_maker", setPolicyMakerSessions)
@@ -162,7 +162,7 @@ export default function History() {
     setDownloadLoading(true)
     const allSessions = [
       ...publicSessions, 
-      ...adminSessions,
+      // ...adminSessions,
       ...internalResearcherSessions,
       ...externalResearcherSessions,
       ...policyMakerSessions
@@ -238,7 +238,7 @@ export default function History() {
       <RoleView role="internal_researcher" sessions={internalResearcherSessions} onSessionClick={handleSessionClick} />
       <RoleView role="external_researcher" sessions={externalResearcherSessions} onSessionClick={handleSessionClick} />
       <RoleView role="policy_maker" sessions={policyMakerSessions} onSessionClick={handleSessionClick} />
-      <RoleView role="admin" sessions={adminSessions} onSessionClick={handleSessionClick} />
+      {/* <RoleView role="admin" sessions={adminSessions} onSessionClick={handleSessionClick} /> */}
       <Button
         onClick={handleDownloadAllData}
         disabled={downloadLoading}
