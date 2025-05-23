@@ -1,9 +1,8 @@
 import json
 import boto3
 import logging
-from typing import Dict, List, Any
+from typing import Dict, List
 import psycopg
-from datetime import datetime
 
 # Set up basic logging
 logging.basicConfig(level=logging.INFO)
@@ -68,6 +67,7 @@ def build_topic_chart_query(topics: List[str], from_year: int, to_year: int, doc
         WHERE dt.topic_name = '{topic}' 
         AND d.doc_language = '{language}'
         AND d.year BETWEEN {from_year} AND {to_year}
+        AND dt.llm_belongs = 'Yes'
         """
         
         # Add document type filter if provided
@@ -128,6 +128,7 @@ def build_mandate_chart_query(mandates: List[str], from_year: int, to_year: int,
         WHERE dm.mandate_name = '{mandate}' 
         AND d.doc_language = '{language}'
         AND d.year BETWEEN {from_year} AND {to_year}
+        AND dm.llm_belongs = 'Yes'
         """
         
         # Add document type filter if provided

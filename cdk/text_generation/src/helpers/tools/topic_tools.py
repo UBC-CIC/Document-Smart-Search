@@ -89,7 +89,7 @@ class TopicTools:
                 "SELECT COUNT(*) "
                 "FROM documents_topics "
                 f"WHERE topic_name = '{name}' "
-                "AND llm_score >= 4;"
+                "AND llm_belongs = 'Yes';"
             )
 
         def _top_docs_sql(name: str, n: int) -> str:
@@ -102,7 +102,7 @@ class TopicTools:
             INNER JOIN documents_topics dt
               ON d.html_url = dt.html_url
             WHERE dt.topic_name = '{name}'
-              AND dt.llm_score >= 4
+              AND dt.llm_belongs = 'Yes'
             ORDER BY dt.llm_score DESC
             LIMIT {n};
             """

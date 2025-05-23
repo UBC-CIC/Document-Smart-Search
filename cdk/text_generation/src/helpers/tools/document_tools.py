@@ -104,7 +104,7 @@ class DocumentTools:
                        dm.llm_explanation
                 FROM documents_mandates dm
                 JOIN mandates m ON dm.mandate_name = m.mandate_name
-                WHERE dm.html_url = '{url}' AND dm.llm_score >= 4
+                WHERE dm.html_url = '{url}' AND dm.llm_belongs = 'Yes'
 
                 UNION ALL
 
@@ -115,7 +115,7 @@ class DocumentTools:
                        dt.llm_explanation
                 FROM documents_topics dt
                 JOIN topics t ON dt.topic_name = t.topic_name
-                WHERE dt.html_url = '{url}' AND t."isDFO" = true AND dt.llm_score >= 4
+                WHERE dt.html_url = '{url}' AND t."isDFO" = true AND dt.llm_belongs = 'Yes'
 
                 UNION ALL
 

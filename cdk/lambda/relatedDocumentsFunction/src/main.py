@@ -58,7 +58,7 @@ def build_mandate_query(name: str, language: str = "English", exclude_doc_id: st
     INNER JOIN documents_mandates dm
       ON d.html_url = dm.html_url
     WHERE dm.mandate_name = '{name}' AND d.doc_language = '{language}'
-      AND dm.llm_score >= 4
+      AND dm.llm_belongs = 'Yes'
     """
     
     # Add exclude condition if provided - directly exclude by doc_id
@@ -101,7 +101,7 @@ def build_dfo_topic_query(name: str, language: str = "English", exclude_doc_id: 
     INNER JOIN documents_topics dt
       ON d.html_url = dt.html_url
     WHERE dt.topic_name = '{name}' AND d.doc_language = '{language}'
-      AND dt.llm_score >= 4
+      AND dt.llm_belongs = 'Yes'
     """
     
     # Add exclude condition if provided - directly exclude by doc_id
@@ -177,7 +177,7 @@ def build_count_query(topic_type: str, name: str, language: str = "English",
         INNER JOIN documents_mandates dm
           ON d.html_url = dm.html_url
         WHERE dm.mandate_name = '{name}' AND d.doc_language = '{language}'
-          AND dm.llm_score >= 4
+          AND dm.llm_belongs = 'Yes'
         """
     elif topic_type == "dfo_topic":
         # Base query for DFO topic count
@@ -187,7 +187,7 @@ def build_count_query(topic_type: str, name: str, language: str = "English",
         INNER JOIN documents_topics dt
           ON d.html_url = dt.html_url
         WHERE dt.topic_name = '{name}' AND d.doc_language = '{language}'
-          AND dt.llm_score >= 4
+          AND dt.llm_belongs = 'Yes'
         """
     elif topic_type == "derived_topic":
         # Base query for derived topic count
