@@ -6,8 +6,11 @@ import cytoscape from "cytoscape";
 import coseBilkent from "cytoscape-cose-bilkent";
 import Filters from "../document-search/components/Filters"; // adjust path as needed
 import { SlidersHorizontal } from "lucide-react";
+import { useDocumentSearch } from "../document-search/hooks/useDocumentSearch"; // adjust path as needed
 
 cytoscape.use(coseBilkent);
+
+
 
 // Mock data
 const mandates = [
@@ -40,23 +43,45 @@ const generatedTopics = [
 export default function GraphPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  const [yearFilters, setYearFilters] = useState({ from: 2010, to: 2024 });
-  const [topicFilters, setTopicFilters] = useState([]);
-  const [mandateFilters, setMandateFilters] = useState([]);
-  const [documentTypeFilters, setDocumentTypeFilters] = useState([]);
-  const [authorFilters, setAuthorFilters] = useState([]);
+  // const [yearFilters, setYearFilters] = useState({ from: 2010, to: 2024 });
+  // const [topicFilters, setTopicFilters] = useState([]);
+  // const [mandateFilters, setMandateFilters] = useState([]);
+  // const [documentTypeFilters, setDocumentTypeFilters] = useState([]);
+  // const [authorFilters, setAuthorFilters] = useState([]);
 
-  const resetFilters = () => {
-    setTopicFilters([]);
-    setMandateFilters([]);
-    setDocumentTypeFilters([]);
-    setAuthorFilters([]);
-    setYearFilters({ from: 2010, to: 2024 });
-  };
+    const {
+      yearFilters,
+      setYearFilters,
+      topicFilters,
+      setTopicFilters,
+      mandateFilters,
+      setMandateFilters,
+      authorFilters,
+      setAuthorFilters,
+      documentTypeFilters,
+      setDocumentTypeFilters,
+      resetFilters,
+      applyFilters,
+      totalResults,
+      totalPages,
+      isLoading,
+      hasSearched,
+    } = useDocumentSearch()
+
+  // const resetFilters = () => {
+  //   setTopicFilters([]);
+  //   setMandateFilters([]);
+  //   setDocumentTypeFilters([]);
+  //   setAuthorFilters([]);
+  //   setYearFilters({ from: 2010, to: 2024 });
+  // };
 
   const elements = useMemo(() => {
-    const selectedMandateIds = new Set(mandateFilters);
-    const selectedTopicIds = new Set(topicFilters);
+    
+    console.log("mandateFilters:", mandateFilters);
+    const selectedMandateIds = new Set(Array.isArray(mandateFilters) ? mandateFilters : []);
+    const selectedTopicIds = new Set(Array.isArray(topicFilters) ? topicFilters : []);
+
 
     let filteredMandates = mandates;
     let filteredTopics = topics;
