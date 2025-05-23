@@ -727,7 +727,7 @@ paths:
         uri:
           Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${userFiltersDockerFunction.Arn}/invocations
         passthroughBehavior: when_no_match
-        httpMethod: GET
+        httpMethod: POST
         type: aws_proxy
   /user/chart_data:
     options:
@@ -848,11 +848,36 @@ paths:
             responseTemplates:
               application/json: |
                 {}
-    get:
+    post:
       tags:
         - User
-      summary: Get a list of available topics
-      operationId: get_topics_GET
+      summary: Get a list of available topics or Mandates
+      operationId: get_topics_post
+      parameters:
+        - in: query
+          name: type
+          required: true
+          description: dfo topic, derived topic, or mandate selection 
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                topicName:
+                  type: string
+                  description: Name of the topic or mandate to search for
+                currentDocID:
+                  type: string
+                  description: The current document ID to exclude from the search
+                filters:
+                  type: array
+                  items:
+                    type: string
+                  description: Filters to apply to the search
       responses:
         "200":
           description: Successfully fetched topics list
