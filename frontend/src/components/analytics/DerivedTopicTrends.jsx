@@ -281,7 +281,7 @@ export default function DerivedTopicTrends() {
     <div className="min-h-screen bg-white dark:bg-gray-900 transition-all duration-300">
       <main className="max-w-5xl mx-auto px-4 py-6 md:py-8">
         <h2 className="text-2xl md:text-3xl font-bold text-center mb-6 md:mb-8 dark:text-white">
-          Topic Trends Analytics
+          Derived Topic Trends Analytics
         </h2>
 
         {/* Filters */}
