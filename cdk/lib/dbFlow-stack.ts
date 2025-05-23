@@ -59,14 +59,15 @@ export class DBFlowStack extends Stack {
       timeout:     Duration.seconds(300),
       memorySize:  512,
       environment: {
-        DB_SECRET_NAME:       db.secretPathAdminName,
-        DB_USER_SECRET_NAME:  db.secretPathUser.secretName,
-        DB_PROXY:             db.secretPathTableCreator.secretName,
+        DB_SECRET_NAME: db.secretPathAdminName,
+        DB_USER_SECRET_NAME: db.secretPathUser.secretName,
+        DB_PROXY: db.secretPathTableCreator.secretName,
       },
       vpc:    db.dbInstance.vpc,
       code:   lambda.Code.fromAsset("lambda/initializer"),
       layers: [ psycopgLambdaLayer ],
       role:   lambdaRole,
+      executeOnHandlerChange: true
     });
 
     // OpenSearch initializer (runs once on deploy)
@@ -81,15 +82,16 @@ export class DBFlowStack extends Stack {
       memorySize:  256,
       environment: {
         OPENSEARCH_ENDPOINT: os.domain.domainEndpoint,
-        TOPIC_INDEX_NAME:    "dfo-topics",
-        MANDATE_INDEX_NAME:  "dfo-mandates",
-        HTML_INDEX_NAME:     "dfo-html-documents",
+        TOPIC_INDEX_NAME:    "dfo-topic-full-index",
+        MANDATE_INDEX_NAME:  "dfo-mandate-full-index",
+        HTML_INDEX_NAME:     "dfo-html-full-index",
         VECTOR_DIMENSION:    "1024",
       },
       vpc:   db.dbInstance.vpc,
       code:  lambda.Code.fromAsset("lambda/opensearch-initializer"),
       role:  lambdaRole,
       layers: [ osPythonLayer ],  // only the 3.11 layer
+      executeOnHandlerChange: true
     });
 
     // allow the initializer to read/write your domain
