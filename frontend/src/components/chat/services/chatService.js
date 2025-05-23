@@ -96,7 +96,12 @@ export async function submitFeedback(fingerprint, session, userRole, rating, des
       )}&feedback_rating=${encodeURIComponent(
         rating
       )}&feedback_description=${encodeURIComponent(description)}`,
-      { method: "POST" }
+      { 
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        }, 
+      }
     );
 
     if (!response.ok) {
