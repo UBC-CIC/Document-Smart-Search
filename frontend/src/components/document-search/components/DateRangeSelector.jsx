@@ -110,7 +110,7 @@ export default function DateRangeSelector({ yearFilters, setYearFilters }) {
   return (
     <div className="relative">
       <label className="block text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-        Year Range
+        CSAS Year Range
       </label>
       
       <button
