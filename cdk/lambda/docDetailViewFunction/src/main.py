@@ -119,7 +119,8 @@ def _fetch_related_documents(
     SELECT d.doc_id,
            d.html_url,
            d.title,
-           d.doc_type
+           d.doc_type,
+           d.year
     FROM documents AS d
     JOIN csas_events AS e
       ON d.event_year   = e.event_year
@@ -131,8 +132,8 @@ def _fetch_related_documents(
     """
     
     results = pgsql.execute_query(sql, conn_info)
-    return [{"doc_id": doc_id, "html_url": url, "title": title, "doc_type": doc_type} 
-            for doc_id, url, title, doc_type in results]
+    return [{"doc_id": doc_id, "html_url": url, "title": title, "doc_type": doc_type, "year": year} 
+            for doc_id, url, title, doc_type, year in results]
 
 def _fetch_document_metadata(*, op_client, index_name: str, document_id: str) -> Dict[str, Any]:
     resp = op_client.search(index=index_name, body=_build_os_query_by_id(document_id))
@@ -289,7 +290,7 @@ def format_document_for_frontend(doc_id: str, doc_data: Dict[str, Any]) -> Dict[
             "id": doc["doc_id"],
             "title": doc["title"],
             "type": doc["doc_type"],
-            "year": doc_data.get("publish_date", "N/A"),
+            "year": doc.get("year", "N/A"),  # Use each document's own year
             "csasEvent": doc_data.get("csas_event_name", "N/A"),
             "csasYear": doc_data.get("csas_event_year", "N/A"),
             "documentUrl": doc["html_url"],

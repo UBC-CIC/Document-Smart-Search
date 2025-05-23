@@ -86,7 +86,9 @@ export default function MetadataSidebar({ document, relatedDocumentsCount = 0, o
         <div className="grid grid-cols-2 gap-2 p-2">
           <div className="bg-gray-200 dark:bg-gray-700 p-2 rounded text-center">
             <div className="text-xs font-medium dark:text-gray-300">Year:</div>
-            <div className="text-sm dark:text-gray-300">{document.year}</div>
+            <div className="text-sm dark:text-gray-300">
+              {document.year || (document.csasYear ? `${document.csasYear}*` : "N/A")}
+            </div>
           </div>
 
           <div className="bg-gray-200 dark:bg-gray-700 p-2 rounded text-center">

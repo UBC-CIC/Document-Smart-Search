@@ -328,7 +328,7 @@ export default function SimilarDocumentsPopup({
                   </Link>
                   <div className="flex justify-between text-sm mt-2">
                     <div className="text-gray-600 dark:text-gray-400">
-                      {doc.documentType} • {doc.year}
+                      {doc.documentType} • {doc.year || (doc.csasYear ? `${doc.csasYear}*` : "N/A")}
                     </div>
                     <div>
                       <span className="bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded text-xs">
