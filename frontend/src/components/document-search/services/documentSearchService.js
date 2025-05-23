@@ -12,11 +12,11 @@ export async function fetchFilterOptions() {
 
   try {
     // Define filters to request
-    const filtersToRequest = ["years", "topics", "mandates", "authors", "document_types"];
+    // const filtersToRequest = ["years", "topics", "mandates", "authors", "document_types"];
     
     // Build the URL with query parameters
     const url = new URL(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/filters`);
-    url.searchParams.append("filters", filtersToRequest.join(","));
+    // url.searchParams.append("filters", filtersToRequest.join(","));
 
     const response = await fetch(url, {
       method: "GET",
@@ -31,7 +31,7 @@ export async function fetchFilterOptions() {
     
     const data = await response.json()
 
-    console.log("Filter options fetched successfully:", data)
+    // console.log("Filter options fetched successfully:", data)
     return data
   } catch (error) {
     console.error("Error fetching filter options:", error.message)
@@ -98,7 +98,7 @@ export async function performDocumentSearch(query, filters) {
     }
 
     // Log the highlights and results for debugging
-    console.log("data:", data.results[1])
+    // console.log("data:", data.results[1])
     return data.results || []
   } catch (error) {
     console.error("Error performing document search:", error.message)

@@ -52,7 +52,13 @@ export default function ResultItem({ result, openQuerySummary }) {
 
         <div className="mb-2">
           <div className="text-xs md:text-sm text-gray-500 dark:text-gray-400">
-            {result.csasEvent ? `${result.csasEvent} (${result.csasYear})` : "No Associated CSAS Event"}
+            {result.csasEvent ? `CSAS Event: ${result.csasEvent} (${result.csasYear})` : "No Associated CSAS Event"}
+          </div>
+        </div>
+
+        <div className="mb-2">
+          <div className="text-xs md:text-sm text-gray-500 dark:text-gray-400">
+            Document Year: {result.year ? result.year : (result.csasYear ? `${result.csasYear}*` : "Unknown")}
           </div>
         </div>
 
@@ -100,7 +106,7 @@ export default function ResultItem({ result, openQuerySummary }) {
             rel="noopener noreferrer"
             className="text-blue-600 dark:text-blue-400 text-xs md:text-sm flex items-center"
           >
-            View Document <ChevronRight className="h-3 w-3 md:h-4 md:w-4 ml-1" />
+            View Web Page <ChevronRight className="h-3 w-3 md:h-4 md:w-4 ml-1" />
           </a>
         </div>
       </div>

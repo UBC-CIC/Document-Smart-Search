@@ -49,7 +49,7 @@ export default function Filters({
         
         {/* Mandate Filter */}
         <AsyncFilterSelect
-          title="Mandates"
+          title="DFO Mandates"
           filters={mandateFilters}
           setFilters={setMandateFilters}
           placeholder="Search mandates..."
@@ -57,19 +57,19 @@ export default function Filters({
 
         {/* Topic Filter */}
         <AsyncFilterSelect
-          title="Topics"
+          title="DFO Topics"
           filters={topicFilters}
           setFilters={setTopicFilters}
           placeholder="Search topics..."
         />
 
-        {/* Author Filter */}
+        {/* Author Filter - No longer supported
         <AsyncFilterSelect
           title="Authors"
           filters={authorFilters}
           setFilters={setAuthorFilters}
           placeholder="Search authors..."
-        />
+        /> */}
       </div>
     </div>
   )

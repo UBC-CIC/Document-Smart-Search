@@ -1,350 +1,281 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Info } from "lucide-react";
-import { DateRange } from "react-date-range";
 import AsyncSelect from "react-select/async";
-import 'react-date-range/dist/styles.css';
-import 'react-date-range/dist/theme/default.css';
 import { ResponsiveContainer } from "recharts";
-import { useRef } from "react";
 import { useClickAway } from "react-use";
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, Bar, BarChart, Cell } from 'recharts';
+import { colorPalette, mockTopicTrendsData, mockTopicOptions, mockDocumentTypes } from "./mockdata/mockAnalyticsData";
+
+// Set this to false to use real API data
+const USE_MOCK_DATA = false;
+
+/**
+ * Fetch available filter options for topics
+ */
+const fetchFilterOptions = async () => {
+  try {
+    // Define filters to request
+    const filtersToRequest = ["years", "document_types", "topics"];
+    
+    // Build the URL with query parameters
+    const url = new URL(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/filters`);
+    url.searchParams.append("filters", filtersToRequest.join(","));
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    
+    const data = await response.json();
+    return {
+      years: data.years || [],
+      documentTypes: data.documentTypes || [],
+      topics: data.topics || []
+    };
+  } catch (error) {
+    console.error("Error fetching filter options:", error.message);
+    return { years: [], documentTypes: [], topics: [] };
+  }
+};
 
 export default function TopicTrends() {
-  const [showCalendar, setShowCalendar] = useState(false);
+  // State variables
   const [loading, setLoading] = useState(true);
-  const calendarRef = useRef(null);
-  // const [chartData, setChartData] = useState([]);
-  const [editingField, setEditingField] = useState(null); // 'start' or 'end'
-const chartData = [
-  {
-    year: 2010,
-    "Stock Assessments": 12,
-    "Biomass Estimation": 8,
-    "Harvest Strategies & TAC (Total Allowable Catch)": 15,
-    "Fisheries Monitoring & Compliance": 10,
-    "Bycatch Reduction": 7,
-    "Indigenous & Community-Based Fisheries": 5,
-    "Sustainable Practices": 14,
-    "Regulatory Compliance": 9,
-    "Innovation in Aquaculture Technologies": 6,
-  },
-  {
-    year: 2011,
-    "Stock Assessments": 14,
-    "Biomass Estimation": 10,
-    "Harvest Strategies & TAC (Total Allowable Catch)": 17,
-    "Fisheries Monitoring & Compliance": 12,
-    "Bycatch Reduction": 6,
-    "Indigenous & Community-Based Fisheries": 8,
-    "Sustainable Practices": 13,
-    "Regulatory Compliance": 10,
-    "Innovation in Aquaculture Technologies": 5,
-  },
-  {
-    year: 2012,
-    "Stock Assessments": 16,
-    "Biomass Estimation": 11,
-    "Harvest Strategies & TAC (Total Allowable Catch)": 19,
-    "Fisheries Monitoring & Compliance": 14,
-    "Bycatch Reduction": 9,
-    "Indigenous & Community-Based Fisheries": 6,
-    "Sustainable Practices": 15,
-    "Regulatory Compliance": 12,
-    "Innovation in Aquaculture Technologies": 7,
-  },
-  {
-    year: 2013,
-    "Stock Assessments": 18,
-    "Biomass Estimation": 13,
-    "Harvest Strategies & TAC (Total Allowable Catch)": 16,
-    "Fisheries Monitoring & Compliance": 15,
-    "Bycatch Reduction": 8,
-    "Indigenous & Community-Based Fisheries": 9,
-    "Sustainable Practices": 14,
-    "Regulatory Compliance": 11,
-    "Innovation in Aquaculture Technologies": 9,
-  },
-  {
-    year: 2014,
-    "Stock Assessments": 20,
-    "Biomass Estimation": 12,
-    "Harvest Strategies & TAC (Total Allowable Catch)": 18,
-    "Fisheries Monitoring & Compliance": 16,
-    "Bycatch Reduction": 10,
-    "Indigenous & Community-Based Fisheries": 7,
-    "Sustainable Practices": 13,
-    "Regulatory Compliance": 13,
-    "Innovation in Aquaculture Technologies": 11,
-  },
-  {
-    year: 2015,
-    "Stock Assessments": 22,
-    "Biomass Estimation": 14,
-    "Harvest Strategies & TAC (Total Allowable Catch)": 20,
-    "Fisheries Monitoring & Compliance": 17,
-    "Bycatch Reduction": 11,
-    "Indigenous & Community-Based Fisheries": 8,
-    "Sustainable Practices": 16,
-    "Regulatory Compliance": 14,
-    "Innovation in Aquaculture Technologies": 10,
-  },
-  {
-    year: 2016,
-    "Stock Assessments": 24,
-    "Biomass Estimation": 15,
-    "Harvest Strategies & TAC (Total Allowable Catch)": 21,
-    "Fisheries Monitoring & Compliance": 18,
-    "Bycatch Reduction": 13,
-    "Indigenous & Community-Based Fisheries": 9,
-    "Sustainable Practices": 17,
-    "Regulatory Compliance": 16,
-    "Innovation in Aquaculture Technologies": 13,
-  },
-  {
-    year: 2017,
-    "Stock Assessments": 26,
-    "Biomass Estimation": 16,
-    "Harvest Strategies & TAC (Total Allowable Catch)": 23,
-    "Fisheries Monitoring & Compliance": 19,
-    "Bycatch Reduction": 14,
-    "Indigenous & Community-Based Fisheries": 10,
-    "Sustainable Practices": 18,
-    "Regulatory Compliance": 15,
-    "Innovation in Aquaculture Technologies": 12,
-  },
-  {
-    year: 2018,
-    "Stock Assessments": 28,
-    "Biomass Estimation": 18,
-    "Harvest Strategies & TAC (Total Allowable Catch)": 24,
-    "Fisheries Monitoring & Compliance": 21,
-    "Bycatch Reduction": 12,
-    "Indigenous & Community-Based Fisheries": 11,
-    "Sustainable Practices": 20,
-    "Regulatory Compliance": 17,
-    "Innovation in Aquaculture Technologies": 14,
-  },
-  {
-    year: 2019,
-    "Stock Assessments": 30,
-    "Biomass Estimation": 19,
-    "Harvest Strategies & TAC (Total Allowable Catch)": 26,
-    "Fisheries Monitoring & Compliance": 22,
-    "Bycatch Reduction": 15,
-    "Indigenous & Community-Based Fisheries": 12,
-    "Sustainable Practices": 21,
-    "Regulatory Compliance": 18,
-    "Innovation in Aquaculture Technologies": 15,
-  },
-  {
-    year: 2020,
-    "Stock Assessments": 31,
-    "Biomass Estimation": 21,
-    "Harvest Strategies & TAC (Total Allowable Catch)": 27,
-    "Fisheries Monitoring & Compliance": 23,
-    "Bycatch Reduction": 16,
-    "Indigenous & Community-Based Fisheries": 14,
-    "Sustainable Practices": 22,
-    "Regulatory Compliance": 19,
-    "Innovation in Aquaculture Technologies": 17,
-  },
-  {
-    year: 2021,
-    "Stock Assessments": 33,
-    "Biomass Estimation": 22,
-    "Harvest Strategies & TAC (Total Allowable Catch)": 28,
-    "Fisheries Monitoring & Compliance": 24,
-    "Bycatch Reduction": 17,
-    "Indigenous & Community-Based Fisheries": 13,
-    "Sustainable Practices": 24,
-    "Regulatory Compliance": 20,
-    "Innovation in Aquaculture Technologies": 18,
-  },
-  {
-    year: 2022,
-    "Stock Assessments": 32,
-    "Biomass Estimation": 20,
-    "Harvest Strategies & TAC (Total Allowable Catch)": 29,
-    "Fisheries Monitoring & Compliance": 25,
-    "Bycatch Reduction": 18,
-    "Indigenous & Community-Based Fisheries": 15,
-    "Sustainable Practices": 25,
-    "Regulatory Compliance": 21,
-    "Innovation in Aquaculture Technologies": 19,
-  },
-  {
-    year: 2023,
-    "Stock Assessments": 35,
-    "Biomass Estimation": 23,
-    "Harvest Strategies & TAC (Total Allowable Catch)": 31,
-    "Fisheries Monitoring & Compliance": 26,
-    "Bycatch Reduction": 20,
-    "Indigenous & Community-Based Fisheries": 16,
-    "Sustainable Practices": 27,
-    "Regulatory Compliance": 22,
-    "Innovation in Aquaculture Technologies": 21,
-  },
-];
-
-
-  const colorPalette = [
-    "#1f77b4", // blue
-    "#d62728", // red
-    "#2ca02c", // green
-    "#ff7f0e", // orange
-    "#9467bd", // purple
-    "#8c564b", // brown
-    "#e377c2", // pink
-    "#7f7f7f", // gray
-    "#bcbd22", // yellow-green
-    "#17becf", // cyan
-    "#393b79", // deep indigo
-    "#637939", // olive
-    "#843c39", // dark red-brown
-    "#e7969c", // light pink
-    "#a55194", // violet
-    "#9c9ede"  // lavender blue
-  ];
-  
-const [allTopics, setAllTopics] = useState([
-  { label: "Stock Assessments", value: "Stock Assessments" },
-  { label: "Biomass Estimation", value: "Biomass Estimation" },
-  { label: "Harvest Strategies & TAC (Total Allowable Catch)", value: "Harvest Strategies & TAC (Total Allowable Catch)" },
-  { label: "Fisheries Monitoring & Compliance", value: "Fisheries Monitoring & Compliance" },
-  { label: "Bycatch Reduction", value: "Bycatch Reduction" },
-  { label: "Indigenous & Community-Based Fisheries", value: "Indigenous & Community-Based Fisheries" },
-  { label: "Sustainable Practices", value: "Sustainable Practices" },
-  { label: "Regulatory Compliance", value: "Regulatory Compliance" },
-  { label: "Innovation in Aquaculture Technologies", value: "Innovation in Aquaculture Technologies" },
-]);
-
-
-  useClickAway(calendarRef, () => {
-    setShowCalendar(false);
-  });
-  const [dateRange, setDateRange] = useState([
-    {
-      startDate: new Date(2010, 0, 1),
-      endDate: new Date(2023, 11, 31),
-      key: "selection",
-    },
-  ]);
+  const [chartData, setChartData] = useState([]);
+  const [allTopics, setAllTopics] = useState([]);
+  const [allDocumentTypes, setAllDocumentTypes] = useState([]);
   const [selectedTopics, setSelectedTopics] = useState([]);
+  const [selectedDocTypes, setSelectedDocTypes] = useState([]);
+  
+  // Year range picker state
+  const [isYearSelectorOpen, setIsYearSelectorOpen] = useState(false);
+  const yearSelectorRef = useRef(null);
+  
+  // Available years - calculated once during initial fetch
+  const [availableYears, setAvailableYears] = useState([]);
+  const [minAvailableYear, setMinAvailableYear] = useState(2010);
+  const [maxAvailableYear, setMaxAvailableYear] = useState(new Date().getFullYear());
+  
+  // Selected range - can be changed by user
+  const [fromYear, setFromYear] = useState(2010);
+  const [toYear, setToYear] = useState(new Date().getFullYear());
 
+  // Generate all years in a range
+  const generateYearsInRange = (start, end) => {
+    const years = [];
+    for (let year = start; year <= end; year++) {
+      years.push(year);
+    }
+    return years;
+  };
+  
+  // Calculate total documents for a given topic
   const getTotalDocuments = (topic) => {
-    return chartData.reduce((total, data) => total + (data[topic] || 0), 0);
+    return chartData
+      .filter(data => data.year >= fromYear && data.year <= toYear)
+      .reduce((total, data) => total + (data[topic] || 0), 0);
   };
 
-  
-
-
+  // Fetch chart data based on selected criteria
   const fetchChartData = async () => {
+    // Don't fetch data if no topics are selected
+    if (selectedTopics.length === 0) {
+      setChartData([]);
+      setLoading(false);
+      return;
+    }
+
+    if (USE_MOCK_DATA) {
+      setChartData(mockTopicTrendsData);
+      setLoading(false);
+      return;
+    }
+    
     setLoading(true);
     try {
-      const session = await fetchAuthSession()
-      const token = session.tokens.idToken
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_ENDPOINT}user/chart_data?startDate=${dateRange[0].startDate.toISOString()}&endDate=${dateRange[0].endDate.toISOString()}&topics=${selectedTopics.map(topic => topic.value).join(",")}`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: token,
-            "Content-Type": "application/json",
-          },
-        },
-      )
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
-      const data = await response.json()
-
-      // Update state with the fetched data
-      // setChartData(data);
-
-      // Dynamically calculate min and max dates based on the fetched chart data
-      const dates = data.map(item => item.year);
-      const dynamicMinDate = new Date(Math.min(...dates));
-      const dynamicMaxDate = new Date(Math.max(...dates));
-
-      // Set the min and max dates for the calendar based on the selected topics' data
-      setMinDate(dynamicMinDate);
-      setMaxDate(dynamicMaxDate);
-
-      // Update dateRange state to use the new min and max dates
-      setDateRange([{ startDate: dynamicMinDate, endDate: dynamicMaxDate, key: "selection" }]);
-    } catch (error) {
-      console.error(`Error fetching min/max dates:`, error)
-      setDateRange([{ startDate: new Date(2000, 0, 1), endDate: new Date(), key: "selection" }]);
-      // setChartData([]); // Reset chart data on error
-    } finally {
-      setLoading(false)
-    }
-
-  };
-
-  const fetchTopics = async () => {
-    setLoading(true)
-    try {
-      const session = await fetchAuthSession()
-      const token = session.tokens.idToken
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_ENDPOINT}user/topics`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: token,
-            "Content-Type": "application/json",
-          },
-        },
-      )
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
-      const data = await response.json()
-      console.log(data)
-      setAllTopics(data)
-    } catch (error) {
-      console.error(`Error fetching topics:`, error)
+      // For real API implementation
+      const url = new URL(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/chart_data`);
+      url.searchParams.append("fromYear", fromYear.toString());
+      url.searchParams.append("toYear", toYear.toString());
       
+      if (selectedTopics.length > 0) {
+        url.searchParams.append("topics", selectedTopics.join(","));
+      }
+      
+      if (selectedDocTypes.length > 0) {
+        url.searchParams.append("document_types", selectedDocTypes.join(","));
+      }
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json();
+      setChartData(data);
+    } catch (error) {
+      console.error(`Error fetching chart data:`, error);
+      setChartData([]);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   };
 
+  // Initialize filter options and set up available years
+  const fetchFilters = async () => {
+    setLoading(true);
+    
+    try {
+      let years = [];
+      
+      if (USE_MOCK_DATA) {
+        setAllTopics(mockTopicOptions);
+        setAllDocumentTypes(mockDocumentTypes);
+        setChartData(mockTopicTrendsData);
+        
+        // Extract unique years from mock data
+        years = [...new Set(mockTopicTrendsData.map(item => item.year))].sort((a, b) => a - b);
+      } else {
+        const filterOptions = await fetchFilterOptions();
+        
+        // Process topics
+        if (filterOptions.topics && filterOptions.topics.length > 0) {
+          setAllTopics(filterOptions.topics);
+        }
+        
+        // Process document types
+        if (filterOptions.documentTypes && filterOptions.documentTypes.length > 0) {
+          setAllDocumentTypes(filterOptions.documentTypes);
+        }
+        
+        // Process years
+        if (filterOptions.years && filterOptions.years.length > 0) {
+          years = filterOptions.years.map(year => parseInt(year)).sort((a, b) => a - b);
+        }
+      }
+      
+      // Only set year range once during initialization
+      if (years.length > 0) {
+        const minYear = Math.min(...years);
+        const maxYear = Math.max(...years);
+        
+        // Generate all years in range
+        const fullYearRange = generateYearsInRange(minYear, maxYear);
+        setAvailableYears(fullYearRange);
+        
+        // Set min/max range
+        setMinAvailableYear(minYear);
+        setMaxAvailableYear(maxYear);
+        
+        // Initialize selected range to full range
+        setFromYear(minYear);
+        setToYear(maxYear);
+      } else {
+        // Fallback to default years if no data
+        const currentYear = new Date().getFullYear();
+        const defaultRange = generateYearsInRange(currentYear - 10, currentYear);
+        setAvailableYears(defaultRange);
+      }
+    } catch (error) {
+      console.error(`Error fetching filters:`, error);
+      
+      // Fallback to default years on error
+      const currentYear = new Date().getFullYear();
+      const defaultRange = generateYearsInRange(currentYear - 10, currentYear);
+      setAvailableYears(defaultRange);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Format options for AsyncSelect
+  const formatOptionsForSelect = (options) => {
+    return options.map(option => ({
+      label: option,
+      value: option
+    }));
+  };
+
+  // Handle search for AsyncSelect components
+  const handleTopicSearch = async (inputValue) => {
+    if (!inputValue) return formatOptionsForSelect(allTopics);
+    return formatOptionsForSelect(
+      allTopics.filter(topic => topic.toLowerCase().includes(inputValue.toLowerCase()))
+    );
+  };
+  
+  const handleDocTypeSearch = async (inputValue) => {
+    if (!inputValue) return formatOptionsForSelect(allDocumentTypes);
+    return formatOptionsForSelect(
+      allDocumentTypes.filter(docType => docType.toLowerCase().includes(inputValue.toLowerCase()))
+    );
+  };
+
+  // Year range selector handlers
+  const handleFromYearChange = (e) => {
+    const newFromYear = parseInt(e.target.value);
+    setFromYear(newFromYear);
+    
+    // If from year is greater than to year, update to year as well
+    if (newFromYear > toYear) {
+      setToYear(newFromYear);
+    }
+  };
+  
+  const handleToYearChange = (e) => {
+    const newToYear = parseInt(e.target.value);
+    setToYear(newToYear);
+    
+    // If to year is less than from year, update from year as well
+    if (newToYear < fromYear) {
+      setFromYear(newToYear);
+    }
+  };
+  
+  // Convert year value to position percentage for visual bar
+  const yearToPercent = (year) => {
+    if (maxAvailableYear === minAvailableYear) return 50;
+    return ((year - minAvailableYear) / (maxAvailableYear - minAvailableYear)) * 100;
+  };
+
+  // Click away handler
+  useClickAway(yearSelectorRef, () => {
+    setIsYearSelectorOpen(false);
+  });
+
+  // Filter chart data based on selected years
+  const filteredChartData = chartData.filter(item => 
+    item.year >= fromYear && item.year <= toYear
+  );
+  
+  // Effect hooks
   useEffect(() => {
-    fetchTopics(); // Fetch topics when component mounts
+    fetchFilters();
   }, []);
 
   useEffect(() => {
+    // Only fetch data if topics are selected, regardless of document types
     if (selectedTopics.length > 0) {
-      fetchChartData(); // Fetch the chart data when the date range or selected topics change
+      fetchChartData();
+    } else {
+      // Clear chart data when no topics are selected
+      setChartData([]);
     }
-  }, [dateRange, selectedTopics]); // Adding dateRange and selectedTopics as dependencies
-
-
-  const handleTopicSearch = async (inputValue) => {
-    const allTopics = [
-      { label: "Salmon", value: "salmon" },
-      { label: "Conservation", value: "conservation" },
-      { label: "Climate Change", value: "climate-change" },
-      { label: "Aquaculture", value: "aquaculture" },
-      { label: "Fisheries", value: "fisheries" },
-      { label: "Biodiversity", value: "biodiversity" },
-      // ... add more if needed
-    ];
-  
-    if (!inputValue) return allTopics; // return all on empty search
-  
-    return allTopics.filter((topic) =>
-      topic.label.toLowerCase().includes(inputValue.toLowerCase())
-    );
-  };
+  }, [fromYear, toYear, selectedTopics, selectedDocTypes]);
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900 transition-all duration-300">
@@ -356,60 +287,147 @@ const [allTopics, setAllTopics] = useState([
         {/* Filters */}
         <div className="mb-6 md:mb-8 bg-white dark:bg-gray-800 rounded-lg shadow-md p-3 md:p-4 border dark:border-gray-700">
           <h3 className="font-medium dark:text-white mb-3 md:mb-4 text-sm md:text-base">Filters</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="relative">
-  <label className="block text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-    Date Range
-  </label>
-  <div className="flex space-x-2">
-    <input
-      type="text"
-      readOnly
-      onClick={() => {setEditingField('start'); setShowCalendar(true)}}
-      value={dateRange[0].startDate.toLocaleDateString()}
-      className="w-full cursor-pointer rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2 py-1.5 text-xs md:text-sm"
-    />
-    <input
-      type="text"
-      readOnly
-      onClick={() => {setEditingField('end'); setShowCalendar(true)}}
-      value={dateRange[0].endDate.toLocaleDateString()}
-      className="w-full cursor-pointer rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2 py-1.5 text-xs md:text-sm"
-    />
-  </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="relative">
+              <label className="block text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Year Range
+              </label>
+              
+              <button
+                type="button"
+                className="w-full flex justify-between items-center px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm text-left cursor-pointer"
+                onClick={() => setIsYearSelectorOpen(!isYearSelectorOpen)}
+              >
+                <span className="text-gray-700 dark:text-gray-300">
+                  {fromYear === toYear ? `${fromYear}` : `${fromYear} to ${toYear}`}
+                </span>
+                <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
 
-  {showCalendar && (
-    <div ref={calendarRef} className="absolute z-50 mt-2 shadow-lg">
-      <DateRange
-        editableDateInputs
-        onChange={(item) => {
-          const newStart = editingField === "start" ? item.selection.startDate : dateRange[0].startDate;
-          const newEnd = editingField === "end" ? item.selection.endDate : dateRange[0].endDate;
-      
-          setDateRange([{ startDate: newStart, endDate: newEnd, key: "selection" }]);
-          setShowCalendar(false);
-        }}
-        moveRangeOnFirstSelection={false}
-        ranges={dateRange}
-        minDate={new Date(2000, 0, 1)}
-        maxDate={new Date()}
-      />
-    </div>
-  )}
-</div>
+              {isYearSelectorOpen && (
+                <div 
+                  ref={yearSelectorRef}
+                  className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-700 shadow-lg rounded-md border border-gray-300 dark:border-gray-600 p-4"
+                >
+                  <div className="flex flex-col space-y-4">
+                    {/* Year range dropdowns */}
+                    <div className="flex space-x-2">
+                      <div className="w-1/2">
+                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          From
+                        </label>
+                        <select
+                          value={fromYear}
+                          onChange={handleFromYearChange}
+                          className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm py-1.5"
+                        >
+                          {availableYears.map(year => (
+                            <option key={`from-${year}`} value={year}>{year}</option>
+                          ))}
+                        </select>
+                      </div>
+                      
+                      <div className="w-1/2">
+                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          To
+                        </label>
+                        <select
+                          value={toYear}
+                          onChange={handleToYearChange}
+                          className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm py-1.5"
+                        >
+                          {availableYears.map(year => (
+                            <option key={`to-${year}`} value={year}>{year}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    
+                    {/* Years in range summary */}
+                    <div className="text-xs text-gray-600 dark:text-gray-400">
+                      {fromYear === toYear 
+                        ? `1 year selected: ${fromYear}` 
+                        : `${toYear - fromYear + 1} years selected: ${fromYear} to ${toYear}`}
+                    </div>
+                    
+                    {/* Visual bar representation */}
+                    <div className="pt-4 pb-2">
+                      <div className="relative h-2 bg-gray-300 dark:bg-gray-600 rounded-full">
+                        {/* Filled area between markers */}
+                        <div 
+                          className="absolute h-2 bg-blue-500 rounded-full"
+                          style={{ 
+                            left: `${yearToPercent(fromYear)}%`,
+                            right: `${100 - yearToPercent(toYear)}%`
+                          }}
+                        />
+                        
+                        {/* Markers for from and to years */}
+                        <div 
+                          className="absolute top-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-white border-2 border-blue-500"
+                          style={{ left: `${yearToPercent(fromYear)}%`, marginLeft: '-8px' }}
+                        >
+                          <span className="absolute top-5 left-1/2 -translate-x-1/2 text-xs font-medium">
+                            {fromYear}
+                          </span>
+                        </div>
+                        
+                        <div 
+                          className="absolute top-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-white border-2 border-blue-500"
+                          style={{ left: `${yearToPercent(toYear)}%`, marginLeft: '-8px' }}
+                        >
+                          <span className="absolute top-5 left-1/2 -translate-x-1/2 text-xs font-medium">
+                            {toYear}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      {/* Year labels */}
+                      <div className="flex justify-between mt-8 px-1">
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {minAvailableYear}
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {maxAvailableYear}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
 
-
+            <div>
+              <label className="block text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Document Type
+              </label>
+              <AsyncSelect
+                cacheOptions
+                defaultOptions={formatOptionsForSelect(allDocumentTypes)}
+                loadOptions={handleDocTypeSearch}
+                isMulti
+                placeholder="Select document types..."
+                onChange={(selected) => setSelectedDocTypes(selected ? selected.map(item => item.value) : [])}
+                styles={{
+                  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+                }}
+                menuPortalTarget={typeof window !== 'undefined' ? document.body : null}
+              />
+            </div>
+            
             <div className="md:col-span-2">
               <label className="block text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Topic Filter
               </label>
               <AsyncSelect
                 cacheOptions
-                defaultOptions={allTopics}
+                defaultOptions={formatOptionsForSelect(allTopics)}
                 loadOptions={handleTopicSearch}
                 isMulti
                 placeholder="Search topics..."
-                onChange={(selected) => setSelectedTopics(selected)}
+                onChange={(selected) => setSelectedTopics(selected ? selected.map(item => item.value) : [])}
                 styles={{
                   menuPortal: (base) => ({ ...base, zIndex: 9999 }),
                 }}
@@ -421,7 +439,7 @@ const [allTopics, setAllTopics] = useState([
 
         {/* Analytics Dashboard */}
         <div className="grid grid-cols-1 md:grid-cols-1 gap-4 md:gap-6">
-          {/* Co-occurrence */}
+          {/* Line Chart - Topic Trends Over Time */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-3 md:p-4 border dark:border-gray-700">
             <div className="flex justify-between items-center mb-3 md:mb-4">
               <h3 className="font-medium dark:text-white text-sm md:text-base">
@@ -429,27 +447,26 @@ const [allTopics, setAllTopics] = useState([
               </h3>
               <div className="flex items-center space-x-2">
                 <span className="text-xs text-gray-500 dark:text-gray-400 hidden sm:inline">
-                  Last updated: Jan 10, 2023
+                  {USE_MOCK_DATA ? "Mock Data" : "Last updated: " + new Date().toLocaleDateString()}
                 </span>
                 <Info className="h-4 w-4 text-gray-500 dark:text-gray-400" />
               </div>
             </div>
             {(selectedTopics.length === 0) ?
               (<div className="aspect-video bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
-              {/* Placeholder */}
               <p className="text-sm text-gray-600 dark:text-gray-300">Select topics to begin</p>
             </div>) : (
             <ResponsiveContainer width="100%" height={450}>
-              <LineChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+              <LineChart data={filteredChartData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
                 <XAxis dataKey="year" label={{ value: "Year", position: "insideBottom", offset: -5 }} />
                 <YAxis label={{ value: "# of Documents", angle: -90, position: "insideLeft" }} />
                 <Tooltip />
                 <Legend />
                 {selectedTopics.map((topic, index) => (
                   <Line
-                    key={topic.value}
+                    key={topic}
                     type="monotone"
-                    dataKey={topic.value}
+                    dataKey={topic}
                     stroke={colorPalette[index % colorPalette.length]}
                     strokeWidth={2}
                     dot={false}
@@ -460,7 +477,7 @@ const [allTopics, setAllTopics] = useState([
             </ResponsiveContainer>)}
           </div>
 
-          {/* Trend Over Time */}
+          {/* Bar Chart - Total Document Count */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-3 md:p-4 border dark:border-gray-700">
             <div className="flex justify-between items-center mb-3 md:mb-4">
               <h3 className="font-medium dark:text-white text-sm md:text-base">
@@ -468,32 +485,32 @@ const [allTopics, setAllTopics] = useState([
               </h3>
               <div className="flex items-center space-x-2">
                 <span className="text-xs text-gray-500 dark:text-gray-400 hidden sm:inline">
-                  Last updated: Jan 10, 2023
+                  {USE_MOCK_DATA ? "Mock Data" : "Last updated: " + new Date().toLocaleDateString()}
                 </span>
                 <Info className="h-4 w-4 text-gray-500 dark:text-gray-400" />
               </div>
             </div>
             {(selectedTopics.length === 0) ?
               (<div className="aspect-video bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
-              {/* Placeholder */}
               <p className="text-sm text-gray-600 dark:text-gray-300">Select topics to begin</p>
             </div>) : (
             <ResponsiveContainer width="100%" height={450}>
-      <BarChart data={selectedTopics.map(topic => ({ name: topic.label, count: getTotalDocuments(topic.value) }))} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-
-        <XAxis dataKey="name" />  {/* Topic name on X-axis */}
-        <YAxis />  {/* Document count on Y-axis */}
-        <Tooltip />
-        <Bar
-          dataKey="count"
-          barSize={75}
-        >
-          {/* Use Cell to apply a unique color to each bar */}
-          {selectedTopics.map((entry, index) => (
-            <Cell key={`cell-${index}`} fill={colorPalette[index % colorPalette.length]} />
-          ))}
-        </Bar>
-      </BarChart>
+              <BarChart 
+                data={selectedTopics.map(topic => ({ 
+                  name: topic, 
+                  count: getTotalDocuments(topic) 
+                }))} 
+                margin={{ top: 10, right: 20, left: 0, bottom: 0 }}
+              >
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Bar dataKey="count" barSize={75}>
+                  {selectedTopics.map((_, index) => (
+                    <Cell key={`cell-${index}`} fill={colorPalette[index % colorPalette.length]} />
+                  ))}
+                </Bar>
+              </BarChart>
             </ResponsiveContainer>)}
           </div>      
         </div>

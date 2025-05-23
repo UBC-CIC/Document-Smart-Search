@@ -3,6 +3,7 @@ import { useClickAway } from "react-use";
 
 export default function DateRangeSelector({ yearFilters, setYearFilters }) {
   const dropdownRef = useRef(null);
+  const isUserAction = useRef(false); // Track if change is from user interaction
   
   // Get all available years and sort them numerically
   const availableYears = [...new Set(Object.keys(yearFilters).map(y => parseInt(y)))].sort((a, b) => a - b);
@@ -21,10 +22,11 @@ export default function DateRangeSelector({ yearFilters, setYearFilters }) {
   const [fromYear, setFromYear] = useState(minAvailableYear);
   const [toYear, setToYear] = useState(maxAvailableYear);
   const [isOpen, setIsOpen] = useState(false);
+  const [initialized, setInitialized] = useState(false);
   
-  // Update the year filters when range changes
+  // Update the year filters when range changes (from user interaction only)
   useEffect(() => {
-    if (availableYears.length === 0) return;
+    if (!isUserAction.current || availableYears.length === 0) return;
     
     const updatedFilters = { ...yearFilters };
     Object.keys(updatedFilters).forEach(year => {
@@ -33,6 +35,7 @@ export default function DateRangeSelector({ yearFilters, setYearFilters }) {
     });
     
     setYearFilters(updatedFilters);
+    isUserAction.current = false; // Reset after updating filters
   }, [fromYear, toYear]);
   
   // Determine display text
@@ -40,27 +43,34 @@ export default function DateRangeSelector({ yearFilters, setYearFilters }) {
     ? `${fromYear}` 
     : `${fromYear} to ${toYear}`;
   
-  // Update filters when component mounts to ensure at least some years are selected
+  // Initialize the component once with yearFilters data
   useEffect(() => {
+    if (initialized || Object.keys(yearFilters).length === 0) return;
+    
     const selectedYears = Object.entries(yearFilters)
       .filter(([_, isActive]) => isActive)
       .map(([year]) => parseInt(year));
     
     if (selectedYears.length > 0) {
+      // If we have active years selected, use them
       setFromYear(Math.min(...selectedYears));
       setToYear(Math.max(...selectedYears));
-    } else {
-      // If no years selected, default to all years
+    } else if (availableYears.length > 0) {
+      // If no years selected but we have available years, default to all years
       setFromYear(minAvailableYear);
       setToYear(maxAvailableYear);
       
+      // Initialize the filters to all true within the range
       const updatedFilters = { ...yearFilters };
       Object.keys(updatedFilters).forEach(year => {
-        updatedFilters[year] = true;
+        const yearNum = parseInt(year);
+        updatedFilters[year] = yearNum >= minAvailableYear && yearNum <= maxAvailableYear;
       });
       setYearFilters(updatedFilters);
     }
-  }, []);
+    
+    setInitialized(true);
+  }, [yearFilters, minAvailableYear, maxAvailableYear, availableYears, initialized]);
   
   useClickAway(dropdownRef, () => {
     setIsOpen(false);
@@ -68,6 +78,7 @@ export default function DateRangeSelector({ yearFilters, setYearFilters }) {
   
   const handleFromYearChange = (e) => {
     const newFromYear = parseInt(e.target.value);
+    isUserAction.current = true; // Mark this as a user action
     setFromYear(newFromYear);
     
     // If from year is greater than to year, update to year as well
@@ -78,6 +89,7 @@ export default function DateRangeSelector({ yearFilters, setYearFilters }) {
   
   const handleToYearChange = (e) => {
     const newToYear = parseInt(e.target.value);
+    isUserAction.current = true; // Mark this as a user action
     setToYear(newToYear);
     
     // If to year is less than from year, update from year as well
@@ -92,10 +104,13 @@ export default function DateRangeSelector({ yearFilters, setYearFilters }) {
     return ((year - minAvailableYear) / (maxAvailableYear - minAvailableYear)) * 100;
   };
 
+  // Don't render anything if there are no years
+  if (availableYears.length === 0) return null;
+
   return (
     <div className="relative">
       <label className="block text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-        Year Range
+        CSAS Year Range
       </label>
       
       <button

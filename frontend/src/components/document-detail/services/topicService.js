@@ -19,20 +19,23 @@ export async function fetchTopicFilterOptions() {
   }
 
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/filters`, {
-      method: "POST",
+    // Define filters to request
+    const filtersToRequest = ["years", "document_types"];
+    
+    // Build the URL with query parameters
+    const url = new URL(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/filters`);
+    url.searchParams.append("filters", filtersToRequest.join(","));
+
+    const response = await fetch(url, {
+      method: "GET",
       headers: {
         "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        filters: ["years", "documentTypes"],
-      }),
+      }
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      throw new Error(`HTTP error! status: ${response.status}`)
     }
-    
     const data = await response.json();
     return {
       years: data.years || [],
@@ -96,7 +99,7 @@ export async function fetchRelatedDocumentsByTopic(
   // Real API implementation
   try {
     // Simplified API call - just request filtered results (up to 50)
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/related-documents?type=${encodeURIComponent(topicType)}`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/topics?type=${encodeURIComponent(topicType)}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -108,7 +111,7 @@ export async function fetchRelatedDocumentsByTopic(
           documentTypes: Object.keys(filters.documentTypes).filter(type => filters.documentTypes[type])
         },
         currentDocID: excludeDocumentId,
-        limit: 50  // Request up to 50 documents
+        // limit: 50  // Request up to 50 documents
       }),
     });
     

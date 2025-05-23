@@ -145,7 +145,7 @@ def format_results_for_frontend(results: List[Dict[str, Any]]) -> List[Dict[str,
             "title": result.get("title", "Unknown Title"),
             "documentType": result.get("documentType", "Unknown Type"),
             "year": result.get("year", "N/A"),
-            "semanticScore": result.get("_score", 0.0),
+            "semanticScore": result.get("semanticScore", 0.0),
             "csasEvent": result.get("csasEvent", ""),
             "csasYear": result.get("csasYear", "")
         }

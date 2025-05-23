@@ -89,7 +89,7 @@ class MandateTools:
                 "SELECT COUNT(*) "
                 "FROM documents_mandates "
                 f"WHERE mandate_name = '{name}' "
-                "AND llm_score >= 4;"
+                "AND llm_belongs = 'Yes';"
             )
 
         def _top_docs_sql(name: str, n: int) -> str:
@@ -102,7 +102,7 @@ class MandateTools:
             INNER JOIN documents_mandates dm
               ON d.html_url = dm.html_url
             WHERE dm.mandate_name = '{name}'
-              AND dm.llm_score >= 4
+              AND dm.llm_belongs = 'Yes'
             ORDER BY dm.llm_score DESC
             LIMIT {n};
             """

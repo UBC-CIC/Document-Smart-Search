@@ -10,8 +10,9 @@ export function useTopicPopup() {
   });
   
   const [isLoading, setIsLoading] = useState(false);
-  const [allDocuments, setAllDocuments] = useState([]); // Store all fetched documents
-  const [displayedDocuments, setDisplayedDocuments] = useState([]); // Store paginated documents
+  const [allDocuments, setAllDocuments] = useState([]); 
+  const [displayedDocuments, setDisplayedDocuments] = useState([]);
+  const [totalCount, setTotalCount] = useState(0); // Add state for total count from API
   const [metadata, setMetadata] = useState({});
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -20,24 +21,37 @@ export function useTopicPopup() {
   const [filterOptions, setFilterOptions] = useState({ years: [], documentTypes: [] });
   const resultsPerPage = 5;
 
-  // When popup opens with a topic, fetch filter options
+  // Single effect responsible for both filter options and document loading
   useEffect(() => {
     if (popupState.isOpen && popupState.topicName) {
-      // Get filter options when popup opens
-      fetchTopicFilterOptions().then(options => {
-        setFilterOptions(options);
-        setFilters({
-          years: Object.fromEntries(options.years.map(year => [year, false])),
-          documentTypes: Object.fromEntries(options.documentTypes.map(type => [type, false]))
+      // First, fetch the filter options
+      fetchTopicFilterOptions()
+        .then(options => {
+          setFilterOptions(options);
+          const newFilters = {
+            years: Object.fromEntries(options.years.map(year => [year, false])),
+            documentTypes: Object.fromEntries(options.documentTypes.map(type => [type, false]))
+          };
+          setFilters(newFilters);
+          
+          // Once filter options are set, load the documents if we have a topic name and type
+          if (popupState.topicType) {
+            loadDocuments(popupState.topicName, popupState.topicType, newFilters, popupState.excludeDocumentId);
+          }
+        })
+        .catch(error => {
+          console.error("Error fetching filter options:", error);
         });
-        
-        // Now fetch documents with the initialized filters
-        loadDocuments();
-      }).catch(error => {
-        console.error("Error fetching filter options:", error);
-      });
     }
-  }, [popupState.isOpen, popupState.topicName, popupState.topicType]);
+  }, [popupState.isOpen, popupState.topicName, popupState.topicType, popupState.excludeDocumentId]);
+
+  // Only reload documents when filters change (excluding initial load)
+  useEffect(() => {
+    // This condition ensures we don't trigger on the initial filter setup
+    if (popupState.isOpen && popupState.topicName && popupState.topicType && filterOptions.years.length > 0) {
+      loadDocuments(popupState.topicName, popupState.topicType, filters, popupState.excludeDocumentId);
+    }
+  }, [filters]);
 
   // Handle pagination and sorting client-side
   useEffect(() => {
@@ -52,10 +66,24 @@ export function useTopicPopup() {
       const startIndex = (currentPage - 1) * resultsPerPage;
       const endIndex = startIndex + resultsPerPage;
       setDisplayedDocuments(sortedDocuments.slice(startIndex, endIndex));
+    } else {
+      setDisplayedDocuments([]);
     }
   }, [allDocuments, sortBy, currentPage, popupState.topicType]);
 
   const openPopup = (topicName, topicType, excludeDocumentId = null) => {
+    // Set loading to true immediately when popup opens
+    setIsLoading(true);
+    
+    // Reset sortBy based on topic type
+    // For derived topics, only semanticScore is valid
+    if (topicType === 'derived') {
+      setSortBy('semanticScore');
+    } else {
+      // For mandate and dfo topics, default to combined score
+      setSortBy('combined');
+    }
+    
     setPopupState({
       isOpen: true,
       topicName,
@@ -63,6 +91,10 @@ export function useTopicPopup() {
       excludeDocumentId,
     });
     setCurrentPage(1);
+    // Reset documents to avoid showing stale data
+    setAllDocuments([]);
+    setDisplayedDocuments([]);
+    setTotalCount(0);
   };
 
   const closePopup = () => {
@@ -77,25 +109,33 @@ export function useTopicPopup() {
     setMetadata({});
   };
 
-  const loadDocuments = async () => {
-    if (!popupState.topicName || !popupState.topicType) return;
+  const loadDocuments = async (topicName, topicType, currentFilters, excludeDocId) => {
+    if (!topicName || !topicType) {
+      setIsLoading(false);
+      return;
+    }
     
-    setIsLoading(true);
+    // No need to set isLoading here since it's already set in openPopup
+    // Only set it to false if we're reloading due to filter changes
+    if (!isLoading) {
+      setIsLoading(true);
+    }
     
     try {
-      // Call fetchRelatedDocumentsByTopic with the updated parameters (no pagination or sorting)
       const result = await fetchRelatedDocumentsByTopic(
-        popupState.topicName,
-        popupState.topicType,
-        filters,
-        popupState.excludeDocumentId
+        topicName,
+        topicType,
+        currentFilters,
+        excludeDocId
       );
       
       setAllDocuments(result.documents || []);
-      // No metadata is needed anymore
-      setMetadata({}); // Just set to empty object
+      setTotalCount(result.totalCount || 0); 
+      setMetadata({});
     } catch (error) {
       console.error("Failed to load related documents:", error);
+      setAllDocuments([]);
+      setTotalCount(0);
     } finally {
       setIsLoading(false);
     }
@@ -104,7 +144,6 @@ export function useTopicPopup() {
   const handleFilterChange = (newFilters) => {
     setFilters(newFilters);
     setCurrentPage(1); // Reset to first page
-    loadDocuments(); // Reload documents with the new filters
   };
 
   const handleSortChange = (newSortBy) => {
@@ -147,8 +186,9 @@ export function useTopicPopup() {
 
   return {
     popupState,
-    documents: displayedDocuments, // Return the paginated documents
-    metadata: {}, // Just return an empty object since we're not using it anymore
+    documents: displayedDocuments,
+    totalCount, // Return the total count from API
+    metadata: {},
     isLoading,
     currentPage,
     totalPages,

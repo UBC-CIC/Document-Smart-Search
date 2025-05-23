@@ -28,7 +28,7 @@ export default function RelatedDocumentsList({ documents }) {
             <div className="flex gap-2 text-xs text-gray-600 dark:text-gray-400 mt-1">
               <span>{doc.type}</span>
               <span>•</span>
-              <span>{doc.year}</span>
+              <span>{doc.year || (doc.csasYear ? `${doc.csasYear}*` : "N/A")}</span>
             </div>
           </Link>
         </div>
