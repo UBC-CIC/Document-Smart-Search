@@ -33,13 +33,13 @@ export function useFeedback(fingerprint, session, messages) {
       : "No specific feedback provided";
 
     try {
-      console.log("Submitting feedback with:", {
-        fingerprint,
-        session,
-        userRole,
-        rating: feedback.rating,
-        description
-      });
+      // console.log("Submitting feedback with:", {
+      //   fingerprint,
+      //   session,
+      //   userRole,
+      //   rating: feedback.rating,
+      //   description
+      // });
       
       // Send feedback to the API
       await sendFeedback(

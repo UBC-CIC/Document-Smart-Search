@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { ToastContainer } from "react-toastify";
+import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
 // Import components
@@ -112,10 +112,10 @@ export default function Chat() {
         isSidebarOpen ? "md:ml-96" : ""
       }`}
     >
-      {/* Citations Sidebar */}
-      <div className={`fixed inset-0 z-40 pointer-events-none ${isSidebarOpen ? "visible" : "invisible"}`}>
+      {/* Citations Sidebar - z-index set to be below modal but above content */}
+      <div className={`fixed inset-0 z-30 pointer-events-none ${isSidebarOpen ? "visible" : "invisible"}`}>
         <div
-          className={`absolute inset-y-0 left-0 w-96 bg-white shadow-lg transform transition-transform duration-300 pointer-events-auto ${
+          className={`absolute top-12 bottom-0 left-0 w-96 bg-white shadow-lg transform transition-transform duration-300 pointer-events-auto ${
             isSidebarOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
@@ -143,7 +143,7 @@ export default function Chat() {
       </div>
 
       {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-4 py-6 md:py-8 flex-grow flex flex-col">
+      <main className="max-w-6xl mx-auto px-4 py-6 md:py-8 flex-grow flex flex-col relative z-10">
         <div className="relative mb-6 md:mb-8">
           <h2 className="text-2xl md:text-3xl font-bold text-center">SmartSearch Assistant</h2>
         </div>
@@ -156,7 +156,16 @@ export default function Chat() {
           currentMessageId={currentMessageId}
           setCurrentMessageId={setCurrentMessageId}
           onShowFeedback={() => setShowFeedback(true)}
-          onOpenSidebar={() => setIsSidebarOpen(true)}
+          onOpenSidebar={(messageId) => {
+            // If we're viewing the same message's sources, toggle the sidebar
+            if (currentMessageId === messageId) {
+              setIsSidebarOpen(prev => !prev);
+            } else {
+              // If it's a different message, set the current message and open the sidebar
+              setCurrentMessageId(messageId);
+              setIsSidebarOpen(true);
+            }
+          }}
           sendMessage={sendMessage} // Pass sendMessage function to handle option clicks
         />
 
@@ -176,13 +185,18 @@ export default function Chat() {
           userInput={userInput}
           setUserInput={setUserInput}
           sendMessage={async (input) => {
+            // Don't automatically open sidebar anymore
             const result = await sendMessage(input);
-            if (result?.hasTools) {
-              setIsSidebarOpen(true);
-            }
+            // Let the user decide when to open sidebar
+            return result;
           }}
           isLoading={isLoading}
-          resetSession={resetSession}
+          resetSession={() => {
+            // Close the sidebar when creating a new session
+            setIsSidebarOpen(false);
+            // Then call the original reset function
+            resetSession();
+          }}
           toggleListening={toggleListening}
           isListening={isListening}
           showDownloadButton={messages.length > 1}
@@ -190,7 +204,7 @@ export default function Chat() {
         />
       </main>
 
-      {/* Disclaimer Modal */}
+      {/* Disclaimer Modal - z-index set higher than sidebar */}
       <DisclaimerModal show={showDisclaimer} onClose={() => setShowDisclaimer(false)} />
 
       <ToastContainer
