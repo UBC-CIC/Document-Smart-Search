@@ -74,9 +74,9 @@ export default function NavigationHeader() {
               Document Search
             </button>
             <button
-              onClick={() => handleNavigation("/topic-trends")}
+              onClick={() => handleNavigation("/analytics")}
               className={
-                isActive("/topic-trends")
+                isActive("/analytics")
                   ? `text-blue-600 border-b-2 border-blue-600 ${baseDesktopClasses}`
                   : `text-gray-500 ${baseDesktopClasses}`
               }
@@ -130,9 +130,9 @@ export default function NavigationHeader() {
               Document Search
             </button>
             <button
-              onClick={() => handleNavigation("/topic-trends")}
+              onClick={() => handleNavigation("/analytics")}
               className={
-                isActive("/topic-trends")
+                isActive("/analytics")
                   ? `text-blue-600 ${baseMobileClasses}`
                   : `text-gray-700 ${baseMobileClasses}`
               }
