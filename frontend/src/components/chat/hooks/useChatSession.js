@@ -8,12 +8,13 @@ const INITIAL_GREETING =
   "Hello! I am a Smart Agent specialized in Fisheries and Oceans Canada (DFO). " +
   "I can help you with questions related to DFO documents, science advice, and more! " +
   "Please select the best role below that fits you. We can better answer your questions. " +
-  "Don't include personal details such as your name and private content.";
+  "Do not include personal details such as your name and private content.";
 
 export function useChatSession() {
   const [fingerprint, setFingerprint] = useState("");
   const [session, setSession] = useState(null);
   const [isCreatingSession, setIsCreatingSession] = useState(false);
+  const [isNewSession, setIsNewSession] = useState(true); // Track if session is new
   const [messages, setMessages] = useState([
     {
       id: "initial",
@@ -39,11 +40,13 @@ export function useChatSession() {
     if (existingSession) {
       const parsedSession = JSON.parse(existingSession);
       setSession(parsedSession);
+      setIsNewSession(false); // Not a new session
       // Don't show disclaimer for existing sessions
       setShowDisclaimer(false);
     } else {
       // Show disclaimer for new sessions
       setShowDisclaimer(true);
+      setIsNewSession(true); // Mark as new session
     }
   }, []);
 
@@ -53,23 +56,24 @@ export function useChatSession() {
     initializeSession(fingerprint);
   }, [fingerprint, session]);
 
-  // Fetch messages when session is available
+  // Fetch messages when session is available but only for existing sessions
   useEffect(() => {
-    if (session) {
+    if (session && !isNewSession) {
       loadChatHistory(session);
     }
-  }, [session]);
+  }, [session, isNewSession]);
 
   // Initialize a new chat session
   const initializeSession = async (currentFingerprint) => {
     if (!currentFingerprint) return;
 
     setIsCreatingSession(true);
-    setShowDisclaimer(true); // Immediately show disclaimer when creating new session
+    setShowDisclaimer(true); // Keep disclaimer visible for new sessions
     
     try {
       const sessionData = await createChatSession(currentFingerprint);
       setSession(sessionData);
+      setIsNewSession(true); // Mark as new session
       localStorage.setItem("dfoSession", JSON.stringify(sessionData));
 
       // Initialize with first message
@@ -97,7 +101,10 @@ export function useChatSession() {
     if (!sessionId) return;
 
     try {
-      setShowDisclaimer(false); // Hide disclaimer when loading existing chat history
+      // Only hide disclaimer when loading existing chat history
+      if (!isNewSession) {
+        setShowDisclaimer(false);
+      }
 
       const data = await fetchChatMessages(sessionId);
       const messagesList = data.messages || [];
@@ -151,6 +158,7 @@ export function useChatSession() {
   // Reset the session
   const resetSession = () => {
     setSession(null);
+    setIsNewSession(true); // Mark as new session
     setMessages([
       {
         id: "initial",

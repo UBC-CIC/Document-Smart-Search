@@ -93,40 +93,38 @@ class DocumentTools:
             return {"Error": "Document not found in Opensearch"}
 
         def _classification_sql(url: str) -> str:
-            # Raw f‑string kept: parameters are already trusted / pre‑escaped elsewhere.
             return f"""
             SELECT *
             FROM (
                 SELECT 'mandate' AS entity_type,
-                       m.mandate_name  AS entity_name,
-                       dm.semantic_score,
-                       dm.llm_score,
-                       dm.llm_explanation
+                    m.mandate_name  AS entity_name,
+                    dm.semantic_score,
+                    dm.llm_score,
+                    dm.llm_explanation
                 FROM documents_mandates dm
                 JOIN mandates m ON dm.mandate_name = m.mandate_name
-                WHERE dm.html_url = '{url}' AND dm.llm_score >= 4
+                WHERE dm.html_url = '{url}' AND dm.llm_belongs = 'Yes'
 
                 UNION ALL
 
                 SELECT 'dfo_topic',
-                       t.topic_name,
-                       dt.semantic_score,
-                       dt.llm_score,
-                       dt.llm_explanation
+                    t.topic_name,
+                    dt.semantic_score,
+                    dt.llm_score,
+                    dt.llm_explanation
                 FROM documents_topics dt
                 JOIN topics t ON dt.topic_name = t.topic_name
-                WHERE dt.html_url = '{url}' AND dt.llm_score >= 4
+                WHERE dt.html_url = '{url}' AND dt.llm_belongs = 'Yes'
 
                 UNION ALL
 
                 SELECT 'non_dfo_topic',
-                       t.topic_name,
-                       dt.semantic_score,
-                       dt.llm_score,
-                       dt.llm_explanation
-                FROM documents_topics dt
-                JOIN topics t ON dt.topic_name = t.topic_name
-                WHERE dt.html_url = '{url}' AND dt.llm_score >= 4
+                    ddt.topic_name,
+                    ddt.confidence_score,
+                    NULL::numeric,
+                    NULL::text
+                FROM documents_derived_topic ddt
+                WHERE ddt.html_url = '{url}'
             ) AS combined_results
             ORDER BY llm_score DESC;
             """
@@ -138,14 +136,14 @@ class DocumentTools:
             for entity_type, name, sem_score, llm_score, explain in rows:
                 if entity_type == "mandate":
                     mandates.append(
-                        {"name": name, "llm_score": llm_score / 10, "llm_explaination": explain}
+                        {"name": name, "llm_score": float(llm_score) / 10, "llm_explaination": explain}
                     )
                 elif entity_type == "dfo_topic":
                     dfo_topics.append(
-                        {"name": name, "llm_score": llm_score / 10, "llm_explaination": explain}
+                        {"name": name, "llm_score": float(llm_score) / 10, "llm_explaination": explain}
                     )
                 else:  # non_dfo_topic
-                    non_dfo.append({"name": name, "semantic_score": float(llm_score)})
+                    non_dfo.append({"name": name, "semantic_score": float(sem_score)})
 
             return mandates, dfo_topics, non_dfo
 
@@ -161,6 +159,8 @@ class DocumentTools:
                     "other_topics": other_topics,
                 }
             )
+
+            # print(f"Document categorization results: {base_results}")
 
             return json.dumps(
                 {

@@ -131,6 +131,19 @@ def handler(event, context):
                     logger.error(f"Error querying RDS for mandates: {str(e)}")
                     filters["mandates"] = []  # Empty list fallback on error
                 
+            # elif f == "document_types":
+            #     # Fetch document types from RDS
+            #     try:
+            #         sql = """
+            #         SELECT DISTINCT doc_type
+            #         FROM documents
+            #         """
+            #         results = execute_rds_query(rds_conn, sql)
+            #         filters["documentTypes"] = [x[0] for x in results if x[0] is not None]
+            #     except Exception as e:
+            #         logger.error(f"Error querying RDS for document types: {str(e)}")
+            #         filters["documentTypes"] = []  # Empty list fallback on error
+                
             elif f == "document_types":
                 # Fetch document types from RDS
                 try:
@@ -139,11 +152,21 @@ def handler(event, context):
                     FROM documents
                     """
                     results = execute_rds_query(rds_conn, sql)
-                    filters["documentTypes"] = [x[0] for x in results if x[0] is not None]
+                    doc_types = [x[0] for x in results if x[0] is not None]
+                    
+                    # Sort "Unknown" to be last in the list
+                    if "Unknown" in doc_types:
+                        doc_types.remove("Unknown")
+                        doc_types.sort()  # Sort remaining document types
+                        doc_types.append("Unknown")  # Add Unknown at the end
+                    else:
+                        doc_types.sort()
+                        
+                    filters["documentTypes"] = doc_types
                 except Exception as e:
                     logger.error(f"Error querying RDS for document types: {str(e)}")
                     filters["documentTypes"] = []  # Empty list fallback on error
-                
+
             elif f == "authors":
                 # Fetch authors from OpenSearch using aggregation
                 # Note: No longer used in the frontend so not implemented

@@ -7,6 +7,7 @@ import { X } from "lucide-react"
 
 const FeedbackComponent = ({ feedback, setFeedback, onSubmit, isSubmitting, onClose }) => {
   const [hoverRating, setHoverRating] = useState(0)
+  const [customFeedback, setCustomFeedback] = useState("")
 
   const options = ["Not enough information", "Confusing to use", "Inaccurate reviews"]
 
@@ -17,6 +18,23 @@ const FeedbackComponent = ({ feedback, setFeedback, onSubmit, isSubmitting, onCl
         ? prev.description.filter((desc) => desc !== option)
         : [...prev.description, option],
     }))
+  }
+
+  const handleCustomFeedbackChange = (e) => {
+    setCustomFeedback(e.target.value)
+  }
+
+  const handleSubmit = () => {
+    // Add custom feedback to description if it exists
+    if (customFeedback.trim()) {
+      setFeedback((prev) => ({
+        ...prev,
+        description: [...prev.description, customFeedback.trim()]
+      }))
+    }
+    
+    // Call the parent submit handler
+    onSubmit()
   }
 
   return (
@@ -48,23 +66,36 @@ const FeedbackComponent = ({ feedback, setFeedback, onSubmit, isSubmitting, onCl
         </div>
       </div>
 
-      {feedback.rating > 0 && feedback.rating < 5 && (
+      {feedback.rating > 0 && (
         <>
           <p className="text-base mb-3">How can we improve?</p>
-          <div className="flex flex-wrap gap-2 mb-4">
-            {options.map((option) => (
-              <button
-                key={option}
-                onClick={() => handleOptionClick(option)}
-                className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
-                  feedback.description.includes(option)
-                    ? "bg-gray-600 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                {option}
-              </button>
-            ))}
+          {feedback.rating < 5 && (
+            <div className="flex flex-wrap gap-2 mb-4">
+              {options.map((option) => (
+                <button
+                  key={option}
+                  onClick={() => handleOptionClick(option)}
+                  className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
+                    feedback.description.includes(option)
+                      ? "bg-gray-600 text-white"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+          )}
+          
+          {/* Custom feedback textarea */}
+          <div className="mb-4">
+            <textarea 
+              className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-customMain"
+              placeholder="Add your own feedback here..."
+              rows="3"
+              value={customFeedback}
+              onChange={handleCustomFeedbackChange}
+            ></textarea>
           </div>
         </>
       )}
@@ -72,8 +103,8 @@ const FeedbackComponent = ({ feedback, setFeedback, onSubmit, isSubmitting, onCl
       <Button
         className="w-32 bg-customMain hover:bg-customMain/90"
         variant="default"
-        onClick={onSubmit}
-        disabled={isSubmitting}
+        onClick={handleSubmit}
+        disabled={isSubmitting || feedback.rating === 0}
       >
         {isSubmitting ? "Sending..." : "Send Feedback"}
       </Button>

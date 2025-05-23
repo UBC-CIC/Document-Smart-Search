@@ -52,7 +52,7 @@ export default function ResultItem({ result, openQuerySummary }) {
 
         <div className="mb-2">
           <div className="text-xs md:text-sm text-gray-500 dark:text-gray-400">
-            {result.csasEvent ? `${result.csasEvent} (${result.csasYear})` : "No Associated CSAS Event"}
+            {result.csasEvent ? `CSAS Event: ${result.csasEvent} (${result.csasYear})` : "No Associated CSAS Event"}
           </div>
         </div>
 

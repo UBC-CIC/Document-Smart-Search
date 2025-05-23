@@ -32,7 +32,7 @@ export default function NavigationHeader() {
   const baseMobileClasses = "font-medium py-2";
 
   return (
-    <header className="border-b shadow-sm sticky top-0 bg-white z-10">
+    <header className="border-b shadow-sm sticky top-0 bg-white" style={{ zIndex: 1000 }}>
       <div className="max-w-[90%] mx-auto px-4 py-2 flex items-center justify-between">
       {/* Left side: Logo */}
         <div className="flex items-center">
@@ -83,7 +83,7 @@ export default function NavigationHeader() {
             >
               Analytics
             </button>
-            <button
+            {/* <button
               onClick={() => handleNavigation("/graph")}
               className={
                 isActive("/graph")
@@ -92,7 +92,7 @@ export default function NavigationHeader() {
               }
             >
               Graph
-            </button>
+            </button> */}
           </nav>
 
           {/* Mobile Navigation Toggle */}

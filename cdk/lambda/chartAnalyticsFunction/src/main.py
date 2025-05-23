@@ -1,9 +1,8 @@
 import json
 import boto3
 import logging
-from typing import Dict, List, Any
+from typing import Dict, List
 import psycopg
-from datetime import datetime
 
 # Set up basic logging
 logging.basicConfig(level=logging.INFO)
@@ -37,16 +36,22 @@ def get_secret(secret_name: str) -> Dict:
         logger.error(f"Error fetching secret {secret_name}: {e}")
         raise
 
-def build_topic_chart_query(topics: List[str], start_date: str, end_date: str, language: str = "English") -> str:
+def execute_rds_query(rds_conn, q: str, verbose: bool = False):
+    with rds_conn.cursor() as cursor:
+        cursor.execute(q)
+        if "select" in q.lower():
+            return cursor.fetchall()
+        if verbose:
+            print("Query executed!")
+        return None
+    
+def build_topic_chart_query(topics: List[str], from_year: int, to_year: int, doc_types: List[str] = None, language: str = "English") -> str:
     """Build SQL query to get document counts by year for topics."""
-    # Parse dates to get years
-    start_year = datetime.fromisoformat(start_date.replace('Z', '+00:00')).year
-    end_year = datetime.fromisoformat(end_date.replace('Z', '+00:00')).year
     
     # Base query structure - creates rows for all years in range
     query = f"""
     WITH years AS (
-        SELECT generate_series({start_year}, {end_year}) AS year
+        SELECT generate_series({from_year}, {to_year}) AS year
     ),
     """
     
@@ -55,14 +60,24 @@ def build_topic_chart_query(topics: List[str], start_date: str, end_date: str, l
     for i, topic in enumerate(topics):
         topic_subquery = f"""
     topic_{i}_counts AS (
-        SELECT d.year, COUNT(*) as count
+        SELECT d.event_year as year, COUNT(*) as count
         FROM documents d
         INNER JOIN documents_topics dt
         ON d.html_url = dt.html_url
         WHERE dt.topic_name = '{topic}' 
         AND d.doc_language = '{language}'
-        AND d.year BETWEEN {start_year} AND {end_year}
-        GROUP BY d.year
+        AND d.event_year BETWEEN {from_year} AND {to_year}
+        AND dt.llm_belongs = 'Yes'
+        """
+        
+        # Add document type filter if provided
+        if doc_types and len(doc_types) > 0:
+            doc_types_quoted = [f"'{doc_type}'" for doc_type in doc_types]
+            doc_types_str = ", ".join(doc_types_quoted)
+            topic_subquery += f"AND d.doc_type IN ({doc_types_str})\n"
+            
+        topic_subquery += """
+        GROUP BY d.event_year
     )"""
         topic_subqueries.append(topic_subquery)
     
@@ -91,16 +106,13 @@ def build_topic_chart_query(topics: List[str], start_date: str, end_date: str, l
     
     return query
 
-def build_mandate_chart_query(mandates: List[str], start_date: str, end_date: str, language: str = "English") -> str:
+def build_mandate_chart_query(mandates: List[str], from_year: int, to_year: int, doc_types: List[str] = None, language: str = "English") -> str:
     """Build SQL query to get document counts by year for mandates."""
-    # Parse dates to get years
-    start_year = datetime.fromisoformat(start_date.replace('Z', '+00:00')).year
-    end_year = datetime.fromisoformat(end_date.replace('Z', '+00:00')).year
     
     # Base query structure - creates rows for all years in range
     query = f"""
     WITH years AS (
-        SELECT generate_series({start_year}, {end_year}) AS year
+        SELECT generate_series({from_year}, {to_year}) AS year
     ),
     """
     
@@ -109,14 +121,24 @@ def build_mandate_chart_query(mandates: List[str], start_date: str, end_date: st
     for i, mandate in enumerate(mandates):
         mandate_subquery = f"""
     mandate_{i}_counts AS (
-        SELECT d.year, COUNT(*) as count
+        SELECT d.event_year as year, COUNT(*) as count
         FROM documents d
         INNER JOIN documents_mandates dm
         ON d.html_url = dm.html_url
         WHERE dm.mandate_name = '{mandate}' 
         AND d.doc_language = '{language}'
-        AND d.year BETWEEN {start_year} AND {end_year}
-        GROUP BY d.year
+        AND d.event_year BETWEEN {from_year} AND {to_year}
+        AND dm.llm_belongs = 'Yes'
+        """
+        
+        # Add document type filter if provided
+        if doc_types and len(doc_types) > 0:
+            doc_types_quoted = [f"'{doc_type}'" for doc_type in doc_types]
+            doc_types_str = ", ".join(doc_types_quoted)
+            mandate_subquery += f"AND d.doc_type IN ({doc_types_str})\n"
+            
+        mandate_subquery += """
+        GROUP BY d.event_year
     )"""
         mandate_subqueries.append(mandate_subquery)
     
@@ -145,145 +167,69 @@ def build_mandate_chart_query(mandates: List[str], start_date: str, end_date: st
     
     return query
 
-def get_topics_list(pgsql_conn, conn_info: Dict[str, Any], language: str = "English") -> List[Dict[str, str]]:
-    """Get the list of available topics."""
-    query = f"""
-    SELECT DISTINCT topic_name 
-    FROM documents_topics
-    WHERE topic_name IS NOT NULL
-    ORDER BY topic_name
-    """
-    
-    results = pgsql_conn.execute_query(query, conn_info)
-    return [{"label": row[0], "value": row[0]} for row in results]
-
-def get_mandates_list(pgsql_conn, conn_info: Dict[str, Any], language: str = "English") -> List[Dict[str, str]]:
-    """Get the list of available mandates."""
-    query = f"""
-    SELECT DISTINCT mandate_name 
-    FROM documents_mandates
-    WHERE mandate_name IS NOT NULL
-    ORDER BY mandate_name
-    """
-    
-    results = pgsql_conn.execute_query(query, conn_info)
-    return [{"label": row[0], "value": row[0]} for row in results]
-
-def get_chart_data(
-    *, pgsql_conn, conn_info: Dict[str, Any],
-    data_type: str, items: List[str],
-    start_date: str, end_date: str,
-    language: str = "English"
-) -> List[Dict[str, Any]]:
-    """
-    Get chart data for topics or mandates over time.
-    """
-    logger.info(f"Getting chart data for {data_type}: {items}")
-    
-    if not items:
-        return []
-    
-    # Build appropriate query based on data type
-    if data_type == "topics":
-        query = build_topic_chart_query(items, start_date, end_date, language)
-    elif data_type == "mandates":
-        query = build_mandate_chart_query(items, start_date, end_date, language)
-    else:
-        raise ValueError(f"Unknown data type: {data_type}")
-    
-    # Execute the query
-    logger.debug(f"Executing chart query: {query}")
-    results = pgsql_conn.execute_query(query, conn_info)
-    
-    # Convert query results to frontend chart format
-    chart_data = []
-    for row in results:
-        data_point = {"year": row[0]}  # First column is year
-        
-        # Add counts for each topic/mandate
-        for i, item in enumerate(items):
-            data_point[item] = row[i + 1]  # Offset by 1 for the year column
-            
-        chart_data.append(data_point)
-    
-    return chart_data
-
-class PgExecutor:
-    """A simple class to execute PostgreSQL queries with a connection."""
-    
-    def __init__(self, conn):
-        self.conn = conn
-        
-    def execute_query(self, sql, conn_info):
-        with self.conn.cursor() as cursor:
-            cursor.execute(sql)
-            return cursor.fetchall()
+def execute_chart_query(pgsql_conn, query):
+    """Execute chart query and return results"""
+    with pgsql_conn.cursor() as cursor:
+        cursor.execute(query)
+        columns = [desc[0] for desc in cursor.description]
+        results = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        return results
 
 def handler(event, context):
     try:
         # Parse query string parameters
         query_params = event.get("queryStringParameters", {}) or {}
-        # Parse body if present
-        if event.get("body"):
-            body = json.loads(event.get("body"))
-        else:
-            body = {}
         
-        # Determine request type (topics or mandates)
-        request_type = query_params.get("type", "topics")
+        # Get date range parameters (required)
+        from_year = query_params.get("fromYear")
+        to_year = query_params.get("toYear")
         
-        # For topics list or mandates list
-        if request_type == "topics_list" or request_type == "mandates_list":
-            language = body.get("language", "English")
-            
-            # Set up database connection
-            rds_secret = get_secret(RDS_SEC)
-            rds_conn_info = {
-                "host": rds_secret['host'],
-                "port": rds_secret['port'],
-                "dbname": rds_secret['dbname'],
-                "user": rds_secret['username'],
-                "password": rds_secret['password']
-            }
-            
-            rds_conn = psycopg.connect(**rds_conn_info)
-            pgsql_executor = PgExecutor(rds_conn)
-            
-            try:
-                if request_type == "topics_list":
-                    result = get_topics_list(pgsql_executor, rds_conn_info, language)
-                else:  # mandates_list
-                    result = get_mandates_list(pgsql_executor, rds_conn_info, language)
-                
-                return {
-                    "statusCode": 200,
-                    "body": json.dumps(result),
-                    "headers": {
-                        "Content-Type": "application/json",
-                        "Access-Control-Allow-Origin": "*"
-                    }
-                }
-            finally:
-                rds_conn.close()
-        
-        # For chart data requests
-        start_date = query_params.get("startDate")
-        end_date = query_params.get("endDate")
-        items_param = query_params.get("topics" if request_type == "topics" else "mandates", "")
-        items = items_param.split(",") if items_param else []
-        language = body.get("language", "English")
-        
-        if not start_date or not end_date:
+        if not from_year or not to_year:
             return {
                 "statusCode": 400,
-                "body": json.dumps({"error": "Missing date range parameters"}),
+                "body": json.dumps({"error": "Missing year range parameters"}),
                 "headers": {
                     "Content-Type": "application/json",
                     "Access-Control-Allow-Origin": "*"
                 }
             }
         
-        # Set up database connection
+        # Convert years to integers
+        try:
+            from_year = int(from_year)
+            to_year = int(to_year)
+        except ValueError:
+            return {
+                "statusCode": 400,
+                "body": json.dumps({"error": "Year parameters must be integers"}),
+                "headers": {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*"
+                }
+            }
+        
+        # Parse topics/mandates parameters
+        topics = query_params.get("topics", "").split(",") if query_params.get("topics") else []
+        mandates = query_params.get("mandates", "").split(",") if query_params.get("mandates") else []
+        
+        # Parse document types
+        doc_types = query_params.get("document_types", "").split(",") if query_params.get("document_types") else []
+        
+        # Check if we have either topics or mandates
+        if not topics and not mandates:
+            return {
+                "statusCode": 400,
+                "body": json.dumps({"error": "Either topics or mandates parameter must be provided"}),
+                "headers": {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*"
+                }
+            }
+        
+        # Default language
+        language = query_params.get("language", "English")
+        
+        # Connect to database
         rds_secret = get_secret(RDS_SEC)
         rds_conn_info = {
             "host": rds_secret['host'],
@@ -293,31 +239,35 @@ def handler(event, context):
             "password": rds_secret['password']
         }
         
-        rds_conn = psycopg.connect(**rds_conn_info)
-        pgsql_executor = PgExecutor(rds_conn)
-        
+        # Connect to PostgreSQL
         try:
-            # Get chart data
-            result = get_chart_data(
-                pgsql_conn=pgsql_executor,
-                conn_info=rds_conn_info,
-                data_type=request_type,
-                items=items,
-                start_date=start_date,
-                end_date=end_date,
-                language=language
-            )
-            
+            with psycopg.connect(**rds_conn_info) as conn:
+                # Build and execute appropriate query
+                if topics:
+                    query = build_topic_chart_query(topics, from_year, to_year, doc_types, language)
+                    result = execute_chart_query(conn, query)
+                else:
+                    query = build_mandate_chart_query(mandates, from_year, to_year, doc_types, language)
+                    result = execute_chart_query(conn, query)
+                
+                return {
+                    "statusCode": 200,
+                    "body": json.dumps(result),
+                    "headers": {
+                        "Content-Type": "application/json",
+                        "Access-Control-Allow-Origin": "*"
+                    }
+                }
+        except Exception as db_error:
+            logger.error(f"Database error: {str(db_error)}")
             return {
-                "statusCode": 200,
-                "body": json.dumps(result),
+                "statusCode": 500,
+                "body": json.dumps({"error": f"Database error: {str(db_error)}"}),
                 "headers": {
                     "Content-Type": "application/json",
                     "Access-Control-Allow-Origin": "*"
                 }
             }
-        finally:
-            rds_conn.close()
     
     except ValueError as ve:
         return {
