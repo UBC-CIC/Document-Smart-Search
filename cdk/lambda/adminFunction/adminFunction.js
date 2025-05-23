@@ -532,6 +532,8 @@ exports.handler = async (event) => {
         break
       case "GET /admin/latest_prompt":
         try {
+          console.log("Fetching latest prompts...");
+          
           // Queries to get the most recent non-null entries for each role
           const latestPublicPrompt = await sqlConnectionTableCreator`
       SELECT public, time_created
@@ -540,57 +542,67 @@ exports.handler = async (event) => {
       ORDER BY time_created DESC NULLS LAST
       LIMIT 1;
     `
+          console.log("Latest public prompt:", latestPublicPrompt);
 
-          const latestEducatorPrompt = await sqlConnectionTableCreator`
-      SELECT educator, time_created
+          const latestInternalResearcherPrompt = await sqlConnectionTableCreator`
+      SELECT internal_researcher, time_created
       FROM prompts
-      WHERE educator IS NOT NULL
+      WHERE internal_researcher IS NOT NULL
       ORDER BY time_created DESC NULLS LAST
       LIMIT 1;
     `
+          console.log("Latest internal researcher prompt:", latestInternalResearcherPrompt);
 
-          const latestAdminPrompt = await sqlConnectionTableCreator`
-      SELECT admin, time_created
+          const latestPolicyMakerPrompt = await sqlConnectionTableCreator`
+      SELECT policy_maker, time_created
       FROM prompts
-      WHERE admin IS NOT NULL
+      WHERE policy_maker IS NOT NULL
       ORDER BY time_created DESC NULLS LAST
       LIMIT 1;
     `
+          console.log("Latest policy maker prompt:", latestPolicyMakerPrompt);
+
+          const latestExternalResearcherPrompt = await sqlConnectionTableCreator`
+      SELECT external_researcher, time_created
+      FROM prompts
+      WHERE external_researcher IS NOT NULL
+      ORDER BY time_created DESC NULLS LAST
+      LIMIT 1;
+    `
+          console.log("Latest external researcher prompt:", latestExternalResearcherPrompt);
 
           // Building the response object with non-null values for each role
-          const latestPrompt = {}
-          if (latestPublicPrompt.length > 0) {
-            latestPrompt.public = {
+          const latestPrompt = {
+            public: latestPublicPrompt.length > 0 ? {
               prompt: latestPublicPrompt[0].public,
-              time_created: latestPublicPrompt[0].time_created,
-            }
-          }
-          if (latestEducatorPrompt.length > 0) {
-            latestPrompt.educator = {
-              prompt: latestEducatorPrompt[0].educator,
-              time_created: latestEducatorPrompt[0].time_created,
-            }
-          }
-          if (latestAdminPrompt.length > 0) {
-            latestPrompt.admin = {
-              prompt: latestAdminPrompt[0].admin,
-              time_created: latestAdminPrompt[0].time_created,
-            }
-          }
+              time_created: latestPublicPrompt[0].time_created
+            } : null,
+            internal_researcher: latestInternalResearcherPrompt.length > 0 ? {
+              prompt: latestInternalResearcherPrompt[0].internal_researcher,
+              time_created: latestInternalResearcherPrompt[0].time_created
+            } : null,
+            policy_maker: latestPolicyMakerPrompt.length > 0 ? {
+              prompt: latestPolicyMakerPrompt[0].policy_maker,
+              time_created: latestPolicyMakerPrompt[0].time_created
+            } : null,
+            external_researcher: latestExternalResearcherPrompt.length > 0 ? {
+              prompt: latestExternalResearcherPrompt[0].external_researcher,
+              time_created: latestExternalResearcherPrompt[0].time_created
+            } : null
+          };
 
-          // Check if any non-null prompts were found
-          if (Object.keys(latestPrompt).length === 0) {
-            response.statusCode = 404
-            response.body = JSON.stringify({ error: "No prompts found" })
-          } else {
-            response.statusCode = 200
-            response.body = JSON.stringify(latestPrompt)
-          }
+          console.log("Final response object:", latestPrompt);
+
+          response.statusCode = 200;
+          response.body = JSON.stringify(latestPrompt);
         } catch (err) {
           // Handle any errors that occur during the query
-          response.statusCode = 500
-          console.error(err)
-          response.body = JSON.stringify({ error: "Internal server error" })
+          response.statusCode = 500;
+          console.error("Error in GET /admin/latest_prompt:", err);
+          response.body = JSON.stringify({ 
+            error: "Internal server error",
+            details: err.message 
+          });
         }
         break
       case "GET /admin/previous_prompts":
@@ -599,21 +611,23 @@ exports.handler = async (event) => {
           const latestTimestamps = await sqlConnectionTableCreator`
       SELECT 
         MAX(time_created) FILTER (WHERE public IS NOT NULL) AS latest_public,
-        MAX(time_created) FILTER (WHERE educator IS NOT NULL) AS latest_educator,
-        MAX(time_created) FILTER (WHERE admin IS NOT NULL) AS latest_admin
+        MAX(time_created) FILTER (WHERE internal_researcher IS NOT NULL) AS latest_internal_researcher,
+        MAX(time_created) FILTER (WHERE policy_maker IS NOT NULL) AS latest_policy_maker,
+        MAX(time_created) FILTER (WHERE external_researcher IS NOT NULL) AS latest_external_researcher
       FROM prompts;
     `
 
-          const { latest_public, latest_educator, latest_admin } = latestTimestamps[0]
+          const { latest_public, latest_internal_researcher, latest_policy_maker, latest_external_researcher } = latestTimestamps[0]
 
           // Query to get all previous non-null entries for each role after the latest entry
           const previousPrompts = await sqlConnectionTableCreator`
-      SELECT public, educator, admin, time_created
+      SELECT public, internal_researcher, policy_maker, external_researcher, time_created
       FROM prompts
       WHERE 
         (public IS NOT NULL AND time_created < ${latest_public}) OR
-        (educator IS NOT NULL AND time_created < ${latest_educator}) OR
-        (admin IS NOT NULL AND time_created < ${latest_admin})
+        (internal_researcher IS NOT NULL AND time_created < ${latest_internal_researcher}) OR
+        (policy_maker IS NOT NULL AND time_created < ${latest_policy_maker}) OR
+        (external_researcher IS NOT NULL AND time_created < ${latest_external_researcher})
       ORDER BY time_created DESC;
     `
 
@@ -625,16 +639,22 @@ exports.handler = async (event) => {
                 prompt: entry.public,
                 time_created: entry.time_created,
               })),
-            educator: previousPrompts
-              .filter((entry) => entry.educator !== null)
+            internal_researcher: previousPrompts
+              .filter((entry) => entry.internal_researcher !== null)
               .map((entry) => ({
-                prompt: entry.educator,
+                prompt: entry.internal_researcher,
                 time_created: entry.time_created,
               })),
-            admin: previousPrompts
-              .filter((entry) => entry.admin !== null)
+            policy_maker: previousPrompts
+              .filter((entry) => entry.policy_maker !== null)
               .map((entry) => ({
-                prompt: entry.admin,
+                prompt: entry.policy_maker,
+                time_created: entry.time_created,
+              })),
+            external_researcher: previousPrompts
+              .filter((entry) => entry.external_researcher !== null)
+              .map((entry) => ({
+                prompt: entry.external_researcher,
                 time_created: entry.time_created,
               })),
           }
@@ -665,7 +685,7 @@ exports.handler = async (event) => {
           const { prompt } = JSON.parse(event.body)
 
           // Validate that role is one of the accepted roles
-          if (!["public", "educator", "admin"].includes(role)) {
+          if (!["public", "internal_researcher", "policy_maker", "external_researcher"].includes(role)) {
             response.statusCode = 400
             response.body = JSON.stringify({ error: "Invalid role provided" })
             break
@@ -674,15 +694,16 @@ exports.handler = async (event) => {
           // Prepare the prompt data with null values for other roles
           const promptData = {
             public: role === "public" ? prompt : null,
-            educator: role === "educator" ? prompt : null,
-            admin: role === "admin" ? prompt : null,
+            internal_researcher: role === "internal_researcher" ? prompt : null,
+            policy_maker: role === "policy_maker" ? prompt : null,
+            external_researcher: role === "external_researcher" ? prompt : null,
             time_created: new Date(), // Current timestamp
           }
 
           // Insert into the prompts table
           await sqlConnectionTableCreator`
-      INSERT INTO prompts (public, educator, admin, time_created)
-      VALUES (${promptData.public}, ${promptData.educator}, ${promptData.admin}, ${promptData.time_created});
+      INSERT INTO prompts (public, internal_researcher, policy_maker, external_researcher, time_created)
+      VALUES (${promptData.public}, ${promptData.internal_researcher}, ${promptData.policy_maker}, ${promptData.external_researcher}, ${promptData.time_created});
     `
 
           // Return success response

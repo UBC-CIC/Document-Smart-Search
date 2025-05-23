@@ -21,7 +21,17 @@ const PromptSettings = ({
   setPreviousPrompts,
   setPrompts,
 }) => {
-  const [promptText, setPromptText] = useState(currentPrompt.prompt || "");
+  const [promptText, setPromptText] = useState(currentPrompt?.prompt || "");
+
+  const formatRoleName = (role) => {
+    const roleMap = {
+      'public': 'General Public',
+      'internal_researcher': 'Internal Researcher',
+      'external_researcher': 'External Researcher',
+      'policy_maker': 'Policy Maker'
+    };
+    return roleMap[role] || role;
+  };
 
   const handleSave = async () => {
     try {
@@ -106,10 +116,18 @@ const PromptSettings = ({
     }
   };
 
+  function toTitleCase(str) {
+    return str
+      .toLowerCase()
+      .split(" ")
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  }
+      
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{promptId} Prompt Settings</CardTitle>
+        <CardTitle>{formatRoleName(promptId)} Prompt Settings</CardTitle>
         <CardDescription>
           Warning: modifying the prompt in the text area below can significantly
           impact the quality and accuracy of the responses. Modifying the format
@@ -120,7 +138,7 @@ const PromptSettings = ({
       <CardContent className="space-y-4">
         <div>
           <Label className="text-sm" htmlFor={`prompt-${promptId}`}>
-            Your Prompt
+            Your current prompt (Latest)
           </Label>
           <textarea
             id={`prompt-${promptId}`}

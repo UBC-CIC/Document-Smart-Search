@@ -166,6 +166,7 @@ def create_agent_prompt(user_prompt: Optional[str]) -> PromptTemplate:
         If you lack sufficient evidence, clearly state that you do not have the necessary data.
         When you provide an answer without support from verified documents, please indicate it.
         If you cannot fully answer a query, guide the user on how to obtain more information.
+        
         You have access to the following tools:
         {tools}
         You must follow the following format:
