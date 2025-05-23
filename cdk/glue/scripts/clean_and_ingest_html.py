@@ -243,7 +243,15 @@ async def download_html(url: str, error_dump: List[dict], redirects: List[dict],
                 async with session.get(url, headers=headers) as response:
                     status = response.status
                     html_content = await response.text()
-
+                    
+                    # Check if the page is not found 404, then add to error dump
+                    if status == 404 or "error 404" in html_content.lower() or "page not found" in html_content.lower() or "we couldn't find that web page" in html_content.lower():
+                        error_dump.append({
+                            "error": f"Page not found (HTTP {status}): {html_content}",
+                            "file": url
+                        })
+                        return url, None
+        
                     if status == 302 or 'moved temporarily' in html_content.lower():
                         redirect_url = response.headers.get('Location')
                         # print(f"The page has been moved temporarily to a new location. Redirecting to: {redirect_url}")
@@ -258,6 +266,7 @@ async def download_html(url: str, error_dump: List[dict], redirects: List[dict],
                             retry_status = retry_response.status
                             retry_content = await retry_response.text()
                             
+                            # Check if the page is not found 404 even after retry with redirects, then add to error dump
                             if retry_status == 404 or "error 404" in retry_content.lower() or "page not found" in retry_content.lower():
                                 error_dump.append({
                                     "error": f"Page not found after retry with redirects (HTTP {retry_status}): {retry_content}",
@@ -427,8 +436,13 @@ def extract_document_info(page: BeautifulSoup) -> Dict[str, Optional[str]]:
             authors = []
             authors_h3 = main_section.find('h3')
             if authors_h3 and authors_h3.get_text().strip().startswith('By'):
+                if authors_h3.get_text().strip().startswith('By Authors:'):
+                    # Remove the 'By Author' prefix
+                    authors_text = authors_h3.get_text().strip()[12:].strip()
+                else:
+                    # Remove the 'By' prefix
+                    authors_text = authors_h3.get_text().strip()[3:].strip()
                 # Get the text and remove 'By' prefix
-                authors_text = authors_h3.get_text().strip()[3:].strip()
                 if " and " in authors_text: # the string ' and ' is not preceded by a comma
                     # Handle the ' and ' case by inserting a comma before it (but only when not already preceded by one)
                     authors_text = re.sub(r'(?<![,]) and ', ', ', authors_text)
@@ -602,7 +616,61 @@ def get_embeddings_for_documents(documents: list[Document], embedder, failed_emb
     return valid_docs, np.array(valid_embeddings)
 
 
-# Process and ingest HTML documents with error handling for embedding failures.
+def validate_documents_and_embeddings(documents: list[Document], embeddings: np.ndarray) -> tuple[list[Document], np.ndarray]:
+    """
+    Validates documents and their corresponding embeddings before bulk insertion.
+    Focuses on critical fields: page_content, html_url, and embeddings.
+    
+    Parameters
+    ----------
+    documents : list[Document]
+        List of Document objects to validate
+    embeddings : np.ndarray
+        Array of embeddings corresponding to the documents
+        
+    Returns
+    -------
+    tuple[list[Document], np.ndarray]
+        Tuple of validated documents and embeddings
+    """
+    valid_docs = []
+    valid_embeddings = []
+    
+    for doc, emb in zip(documents, embeddings):
+        try:
+            # Check if document or embedding is None
+            if doc is None or emb is None:
+                continue
+                
+            # Validate html_url
+            html_url = doc.metadata.get('html_url')
+            if not html_url or not isinstance(html_url, str) or not html_url.strip():
+                print(f"Invalid html_url for document {doc.metadata.get('html_url', 'unknown')}")
+                continue
+                
+            # Validate page content
+            if not doc.page_content or not isinstance(doc.page_content, str) or not doc.page_content.strip():
+                print(f"Invalid page content for document {doc.metadata.get('html_url', 'unknown')}")
+                continue
+                
+            # Validate embedding
+            if isinstance(emb, np.ndarray):
+                emb = emb.tolist()
+                
+            if not isinstance(emb, list) or len(emb) != 1024 or any(x is None for x in emb):
+                print(f"Invalid embedding for document {doc.metadata.get('html_url', 'unknown')}")
+                continue
+                
+            valid_docs.append(doc)
+            valid_embeddings.append(emb)
+            
+        except Exception as e:
+            print(f"Error during validation: {str(e)}")
+            continue
+            
+    return valid_docs, np.array(valid_embeddings)
+
+
 def process_and_ingest_html_documents(
     client: OpenSearch, index_name: str, documents: list[Document], embedder, failed_embeddings_metadata, dryrun
 ) -> tuple[int, list[Document]]:
@@ -610,12 +678,22 @@ def process_and_ingest_html_documents(
     valid_docs, html_embeddings = get_embeddings_for_documents(documents, embedder, failed_embeddings_metadata)
 
     if not valid_docs:
-        # print("No documents to ingest after embedding failures.")
+        return 0, []
+
+    # Validate documents and embeddings before bulk insert
+    valid_docs, html_embeddings = validate_documents_and_embeddings(valid_docs, html_embeddings)
+    
+    if not valid_docs:
+        print("No valid documents after validation")
         return 0, []
 
     # Bulk insert the documents and embeddings into OpenSearch.
     if not dryrun:
-        op.bulk_insert_html_documents(client, index_name=index_name, documents=valid_docs, vectors=html_embeddings.tolist())
+        try:
+            op.bulk_insert_html_documents(client, index_name=index_name, documents=valid_docs, vectors=html_embeddings.tolist())
+        except Exception as e:
+            print(f"Error during bulk insert: {str(e)}")
+            return 0, []
 
     return len(valid_docs), valid_docs
 
@@ -886,7 +964,9 @@ async def main(dryrun=False, debug=False):
     # Load HTML data from S3
     html_data = load_html_data_from_s3(HTML_URLS_PATH, sheet_name="CSAS HTML URLs")
     # TODO: Remove this once when ready to ingest all data
-    html_data = html_data.query("`Year` == 2017.0")
+    # html_data = html_data.query("`Year` == 2017.0")
+    frames = [gr_df for _, gr_df in html_data.query("Year > = 2017 and Year <= 2022").groupby("Year")]
+    html_data = pd.concat(frames, ignore_index=True)
     html_data = html_data.to_dict(orient='index')
     
     # Get the url to content

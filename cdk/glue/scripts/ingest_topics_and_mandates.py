@@ -432,7 +432,14 @@ def get_embeddings_for_documents(documents: list[Document], embedder) -> np.arra
     Returns:
       - A numpy array of embeddings.
     """
-    embeddings = [embedder.embed_query(doc.page_content) for doc in documents]
+    embeddings = []
+    for doc in documents:
+        try:
+            embedding = embedder.embed_query(doc.page_content)
+            embeddings.append(embedding)
+        except Exception as e:
+            print(f"Error computing embeddings: {e}")
+            continue
     return np.array(embeddings)
 
 

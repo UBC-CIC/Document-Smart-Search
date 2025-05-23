@@ -675,6 +675,9 @@ async def categorize_documents(documents, document_embeddings, targets, target_e
                 f.write("-"*80 + "\n\n")
             
             response = await query_model(formatted_prompt)
+            if response is None:
+                print(f"Warning: No response from LLM for document {doc_key}, skipping...")
+                continue
             categorization_results[doc_key] = parse_json_response(response)
             
         if debug:
@@ -743,8 +746,12 @@ async def query_model(prompt):
         model_kwargs={"temperature": 0, "top_p": 0.9},
         streaming=True
     )
-    response = await llm.ainvoke(prompt)
-    return response
+    try:
+        response = await llm.ainvoke(prompt)
+        return response
+    except Exception as e:
+        print(f"Error querying model: {e}")
+        return None
 
 
 def get_documents_to_process(client, batch_id: str, pipeline_mode: str) -> Tuple[List[Document], np.ndarray]:
@@ -991,22 +998,28 @@ async def main(dryrun=False, debug=False):
     # Update OpenSearch
     if not dryrun:
         if mandate_categorizations:
-            success, failed = op.bulk_update_categorizations(
-                op_client,
-                DFO_HTML_FULL_INDEX_NAME,
-                mandate_categorizations,
-                "mandate"
-            )
-            print(f"Updated mandate categorizations: {success} successful, {failed} failed")
+            try:
+                success, failed = op.bulk_update_categorizations(
+                    op_client,
+                    DFO_HTML_FULL_INDEX_NAME,
+                    mandate_categorizations,
+                    "mandate"
+                )
+                print(f"Updated mandate categorizations: {success} successful, {failed} failed")
+            except Exception as e:
+                print(f"Error updating mandate categorizations: {e}")
 
         if topic_categorizations:
-            success, failed = op.bulk_update_categorizations(
-                op_client,
-                DFO_HTML_FULL_INDEX_NAME,
-                topic_categorizations,
-                "topic"
-            )
-            print(f"Updated topic categorizations: {success} successful, {failed} failed")
+            try:
+                success, failed = op.bulk_update_categorizations(
+                    op_client,
+                    DFO_HTML_FULL_INDEX_NAME,
+                    topic_categorizations,
+                    "topic"
+                )
+                print(f"Updated topic categorizations: {success} successful, {failed} failed")
+            except Exception as e:
+                print(f"Error updating topic categorizations: {e}")
 
 
 if __name__ == "__main__":

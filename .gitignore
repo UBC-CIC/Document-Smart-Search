@@ -3,4 +3,4 @@
 **/glue/scripts/src*
 **/glue/scripts/configs.json
 **/glue/scripts/test*
-**_output*
+**temp_output*
