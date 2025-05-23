@@ -3,7 +3,9 @@
 import React, { useState, useEffect } from "react";
 import {
   Users,
+  BookOpen,
   GraduationCap,
+  Landmark,
   ShieldCheck,
   ChevronDown,
   ChevronUp,
@@ -24,8 +26,12 @@ const EmptyFeedbackView = ({ role }) => {
     switch (role) {
       case "public":
         return <Users className="mr-2" />;
-      case "educator":
+      case "internal_researcher":
+        return <BookOpen className="mr-2" />;
+      case "external_researcher":
         return <GraduationCap className="mr-2" />;
+      case "policy_maker":
+        return <Landmark className="mr-2" />;
       case "admin":
         return <ShieldCheck className="mr-2" />;
       default:
@@ -36,9 +42,13 @@ const EmptyFeedbackView = ({ role }) => {
   const getRoleLabel = (role) => {
     switch (role) {
       case "public":
-        return "General/Public";
-      case "educator":
-        return "Educator/Educational Designer";
+        return "General Public";
+      case "internal_researcher":
+        return "Internal Researcher";
+      case "external_researcher":
+        return "External Researcher";
+      case "policy_maker":
+        return "Policy Maker";
       case "admin":
         return "Admin";
       default:
@@ -71,10 +81,12 @@ const FeedbackView = ({ role, feedbackData, onFeedbackClick }) => {
     switch (role) {
       case "public":
         return <Users className="mr-2" />;
-      case "educator":
+      case "internal_researcher":
+        return <BookOpen className="mr-2" />;
+      case "external_researcher":
         return <GraduationCap className="mr-2" />;
-      case "admin":
-        return <ShieldCheck className="mr-2" />;
+      case "policy_maker":
+        return <Landmark className="mr-2" />;
       default:
         return null;
     }
@@ -83,11 +95,13 @@ const FeedbackView = ({ role, feedbackData, onFeedbackClick }) => {
   const getRoleLabel = (role) => {
     switch (role) {
       case "public":
-        return "General/Public";
-      case "educator":
-        return "Educator/Educational Designer";
-      case "admin":
-        return "Admin";
+        return "General Public";
+      case "internal_researcher":
+        return "Internal Researcher";
+      case "external_researcher":
+        return "External Researcher";
+      case "policy_maker":
+        return "Policy Maker";
       default:
         return role;
     }
@@ -195,11 +209,16 @@ const Feedback = () => {
   const [selectedSession, setSelectedSession] = useState(null);
 
   // Define role order explicitly
-  const ROLE_ORDER = ['public', 'educator', 'admin'];
+  const ROLE_ORDER = [
+    "public",
+    "internal_researcher",
+    "external_researcher",
+    "policy_maker",
+  ];
 
   function sortFeedbackByTimestamp(data) {
     // First, sort the data by the predefined role order
-    const sortedByRole = data.sort((a, b) => 
+    const sortedByRole = data.sort((a, b) =>
       ROLE_ORDER.indexOf(a.user_role) - ROLE_ORDER.indexOf(b.user_role)
     );
 
@@ -217,6 +236,32 @@ const Feedback = () => {
       return sortedData;
     });
   }
+
+  // // Function to ensure all roles are represented in the data
+  // function ensureAllRolesArePresent(data) {
+  //   const result = [...data];
+
+  //   // Check if each role exists in the data
+  //   ROLE_ORDER.forEach((role) => {
+  //     const roleExists = result.some((item) => item.user_role === role);
+
+  //     // If the role doesn't exist, add an empty entry for it
+  //     if (!roleExists) {
+  //       result.push({
+  //         user_role: role,
+  //         feedback_count: 0,
+  //         average_rating: 0,
+  //         feedback_details: [],
+  //       });
+  //     }
+  //   });
+
+  //   // Sort again to maintain proper order
+  //   return result.sort((a, b) =>
+  //     ROLE_ORDER.indexOf(a.user_role) - ROLE_ORDER.indexOf(b.user_role)
+  //   );
+  // }
+
   useEffect(() => {
     const fetchFeedbackData = async () => {
       try {
@@ -239,6 +284,9 @@ const Feedback = () => {
 
         const data = await response.json();
         const sortedData = sortFeedbackByTimestamp(data);
+        // // Apply the function to ensure all roles are present
+        // const completeData = ensureAllRolesArePresent(sortedData);
+        // setFeedbackData(completeData);
         setFeedbackData(sortedData);
       } catch (error) {
         console.error("Error fetching feedback:", error);

@@ -60,13 +60,13 @@ def build_topic_chart_query(topics: List[str], from_year: int, to_year: int, doc
     for i, topic in enumerate(topics):
         topic_subquery = f"""
     topic_{i}_counts AS (
-        SELECT d.year, COUNT(*) as count
+        SELECT d.event_year as year, COUNT(*) as count
         FROM documents d
         INNER JOIN documents_topics dt
         ON d.html_url = dt.html_url
         WHERE dt.topic_name = '{topic}' 
         AND d.doc_language = '{language}'
-        AND d.year BETWEEN {from_year} AND {to_year}
+        AND d.event_year BETWEEN {from_year} AND {to_year}
         AND dt.llm_belongs = 'Yes'
         """
         
@@ -77,7 +77,7 @@ def build_topic_chart_query(topics: List[str], from_year: int, to_year: int, doc
             topic_subquery += f"AND d.doc_type IN ({doc_types_str})\n"
             
         topic_subquery += """
-        GROUP BY d.year
+        GROUP BY d.event_year
     )"""
         topic_subqueries.append(topic_subquery)
     
@@ -121,13 +121,13 @@ def build_mandate_chart_query(mandates: List[str], from_year: int, to_year: int,
     for i, mandate in enumerate(mandates):
         mandate_subquery = f"""
     mandate_{i}_counts AS (
-        SELECT d.year, COUNT(*) as count
+        SELECT d.event_year as year, COUNT(*) as count
         FROM documents d
         INNER JOIN documents_mandates dm
         ON d.html_url = dm.html_url
         WHERE dm.mandate_name = '{mandate}' 
         AND d.doc_language = '{language}'
-        AND d.year BETWEEN {from_year} AND {to_year}
+        AND d.event_year BETWEEN {from_year} AND {to_year}
         AND dm.llm_belongs = 'Yes'
         """
         
@@ -138,7 +138,7 @@ def build_mandate_chart_query(mandates: List[str], from_year: int, to_year: int,
             mandate_subquery += f"AND d.doc_type IN ({doc_types_str})\n"
             
         mandate_subquery += """
-        GROUP BY d.year
+        GROUP BY d.event_year
     )"""
         mandate_subqueries.append(mandate_subquery)
     

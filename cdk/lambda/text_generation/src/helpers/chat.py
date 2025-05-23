@@ -186,13 +186,33 @@ def create_agent_prompt(user_prompt: Optional[str]) -> PromptTemplate:
         {chat_history}
         Question: {input}
         Thought: {agent_scratchpad}"""
+        return PromptTemplate.from_template(template)
     else:
-        template = user_prompt
+        template = """
+        {user_prompt}
+        
+        You have access to the following tools:
+        {tools}
+        You must follow the following format:
+        Question: The input question you must answer
+        Thought: You should always think about what to do
+        Action: The action to take, should be one of [{tool_names}]
+        Action Input: The input to the action
+        Observation: The result of the action
+        ... (repeat Thought/Action/Action Input/Observation steps as needed)
+        After gathering sufficient information:
+        Thought: I now have all necessary information.
+        Final Answer: Provide an accurate, detailed final answer.
+        After your final answer, list up to 3 follow-up questions without numbering under
+        "You might have the following questions:" that are related to DFO Canada content and the chat history.
+        Begin!
+        Previous conversation history:
+        {chat_history}
+        Question: {input}
+        Thought: {agent_scratchpad}"""
 
-    # print("User Prompt:", user_prompt)
+        return PromptTemplate.from_template(template).partial(user_prompt=user_prompt)
 
-    # return PromptTemplate.from_template(template).partial(user_prompt=user_prompt)
-    return PromptTemplate.from_template(template)
 
 # Note: Currently disabled the user prompt in the template
 def chat_with_agent(

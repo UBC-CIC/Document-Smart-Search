@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Button } from "@/components/ui/button"
-import { ChevronDown, ChevronUp, Users, ShieldCheck } from "lucide-react"
+import { ChevronDown, ChevronUp, Users, ShieldCheck, BookOpen, GraduationCap, Landmark } from "lucide-react"
 import LoadingScreen from "../Loading/LoadingScreen"
 import { fetchAuthSession } from "aws-amplify/auth"
 import Session from "./Session"
@@ -15,8 +15,14 @@ const RoleView = ({ role, sessions, onSessionClick }) => {
     switch (role) {
       case "public":
         return <Users className="mr-2" />
-      case "admin":
-        return <ShieldCheck className="mr-2" />
+      // case "admin":
+      //   return <ShieldCheck className="mr-2" />
+      case "internal_researcher":
+        return <BookOpen className="mr-2" />
+      case "external_researcher":
+        return <GraduationCap className="mr-2" />
+      case "policy_maker":
+        return <Landmark className="mr-2" />
       default:
         return null
     }
@@ -25,9 +31,15 @@ const RoleView = ({ role, sessions, onSessionClick }) => {
   const getRoleLabel = (role) => {
     switch (role) {
       case "public":
-        return "General/Public"
-      case "admin":
-        return "Admin"
+        return "General Public"
+      // case "admin":
+      //   return "Admin"
+      case "internal_researcher":
+        return "Internal Researcher"
+      case "external_researcher":
+        return "External Researcher" 
+      case "policy_maker":
+        return "Policy Maker"
       default:
         return role
     }
@@ -86,7 +98,10 @@ const RoleView = ({ role, sessions, onSessionClick }) => {
 
 export default function History() {
   const [publicSessions, setPublicSessions] = useState([])
-  const [adminSessions, setAdminSessions] = useState([])
+  // const [adminSessions, setAdminSessions] = useState([])
+  const [internalResearcherSessions, setInternalResearcherSessions] = useState([])
+  const [externalResearcherSessions, setExternalResearcherSessions] = useState([])
+  const [policyMakerSessions, setPolicyMakerSessions] = useState([])
   const [selectedSession, setSelectedSession] = useState(null)
   const [loading, setLoading] = useState(true)
   const [downloadLoading, setDownloadLoading] = useState(false)
@@ -127,18 +142,31 @@ export default function History() {
 
     const loadSessions = async () => {
       try {
-        await Promise.all([fetchSessions("public", setPublicSessions), fetchSessions("admin", setAdminSessions)])
+        setLoading(true)
+        await Promise.all([
+          fetchSessions("public", setPublicSessions), 
+          // fetchSessions("admin", setAdminSessions),
+          fetchSessions("internal_researcher", setInternalResearcherSessions),
+          fetchSessions("external_researcher", setExternalResearcherSessions),
+          fetchSessions("policy_maker", setPolicyMakerSessions)
+        ])
       } catch (error) {
         console.error("Error loading sessions:", error)
       }
     }
 
     loadSessions()
-  }, [setPublicSessions, setAdminSessions])
+  }, [])
 
   const handleDownloadAllData = async () => {
     setDownloadLoading(true)
-    const allSessions = [...publicSessions, ...adminSessions]
+    const allSessions = [
+      ...publicSessions, 
+      // ...adminSessions,
+      ...internalResearcherSessions,
+      ...externalResearcherSessions,
+      ...policyMakerSessions
+    ]
     const csvData = []
 
     for (const session of allSessions) {
@@ -207,7 +235,10 @@ export default function History() {
   return (
     <div className="w-full mx-auto space-y-4 p-4 overflow-y-auto mb-8">
       <RoleView role="public" sessions={publicSessions} onSessionClick={handleSessionClick} />
-      <RoleView role="admin" sessions={adminSessions} onSessionClick={handleSessionClick} />
+      <RoleView role="internal_researcher" sessions={internalResearcherSessions} onSessionClick={handleSessionClick} />
+      <RoleView role="external_researcher" sessions={externalResearcherSessions} onSessionClick={handleSessionClick} />
+      <RoleView role="policy_maker" sessions={policyMakerSessions} onSessionClick={handleSessionClick} />
+      {/* <RoleView role="admin" sessions={adminSessions} onSessionClick={handleSessionClick} /> */}
       <Button
         onClick={handleDownloadAllData}
         disabled={downloadLoading}

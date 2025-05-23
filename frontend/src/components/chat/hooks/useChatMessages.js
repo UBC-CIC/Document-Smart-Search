@@ -122,7 +122,7 @@ export function useChatMessages(session, fingerprint, messages, setMessages) {
       const data = await sendChatMessage(session, fingerprint, content, userRole || "public");
       const messageId = Date.now() + 1;
 
-      // Update current message ID for sources display
+      // Update current message ID for sources display but don't open sidebar automatically
       if (data.tools_used && Object.keys(data.tools_used).length > 0) {
         setCurrentMessageId(messageId.toString());
       }

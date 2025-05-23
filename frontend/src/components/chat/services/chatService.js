@@ -89,14 +89,19 @@ export async function sendChatMessage(session, fingerprint, content, userRole) {
 export async function submitFeedback(fingerprint, session, userRole, rating, description) {
   try {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_ENDPOINT}/user/create_feedback?user_info=${encodeURIComponent(
+      `${process.env.NEXT_PUBLIC_API_ENDPOINT}user/create_feedback?user_info=${encodeURIComponent(
         fingerprint
       )}&session_id=${encodeURIComponent(session)}&user_role=${encodeURIComponent(
         userRole
       )}&feedback_rating=${encodeURIComponent(
         rating
       )}&feedback_description=${encodeURIComponent(description)}`,
-      { method: "POST" }
+      { 
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        }, 
+      }
     );
 
     if (!response.ok) {
