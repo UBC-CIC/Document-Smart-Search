@@ -316,10 +316,10 @@ def format_document_for_frontend(doc_id: str, doc_data: Dict[str, Any]) -> Dict[
 
 def handler(event, context):
     try:
-        body = {} if event.get("body") is None else json.loads(event.get("body"))
-        
-        # Check if this is a document detail request
-        document_id = body.get("document_id", "")
+        query_params = event.get("queryStringParameters", {}) or {}
+
+        # Fetch the document ID from query parameters
+        document_id = query_params.get("document_id", "")
         
         if not document_id:
             return {
