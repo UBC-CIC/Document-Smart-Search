@@ -106,16 +106,19 @@ export default function AnalyticsDashboard() {
   }
 
   const roleDisplayMap = {
-    public: "General/Public",
-    admin: "Admin",
+    public: "General Public",
+    internal_researcher: "Internal Researcher",
+    external_researcher: "External Researcher",
+    policy_maker: "Policy Maker"
   }
 
-  const orderedRoles = ["public", "admin"]
+  const orderedRoles = ["public", "internal_researcher", "external_researcher", "policy_maker"]
   const displayedFeedback = orderedRoles.map((role) => {
-    const feedback = avg_feedback_per_role.find((item) => item.user_role === role) || { avg_feedback_rating: 3 }
+    const feedbackItem = avg_feedback_per_role.find((item) => item.user_role === role);
     return {
       userType: roleDisplayMap[role],
-      score: feedback.avg_feedback_rating,
+      score: feedbackItem ? Number(feedbackItem.avg_feedback_rating) : null,
+      hasData: !!feedbackItem
     }
   })
 
@@ -165,11 +168,13 @@ export default function AnalyticsDashboard() {
     return {
       month: formatDate(month, engagementTimeFrame),
       public: monthData.find((item) => item.user_role === "public")?.message_count || 0,
-      admin: monthData.find((item) => item.user_role === "admin")?.message_count || 0,
+      internal_researcher: monthData.find((item) => item.user_role === "internal_researcher")?.message_count || 0,
+      external_researcher: monthData.find((item) => item.user_role === "external_researcher")?.message_count || 0,
+      policy_maker: monthData.find((item) => item.user_role === "policy_maker")?.message_count || 0
     }
   })
 
-  const maxValue = getMaxValue(processedEngagementData, ["public", "admin"])
+  const maxValue = getMaxValue(processedEngagementData, ["public", "internal_researcher", "external_researcher", "policy_maker"])
 
   return (
     <main className="flex-1 p-3 sm:p-6 w-full overflow-x-hidden">
@@ -265,13 +270,21 @@ export default function AnalyticsDashboard() {
             <ChartContainer
               config={{
                 public: {
-                  label: "General/Public Users",
+                  label: "General Public",
                   color: "hsl(var(--chart-1))",
                 },
-                admin: {
-                  label: "Admins",
+                internal_researcher: {
+                  label: "Internal Researcher",
+                  color: "hsl(var(--chart-2))",
+                },
+                external_researcher: {
+                  label: "External Researcher",
                   color: "hsl(var(--chart-3))",
                 },
+                policy_maker: {
+                  label: "Policy Maker",
+                  color: "hsl(var(--chart-4))",
+                }
               }}
               className="h-[250px] sm:h-[350px] w-full sm:w-10/12 overflow-x-auto"
             >
@@ -299,7 +312,9 @@ export default function AnalyticsDashboard() {
                   tick={{ fontSize: 10 }}
                 />
                 <Line type="monotone" dataKey="public" stroke="var(--color-public)" strokeWidth={2} dot={true} />
-                <Line type="monotone" dataKey="admin" stroke="var(--color-admin)" strokeWidth={2} dot={true} />
+                <Line type="monotone" dataKey="internal_researcher" stroke="var(--color-internal_researcher)" strokeWidth={2} dot={true} />
+                <Line type="monotone" dataKey="external_researcher" stroke="var(--color-external_researcher)" strokeWidth={2} dot={true} />
+                <Line type="monotone" dataKey="policy_maker" stroke="var(--color-policy_maker)" strokeWidth={2} dot={true} />
                 <ChartTooltip content={<ChartTooltipContent />} />
               </LineChart>
             </ChartContainer>
@@ -319,12 +334,18 @@ export default function AnalyticsDashboard() {
               <div key={feedback.userType} className="space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">{feedback.userType}</span>
-                  <span className="text-sm text-muted-foreground">{Number(feedback.score).toFixed(1)}</span>
+                  <span className="text-sm text-muted-foreground">
+                    {feedback.hasData ? Number(feedback.score).toFixed(1) : "No data"}
+                  </span>
                 </div>
-                <Progress
-                  value={((feedback.score - 1) / 4) * 100}
-                  className="h-2 bg-adminAccent [&>div]:bg-adminMain"
-                />
+                {feedback.hasData ? (
+                  <Progress
+                    value={((feedback.score - 1) / 4) * 100}
+                    className="h-2 bg-adminAccent [&>div]:bg-adminMain"
+                  />
+                ) : (
+                  <div className="h-2 bg-gray-200"></div>
+                )}
               </div>
             ))}
           </div>

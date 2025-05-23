@@ -22,15 +22,32 @@ export function useFeedback(fingerprint, session, messages) {
     if (!feedback.rating || isSendingFeedback || !fingerprint || !session) return;
 
     setIsSendingFeedback(true);
-    const userRole = getUserRole(messages);
+    let userRole = getUserRole(messages);
+    
+    // Ensure userRole has a default value
+    if (!userRole) userRole = "public";
+    
+    // Ensure description is never empty
+    const description = feedback.description?.length 
+      ? feedback.description.join(", ") 
+      : "No specific feedback provided";
 
     try {
+      console.log("Submitting feedback with:", {
+        fingerprint,
+        session,
+        userRole,
+        rating: feedback.rating,
+        description
+      });
+      
+      // Send feedback to the API
       await sendFeedback(
         fingerprint, 
         session, 
         userRole, 
         feedback.rating, 
-        feedback.description?.join(", ")
+        description
       );
 
       return true;
