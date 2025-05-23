@@ -68,16 +68,23 @@ export default function MetadataSidebar({ document, relatedDocumentsCount = 0, o
                 </div>
               </div>
               <div className="space-y-2">
-                {document.authors.map((author, index) => (
-                  <div key={index} className="text-sm text-center dark:text-gray-300">
-                    <div className="font-medium">{author.name}</div>
-                    {author.department && (
-                      <div className="text-xs text-center text-gray-500 dark:text-gray-400 mt-0.5">
-                        {author.department}
+                {document.authors.map((author, index) => {
+                  // Check if author is a string or an object
+                  const isAuthorObject = typeof author === 'object' && author !== null;
+                  
+                  return (
+                    <div key={index} className="text-sm text-center dark:text-gray-300">
+                      <div className="font-medium">
+                        {isAuthorObject ? author.name : author}
                       </div>
-                    )}
-                  </div>
-                ))}
+                      {isAuthorObject && author.department && (
+                        <div className="text-xs text-center text-gray-500 dark:text-gray-400 mt-0.5">
+                          {author.department}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
