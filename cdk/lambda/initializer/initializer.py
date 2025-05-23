@@ -41,7 +41,7 @@ def insert_into_prompts(public_prompt, internal_researcher_prompt, policy_maker_
     try:
         cursor = connection.cursor()
         insert_query = """
-            INSERT INTO "prompts" ("public", "internal_researcher", "policy_maker", external_researcher", time_created)
+            INSERT INTO "prompts" ("public", "internal_researcher", "policy_maker", "external_researcher", "time_created")
             VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP);
         """
 
