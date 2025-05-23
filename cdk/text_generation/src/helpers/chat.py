@@ -21,7 +21,7 @@ INITIAL_GREETING = {
     "message": ("Hello! I am a Smart Agent specialized in Fisheries and Oceans Canada (DFO). "
                 "I can help you with questions related to DFO documents, science advice, and more!"
                 "\nPlease select the best role below that fits you. We can better answer your questions."
-                "Don't include personal details such as your name and private content."),
+                "Do not include personal details such as your name and private content."),
     "options": ["General Public", "Internal Researcher", "Policy Maker", "External Researcher"]
 }
 
