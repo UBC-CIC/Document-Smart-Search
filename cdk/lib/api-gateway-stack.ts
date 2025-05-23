@@ -580,14 +580,13 @@ export class ApiGatewayStack extends cdk.Stack {
     );
 
     /**
-     *
      * Create Lambda with container image for text generation workflow in RAG pipeline
      */
     const textGenFunc = new lambda.DockerImageFunction(
       this,
       `${id}-TextGenFunction`,
       {
-        code: lambda.DockerImageCode.fromImageAsset("./text_generation", {
+        code: lambda.DockerImageCode.fromImageAsset("./lambda/text_generation", {
           platform: Platform.LINUX_AMD64
         }),
         memorySize: 512,
