@@ -33,7 +33,7 @@ export async function fetchDocumentDetail(documentId) {
 
     const data = await response.json();
 
-    console.log("Document details fetched successfully:", data);
+    // console.log("Document details fetched successfully:", data);
 
     return data;
 

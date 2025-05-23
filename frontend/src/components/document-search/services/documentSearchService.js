@@ -31,7 +31,7 @@ export async function fetchFilterOptions() {
     
     const data = await response.json()
 
-    console.log("Filter options fetched successfully:", data)
+    // console.log("Filter options fetched successfully:", data)
     return data
   } catch (error) {
     console.error("Error fetching filter options:", error.message)
