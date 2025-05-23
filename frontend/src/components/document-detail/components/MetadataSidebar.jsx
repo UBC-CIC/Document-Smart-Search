@@ -6,7 +6,18 @@ export default function MetadataSidebar({ document, relatedDocumentsCount = 0, o
   return (
     <div className="w-full md:w-64">
       <div className="bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden">
-        {document.documentUrl && (
+        {document.htmlUrl && (
+          <a
+            href={document.htmlUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block w-full text-center py-2 bg-green-500 hover:bg-green-600 text-white font-medium dark:text-white text-sm transition-colors"
+          >
+            View Web Page
+          </a>
+        )}
+
+        {document.documentUrl && document.documentUrl !== '#' && (
           <a
             href={document.documentUrl}
             target="_blank"

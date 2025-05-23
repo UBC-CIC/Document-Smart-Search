@@ -1,3 +1,4 @@
+from datetime import datetime
 import json
 import boto3
 import logging
@@ -230,10 +231,11 @@ def get_document_categorization(
         conn_info=conn_info, 
         doc_id=doc_id
     )
-    if last_updated is not None or last_updated != "N/A":
+    # Only convert last_updated to isoformat if it's a datetime object
+    if isinstance(last_updated, datetime):
         base["last_updated"] = last_updated.isoformat()
     else:
-        base["last_updated"] = "N/A"
+        base["last_updated"] = last_updated
     
     mandates, dfo_topics, other_topics = _fetch_classifications(
         pgsql=pgsql_conn, conn_info=conn_info, url=url
