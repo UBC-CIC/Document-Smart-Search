@@ -63,13 +63,13 @@ export default function Filters({
           placeholder="Search topics..."
         />
 
-        {/* Author Filter */}
+        {/* Author Filter - No longer supported
         <AsyncFilterSelect
           title="Authors"
           filters={authorFilters}
           setFilters={setAuthorFilters}
           placeholder="Search authors..."
-        />
+        /> */}
       </div>
     </div>
   )

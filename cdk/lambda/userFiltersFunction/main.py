@@ -146,24 +146,26 @@ def handler(event, context):
                 
             elif f == "authors":
                 # Fetch authors from OpenSearch using aggregation
-                authors_query = {
-                    "size": 0,
-                    "aggs": {
-                        "author_terms": {
-                            "terms": {
-                                "field": "html_authors.keyword",
-                                "size": 1000
-                            }
-                        }
-                    }
-                }
+                # Note: No longer used in the frontend so not implemented
+                filters["authors"] = []
+                # authors_query = {
+                #     "size": 0,
+                #     "aggs": {
+                #         "author_terms": {
+                #             "terms": {
+                #                 "field": "html_authors.keyword",
+                #                 "size": 1000
+                #             }
+                #         }
+                #     }
+                # }
                 
-                try:
-                    response = op_client.search(index="dfo-html-full-index", body=authors_query)
-                    filters["authors"] = [bucket['key'] for bucket in response['aggregations']['author_terms']['buckets']]
-                except Exception as e:
-                    logger.error(f"Error querying OpenSearch for authors: {str(e)}")
-                    filters["authors"] = []  # Empty list if an error occurs
+                # try:
+                #     response = op_client.search(index="dfo-html-full-index", body=authors_query)
+                #     filters["authors"] = [bucket['key'] for bucket in response['aggregations']['author_terms']['buckets']]
+                # except Exception as e:
+                #     logger.error(f"Error querying OpenSearch for authors: {str(e)}")
+                #     filters["authors"] = []  # Empty list if an error occurs
         
         # Sort years in descending order if present
         if "years" in filters:
