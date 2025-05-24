@@ -64,7 +64,7 @@ def handler(event, context):
 
         # If no valid filters requested, return all
         if not requested_filters:
-            requested_filters = ["years", "topics", "mandates", "authors", "document_types"]
+            requested_filters = ["years", "topics", "mandates", "authors", "document_types", "derived_topics"]
         
         # Initialize empty results dictionary
         filters = {}

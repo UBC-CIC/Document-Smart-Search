@@ -21,6 +21,7 @@ EMBEDDING_MODEL_PARAM = "amazon.titan-embed-text-v2:0"
 # Map of frontend filter names to OpenSearch field names
 FILTER_FIELD_MAPPING = {
     "years": "csas_html_year",
+    "derivedTopics": "derived_topic_categorization", 
     "topics": "topic_categorization", 
     "mandates": "mandate_categorization",
     "authors": "html_authors",
