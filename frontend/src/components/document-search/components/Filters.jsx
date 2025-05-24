@@ -8,6 +8,8 @@ export default function Filters({
   setYearFilters,
   topicFilters,
   setTopicFilters,
+  derivedTopicFilters,
+  setDerivedTopicFilters,
   mandateFilters,
   setMandateFilters,
   authorFilters,
@@ -61,6 +63,14 @@ export default function Filters({
           filters={topicFilters}
           setFilters={setTopicFilters}
           placeholder="Search topics..."
+        />
+
+        {/* Derived Topic Filter */}
+        <AsyncFilterSelect
+          title="Derived Topics"
+          filters={derivedTopicFilters}
+          setFilters={setDerivedTopicFilters}
+          placeholder="Search derived topics..."
         />
 
         {/* Author Filter - No longer supported

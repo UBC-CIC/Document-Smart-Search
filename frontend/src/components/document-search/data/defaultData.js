@@ -2,6 +2,7 @@
 export const filterOptions = {
   years: ["2016", "2017", "2018", "2019", "2020", "2021", "2025"],
   topics: ['Stock Assessments', 'Biomass Estimation', 'Harvest Strategies & TAC (Total Allowable Catch)', 'Fisheries Monitoring & Compliance'],
+  derivedTopics: ['Marine Conservation', 'Population Dynamics', 'Ecosystem Impact', 'Climate Adaptation'],
   mandates: ['Sustainable Fisheries and Aquaculture', 'Cross-Cutting Themes'],
   authors: ["DFO Research Team", "External Researchers", "Policy Division"],
   documentTypes: ["Unknown"]

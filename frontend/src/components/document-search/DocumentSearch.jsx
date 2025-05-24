@@ -29,6 +29,8 @@ export default function DocumentSearch() {
     setYearFilters,
     topicFilters,
     setTopicFilters,
+    derivedTopicFilters,
+    setDerivedTopicFilters,
     mandateFilters,
     setMandateFilters,
     authorFilters,
@@ -111,6 +113,8 @@ export default function DocumentSearch() {
             setYearFilters={setYearFilters}
             topicFilters={topicFilters}
             setTopicFilters={setTopicFilters}
+            derivedTopicFilters={derivedTopicFilters}
+            setDerivedTopicFilters={setDerivedTopicFilters}
             mandateFilters={mandateFilters}
             setMandateFilters={setMandateFilters}
             authorFilters={authorFilters}

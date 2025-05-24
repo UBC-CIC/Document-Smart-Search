@@ -61,6 +61,7 @@ export async function performDocumentSearch(query, filters) {
     const transformedFilters = {
       years: Object.keys(filters.yearFilters || {}).filter(key => filters.yearFilters[key]),
       topics: Object.keys(filters.topicFilters || {}).filter(key => filters.topicFilters[key]),
+      derivedTopics: Object.keys(filters.derivedTopicFilters || {}).filter(key => filters.derivedTopicFilters[key]),
       mandates: Object.keys(filters.mandateFilters || {}).filter(key => filters.mandateFilters[key]),
       authors: Object.keys(filters.authorFilters || {}).filter(key => filters.authorFilters[key]),
       documentTypes: Object.keys(filters.documentTypeFilters || {}).filter(key => filters.documentTypeFilters[key]),
@@ -115,7 +116,8 @@ export async function performDocumentSearch(query, filters) {
 function filterMockData(query, filters) {
   const { 
     yearFilters, 
-    topicFilters, 
+    topicFilters,
+    derivedTopicFilters,
     mandateFilters, 
     authorFilters, 
     documentTypeFilters 
@@ -133,6 +135,17 @@ function filterMockData(query, filters) {
     if (anyTopicFilterActive) {
       const hasMatchingTopic = result.topics.some((topic) => topicFilters[topic])
       if (!hasMatchingTopic) {
+        return false
+      }
+    }
+    
+    // Check if any derived topic filter is active
+    const anyDerivedTopicFilterActive = Object.values(derivedTopicFilters).some((value) => value)
+    if (anyDerivedTopicFilterActive) {
+      // For mock data, assume derivedTopics are in the topics array or check for a dedicated derivedTopics array
+      const resultDerivedTopics = result.derivedTopics || result.topics || [];
+      const hasMatchingDerivedTopic = resultDerivedTopics.some((topic) => derivedTopicFilters[topic])
+      if (!hasMatchingDerivedTopic) {
         return false
       }
     }

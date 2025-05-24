@@ -16,6 +16,7 @@ export function useDocumentSearch() {
   // Filter states
   const [yearFilters, setYearFilters] = useState({})
   const [topicFilters, setTopicFilters] = useState({})
+  const [derivedTopicFilters, setDerivedTopicFilters] = useState({}) // Add new filter state for derived topics
   const [mandateFilters, setMandateFilters] = useState({})
   const [authorFilters, setAuthorFilters] = useState({})
   const [documentTypeFilters, setDocumentTypeFilters] = useState({}) // Add new filter state
@@ -31,6 +32,7 @@ export function useDocumentSearch() {
         // Initialize filter states based on fetched options
         setYearFilters(Object.fromEntries(options.years.map((year) => [year, false])))
         setTopicFilters(Object.fromEntries(options.topics.map((topic) => [topic, false])))
+        setDerivedTopicFilters(Object.fromEntries((options.derivedTopics || []).map((topic) => [topic, false])))
         setMandateFilters(Object.fromEntries(options.mandates.map((mandate) => [mandate, false])))
         setAuthorFilters(Object.fromEntries(options.authors.map((author) => [author, false])))
         setDocumentTypeFilters(Object.fromEntries((options.documentTypes || []).map((type) => [type, false])))
@@ -49,6 +51,7 @@ export function useDocumentSearch() {
     // Don't perform search if query is empty and no filters active
     if (!searchQuery.trim() && !Object.values(yearFilters).some(val => val) && 
         !Object.values(topicFilters).some(val => val) && 
+        !Object.values(derivedTopicFilters).some(val => val) && 
         !Object.values(mandateFilters).some(val => val) &&
         !Object.values(authorFilters).some(val => val) &&
         !Object.values(documentTypeFilters).some(val => val)) {
@@ -62,6 +65,7 @@ export function useDocumentSearch() {
       const filters = {
         yearFilters,
         topicFilters,
+        derivedTopicFilters,
         mandateFilters,
         authorFilters,
         documentTypeFilters,
@@ -127,6 +131,7 @@ export function useDocumentSearch() {
   const resetFilters = () => {
     setYearFilters(Object.fromEntries(filterOptions.years.map((year) => [year, false])))
     setTopicFilters(Object.fromEntries(filterOptions.topics.map((topic) => [topic, false])))
+    setDerivedTopicFilters(Object.fromEntries((filterOptions.derivedTopics || []).map((topic) => [topic, false])))
     setMandateFilters(Object.fromEntries(filterOptions.mandates.map((mandate) => [mandate, false])))
     setAuthorFilters(Object.fromEntries(filterOptions.authors.map((author) => [author, false])))
     setDocumentTypeFilters(Object.fromEntries((filterOptions.documentTypes || []).map((type) => [type, false])))
@@ -158,6 +163,8 @@ export function useDocumentSearch() {
     setYearFilters,
     topicFilters,
     setTopicFilters,
+    derivedTopicFilters,
+    setDerivedTopicFilters,
     mandateFilters,
     setMandateFilters,
     authorFilters,
