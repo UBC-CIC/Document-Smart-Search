@@ -210,6 +210,59 @@ export default function DerivedTopicTrends() {
     }));
   };
 
+  // Get random items from an array
+  const getRandomItems = (array, count) => {
+    const shuffled = [...array].sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, count);
+  };
+
+  // Handle selecting topics (limited to 10)
+  const handleTopicSelection = (selected) => {
+    const selectedValues = selected ? selected.map(item => item.value) : [];
+    
+    if (selectedValues.length > 10) {
+      // Limit to first 10 selections
+      setSelectedTopics(selectedValues.slice(0, 10));
+      // Could add a toast/notification here to inform user
+    } else {
+      setSelectedTopics(selectedValues);
+    }
+  };
+
+  // Handle selecting random topics
+  const handleSelectRandomTopics = () => {
+    const MAX_TOPICS = 10;
+    
+    if (allTopics.length <= MAX_TOPICS) {
+      // If we have 10 or fewer topics, select all of them
+      setSelectedTopics(allTopics);
+      return;
+    }
+    
+    if (selectedTopics.length >= MAX_TOPICS) {
+      // If already at limit, select 10 different random topics
+      const unselectedTopics = allTopics.filter(topic => !selectedTopics.includes(topic));
+      
+      // If all topics are already selected, reshuffle for new random selection
+      if (unselectedTopics.length === 0) {
+        setSelectedTopics(getRandomItems(allTopics, MAX_TOPICS));
+        return;
+      }
+      
+      // Get up to 10 random unselected topics
+      const randomUnselected = getRandomItems(unselectedTopics, MAX_TOPICS);
+      setSelectedTopics(randomUnselected);
+    } else {
+      // Select random topics up to 10 total
+      setSelectedTopics(getRandomItems(allTopics, MAX_TOPICS));
+    }
+  };
+
+  // Handle deselecting all topics
+  const handleDeselectAllTopics = () => {
+    setSelectedTopics([]);
+  };
+
   // Handle search for AsyncSelect components
   const handleTopicSearch = async (inputValue) => {
     if (!inputValue) return formatOptionsForSelect(allTopics);
@@ -418,20 +471,39 @@ export default function DerivedTopicTrends() {
             </div>
             
             <div className="md:col-span-2">
-              <label className="block text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Derived Topic Filter
-              </label>
+              <div className="flex justify-between items-center mb-2">
+                <label className="block text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Derived Topic Filter <span className="text-xs text-gray-500">(Max 10)</span>
+                </label>
+                <div className="flex space-x-3">
+                  <button 
+                    type="button"
+                    onClick={handleDeselectAllTopics}
+                    className="text-xs md:text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 transition-colors"
+                  >
+                    Deselect All
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={handleSelectRandomTopics}
+                    className="text-xs md:text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
+                  >
+                    {allTopics.length <= 10 ? "Select All Topics" : "Select Random 10 Topics"}
+                  </button>
+                </div>
+              </div>
               <AsyncSelect
                 cacheOptions
                 defaultOptions={formatOptionsForSelect(allTopics)}
                 loadOptions={handleTopicSearch}
                 isMulti
-                placeholder="Search topics..."
-                onChange={(selected) => setSelectedTopics(selected ? selected.map(item => item.value) : [])}
+                placeholder="Search topics... (10 max)"
+                onChange={handleTopicSelection}
                 styles={{
                   menuPortal: (base) => ({ ...base, zIndex: 9999 }),
                 }}
                 menuPortalTarget={typeof window !== 'undefined' ? document.body : null}
+                value={formatOptionsForSelect(selectedTopics)}
               />
             </div>
           </div>
@@ -443,7 +515,7 @@ export default function DerivedTopicTrends() {
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-3 md:p-4 border dark:border-gray-700">
             <div className="flex justify-between items-center mb-3 md:mb-4">
               <h3 className="font-medium dark:text-white text-sm md:text-base">
-                Document Upload Trends by Derived Topic (Yearly Overview)
+                Yearly Document Count Trends by Derived Topic
               </h3>
               <div className="flex items-center space-x-2">
                 <span className="text-xs text-gray-500 dark:text-gray-400 hidden sm:inline">
@@ -457,11 +529,15 @@ export default function DerivedTopicTrends() {
               <p className="text-sm text-gray-600 dark:text-gray-300">Select topics to begin</p>
             </div>) : (
             <ResponsiveContainer width="100%" height={450}>
-              <LineChart data={filteredChartData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                <XAxis dataKey="year" label={{ value: "Year", position: "insideBottom", offset: -5 }} />
-                <YAxis label={{ value: "# of Documents", angle: -90, position: "insideLeft" }} />
+              <LineChart data={filteredChartData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+                <XAxis 
+                  dataKey="year" 
+                  label={{ value: "CSAS Year", position: "insideBottom", offset: -15 }}
+                  dy={5} // Add extra space below X-axis
+                />
+                <YAxis />
                 <Tooltip />
-                <Legend />
+                <Legend wrapperStyle={{ paddingTop: 20 }}/>
                 {selectedTopics.map((topic, index) => (
                   <Line
                     key={topic}
@@ -502,9 +578,17 @@ export default function DerivedTopicTrends() {
                 }))} 
                 margin={{ top: 10, right: 20, left: 0, bottom: 0 }}
               >
-                <XAxis dataKey="name" />
+                <XAxis dataKey="name" tick={false} />
                 <YAxis />
                 <Tooltip />
+                <Legend 
+                  wrapperStyle={{ paddingTop: 0 }}
+                  payload={selectedTopics.map((topic, index) => ({
+                    value: topic,
+                    type: 'square',
+                    color: colorPalette[index % colorPalette.length]
+                  }))}
+                />
                 <Bar dataKey="count" barSize={75}>
                   {selectedTopics.map((_, index) => (
                     <Cell key={`cell-${index}`} fill={colorPalette[index % colorPalette.length]} />

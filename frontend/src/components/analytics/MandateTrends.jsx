@@ -210,6 +210,59 @@ export default function MandateTrends() {
     }));
   };
 
+  // Get random items from an array
+  const getRandomItems = (array, count) => {
+    const shuffled = [...array].sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, count);
+  };
+
+  // Handle selecting mandates (limited to 10)
+  const handleMandateSelection = (selected) => {
+    const selectedValues = selected ? selected.map(item => item.value) : [];
+    
+    if (selectedValues.length > 10) {
+      // Limit to first 10 selections
+      setSelectedMandates(selectedValues.slice(0, 10));
+      // Could add a toast/notification here to inform user
+    } else {
+      setSelectedMandates(selectedValues);
+    }
+  };
+
+  // Handle deselecting all mandates
+  const handleDeselectAllMandates = () => {
+    setSelectedMandates([]);
+  };
+
+  // Handle selecting random mandates
+  const handleSelectRandomMandates = () => {
+    const MAX_MANDATES = 10;
+    
+    if (allMandates.length <= MAX_MANDATES) {
+      // If we have 10 or fewer mandates, select all of them
+      setSelectedMandates(allMandates);
+      return;
+    }
+    
+    if (selectedMandates.length >= MAX_MANDATES) {
+      // If already at limit, select 10 different random mandates
+      const unselectedMandates = allMandates.filter(mandate => !selectedMandates.includes(mandate));
+      
+      // If all mandates are already selected, reshuffle for new random selection
+      if (unselectedMandates.length === 0) {
+        setSelectedMandates(getRandomItems(allMandates, MAX_MANDATES));
+        return;
+      }
+      
+      // Get up to 10 random unselected mandates
+      const randomUnselected = getRandomItems(unselectedMandates, MAX_MANDATES);
+      setSelectedMandates(randomUnselected);
+    } else {
+      // Select random mandates up to 10 total
+      setSelectedMandates(getRandomItems(allMandates, MAX_MANDATES));
+    }
+  };
+
   // Handle search for AsyncSelect components
   const handleMandateSearch = async (inputValue) => {
     if (!inputValue) return formatOptionsForSelect(allMandates);
@@ -418,20 +471,39 @@ export default function MandateTrends() {
             </div>
             
             <div className="md:col-span-2">
-              <label className="block text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Mandate Filter
-              </label>
+              <div className="flex justify-between items-center mb-2">
+                <label className="block text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Mandate Filter <span className="text-xs text-gray-500">(Max 10)</span>
+                </label>
+                <div className="flex space-x-3">
+                  <button 
+                    type="button"
+                    onClick={handleDeselectAllMandates}
+                    className="text-xs md:text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 transition-colors"
+                  >
+                    Deselect All
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={handleSelectRandomMandates}
+                    className="text-xs md:text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
+                  >
+                    {allMandates.length <= 10 ? "Select All Mandates" : "Random 10 Mandates"}
+                  </button>
+                </div>
+              </div>
               <AsyncSelect
                 cacheOptions
                 defaultOptions={formatOptionsForSelect(allMandates)}
                 loadOptions={handleMandateSearch}
                 isMulti
-                placeholder="Search mandates..."
-                onChange={(selected) => setSelectedMandates(selected ? selected.map(item => item.value) : [])}
+                placeholder="Search mandates... (10 max)"
+                onChange={handleMandateSelection}
                 styles={{
                   menuPortal: (base) => ({ ...base, zIndex: 9999 }),
                 }}
                 menuPortalTarget={typeof window !== 'undefined' ? document.body : null}
+                value={formatOptionsForSelect(selectedMandates)}
               />
             </div>
           </div>
@@ -443,7 +515,7 @@ export default function MandateTrends() {
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-3 md:p-4 border dark:border-gray-700">
             <div className="flex justify-between items-center mb-3 md:mb-4">
               <h3 className="font-medium dark:text-white text-sm md:text-base">
-                Document Upload Trends by Mandate (Yearly Overview)
+                Yearly Document Count by Mandate
               </h3>
               <div className="flex items-center space-x-2">
                 <span className="text-xs text-gray-500 dark:text-gray-400 hidden sm:inline">
@@ -457,11 +529,15 @@ export default function MandateTrends() {
               <p className="text-sm text-gray-600 dark:text-gray-300">Select mandates to begin</p>
             </div>) : (
             <ResponsiveContainer width="100%" height={450}>
-              <LineChart data={filteredChartData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                <XAxis dataKey="year" label={{ value: "Year", position: "insideBottom", offset: -5 }} />
-                <YAxis label={{ value: "# of Documents", angle: -90, position: "insideLeft" }} />
+              <LineChart data={filteredChartData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+                <XAxis 
+                  dataKey="year" 
+                  label={{ value: "CSAS Year", position: "insideBottom", offset: -15 }}
+                  dy={5} // Add extra space below X-axis
+                />
+                <YAxis />
                 <Tooltip />
-                <Legend />
+                <Legend wrapperStyle={{ paddingTop: 20 }}/>
                 {selectedMandates.map((mandate, index) => (
                   <Line
                     key={mandate}
@@ -502,9 +578,17 @@ export default function MandateTrends() {
                 }))} 
                 margin={{ top: 10, right: 20, left: 0, bottom: 0 }}
               >
-                <XAxis dataKey="name" />
+                <XAxis dataKey="name" tick={false} />
                 <YAxis />
                 <Tooltip />
+                <Legend 
+                  wrapperStyle={{ paddingTop: 0 }}
+                  payload={selectedMandates.map((mandate, index) => ({
+                    value: mandate,
+                    type: 'square',
+                    color: colorPalette[index % colorPalette.length]
+                  }))}
+                />
                 <Bar dataKey="count" barSize={75}>
                   {selectedMandates.map((_, index) => (
                     <Cell key={`cell-${index}`} fill={colorPalette[index % colorPalette.length]} />
