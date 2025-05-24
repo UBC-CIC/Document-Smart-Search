@@ -59,7 +59,7 @@ def handler(event, context):
         if query_params and "filters" in query_params:
             requested_filters = query_params["filters"].split(",")
             # Validate and sanitize requested filters
-            allowed_filters = ["years", "topics", "mandates", "authors", "document_types"]
+            allowed_filters = ["years", "topics", "mandates", "authors", "document_types", "derived_topics"]
             requested_filters = [f for f in requested_filters if f in allowed_filters]
 
         # If no valid filters requested, return all
@@ -117,6 +117,19 @@ def handler(event, context):
                 except Exception as e:
                     logger.error(f"Error querying RDS for topics: {str(e)}")
                     filters["topics"] = []  # Empty list fallback on error
+                
+            elif f == "derived_topics":
+                # Fetch derived topics from RDS
+                try:
+                    sql = """
+                    SELECT topic_name
+                    FROM derived_topics
+                    """
+                    results = execute_rds_query(rds_conn, sql)
+                    filters["derivedTopics"] = [x[0] for x in results if x[0] is not None]
+                except Exception as e:
+                    logger.error(f"Error querying RDS for derived topics: {str(e)}")
+                    filters["derivedTopics"] = []  # Empty list fallback on error
                 
             elif f == "mandates":
                 # Fetch mandates from RDS
