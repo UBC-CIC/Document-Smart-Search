@@ -17,7 +17,7 @@ const USE_MOCK_DATA = false;
 const fetchFilterOptions = async () => {
   try {
     // Define filters to request
-    const filtersToRequest = ["years", "document_types", "topics"];
+    const filtersToRequest = ["years", "document_types", "derived_topics"];
     
     // Build the URL with query parameters
     const url = new URL(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/filters`);
@@ -38,7 +38,7 @@ const fetchFilterOptions = async () => {
     return {
       years: data.years || [],
       documentTypes: data.documentTypes || [],
-      topics: data.topics || []
+      topics: data.derivedTopics || []
     };
   } catch (error) {
     console.error("Error fetching filter options:", error.message);
@@ -107,7 +107,7 @@ export default function DerivedTopicTrends() {
       url.searchParams.append("toYear", toYear.toString());
       
       if (selectedTopics.length > 0) {
-        url.searchParams.append("topics", selectedTopics.join(","));
+        url.searchParams.append("derived_topics", selectedTopics.join(","));
       }
       
       if (selectedDocTypes.length > 0) {
