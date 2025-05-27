@@ -9,7 +9,7 @@ import { fetchAuthSession } from "aws-amplify/auth"
 import Session from "./Session"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 
-const RoleView = ({ role, sessions, onSessionClick, startDate, endDate, currentPage, setCurrentPage }) => {
+const RoleView = ({ role, sessions, onSessionClick, startDate, endDate, currentPage, setCurrentPage, totalPages }) => {
   const [isOpen, setIsOpen] = useState(true)
 
   const getRoleIcon = (role) => {
@@ -96,10 +96,10 @@ const RoleView = ({ role, sessions, onSessionClick, startDate, endDate, currentP
           >
             Previous
           </Button>
-          <span>Page {currentPage}</span>
+          <span>Page {currentPage} of {totalPages}</span>
           <Button
-            onClick={() => setCurrentPage((prev) => prev + 1)}
-            disabled={sessions.length === 0}
+            onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+            disabled={currentPage === totalPages}
           >
             Next
           </Button>
@@ -122,35 +122,47 @@ export default function History() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
 
-  const fetchSessions = async (userRole, setSession) => {
-    try {
-      const session = await fetchAuthSession()
-      const token = session.tokens.idToken
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_ENDPOINT}admin/conversation_sessions?user_role=${encodeURIComponent(userRole)}&start_date=${startDate ? startDate.toISOString() : ''}&end_date=${endDate ? endDate.toISOString() : ''}&page=${currentPage}`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: token,
-            "Content-Type": "application/json",
-          },
-        }
-      )
+const fetchSessions = async (userRole, setSession) => {
+  try {
+    const session = await fetchAuthSession();
+    const token = session.tokens.idToken;
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+    const startDateStr = startDate ? startDate.toISOString() : '';
+    const endDateStr = endDate ? endDate.toISOString() : '';
+
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_ENDPOINT}admin/conversation_sessions?user_role=${encodeURIComponent(userRole)}&start_date=${startDateStr}&end_date=${endDateStr}&page=${currentPage}&limit=10`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: token,
+          "Content-Type": "application/json",
+        },
       }
+    );
 
-      const data = await response.json()
-      data.sort((a, b) => new Date(b.last_message_time) - new Date(a.last_message_time))
-      setSession(data)
-    } catch (error) {
-      console.error(`Error fetching ${userRole} sessions:`, error)
-      setSession([])
-    } finally {
-      setLoading(false)
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
+
+    const data = await response.json();
+
+    // Ensure the sessions are in an array format
+    if (Array.isArray(data.sessions)) {
+      data.sessions.sort((a, b) => new Date(b.last_message_time) - new Date(a.last_message_time));
+      setSession(data.sessions);  // Update the state with the sorted sessions
+      setTotalPages(data.totalPages);  // Set totalPages from the API response
+    } else {
+      console.error('API response does not contain an array of sessions:', data);
+      setSession([]);  // Default to an empty array if data.sessions is not an array
+    }
+  } catch (error) {
+    console.error(`Error fetching ${userRole} sessions:`, error);
+    setSession([]);  // Set to empty if there's an error
+  } finally {
+    setLoading(false);  // Set loading to false once the data is fetched
   }
+};
 
   useEffect(() => {
     const loadSessions = async () => {
@@ -260,36 +272,33 @@ export default function History() {
           ))}
         </TabsList>
 
-        {/* Date range filter */}
-        <div className='flex flex-col background-white p-4 rounded-lg shadow-sm border'>
-          <p className='mb-3' style={{color:'GrayText'}}>Filter by Date Range</p>
-        <div className='flex justify-between items-center w-full'>
-        <div className="flex space-x-4 ">
-          <input
-            type="date"
-            value={startDate ? startDate.toISOString().split("T")[0] : ""}
-            onChange={(e) => setStartDate(new Date(e.target.value))}
-            className="p-2 border rounded"
-          />
-          <input
-            type="date"
-            value={endDate ? endDate.toISOString().split("T")[0] : ""}
-            onChange={(e) => setEndDate(new Date(e.target.value))}
-            className="p-2 border rounded"
-          />
-          <Button onClick={() => setCurrentPage(1)}>Apply Date Range</Button>
-          
+        {/* Download button inside the filter section */}
+        <div className="flex flex-col background-white p-4 rounded-lg shadow-sm border mb-4">
+          <div className="flex justify-between items-center w-full">
+            <div className="flex space-x-4">
+              <input
+                type="date"
+                value={startDate ? startDate.toISOString().split("T")[0] : ""}
+                onChange={(e) => setStartDate(new Date(e.target.value))}
+                className="p-2 border rounded"
+              />
+              <input
+                type="date"
+                value={endDate ? endDate.toISOString().split("T")[0] : ""}
+                onChange={(e) => setEndDate(new Date(e.target.value))}
+                className="p-2 border rounded"
+              />
+              <Button onClick={() => setCurrentPage(1)}>Apply Date Range</Button>
+            </div>
+            <Button
+              onClick={handleDownloadAllData}
+              disabled={downloadLoading}
+              className="bg-adminMain hover:bg-adminHover"
+            >
+              {downloadLoading ? "Downloading..." : "Download All Messages"}
+            </Button>
+          </div>
         </div>
-              <Button
-        onClick={handleDownloadAllData}
-        disabled={downloadLoading}
-        className="bg-adminMain hover:bg-adminHover"
-      >
-        {downloadLoading ? "Downloading..." : "Download All Messages"}
-      </Button>
-      </div>
-      </div>
-        
 
         {roles.map((role) => (
           <TabsContent key={role.key} value={role.key}>
@@ -301,6 +310,7 @@ export default function History() {
               endDate={endDate}
               currentPage={currentPage}
               setCurrentPage={setCurrentPage}
+              totalPages={totalPages}
             />
           </TabsContent>
         ))}
