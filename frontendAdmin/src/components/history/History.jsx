@@ -3,20 +3,19 @@
 import { useState, useEffect } from "react"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Button } from "@/components/ui/button"
-import { ChevronDown, ChevronUp, Users, ShieldCheck, BookOpen, GraduationCap, Landmark } from "lucide-react"
+import { ChevronDown, ChevronUp, Users, BookOpen, GraduationCap, Landmark } from "lucide-react"
 import LoadingScreen from "../Loading/LoadingScreen"
 import { fetchAuthSession } from "aws-amplify/auth"
 import Session from "./Session"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 
-const RoleView = ({ role, sessions, onSessionClick }) => {
+const RoleView = ({ role, sessions, onSessionClick, startDate, endDate, currentPage, setCurrentPage }) => {
   const [isOpen, setIsOpen] = useState(true)
 
   const getRoleIcon = (role) => {
     switch (role) {
       case "public":
         return <Users className="mr-2" />
-      // case "admin":
-      //   return <ShieldCheck className="mr-2" />
       case "internal_researcher":
         return <BookOpen className="mr-2" />
       case "external_researcher":
@@ -32,12 +31,10 @@ const RoleView = ({ role, sessions, onSessionClick }) => {
     switch (role) {
       case "public":
         return "General Public"
-      // case "admin":
-      //   return "Admin"
       case "internal_researcher":
         return "Internal Researcher"
       case "external_researcher":
-        return "External Researcher" 
+        return "External Researcher"
       case "policy_maker":
         return "Policy Maker"
       default:
@@ -91,6 +88,22 @@ const RoleView = ({ role, sessions, onSessionClick }) => {
             </div>
           </Button>
         ))}
+        {/* Pagination controls */}
+        <div className="flex justify-between mt-4">
+          <Button
+            onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+            disabled={currentPage === 1}
+          >
+            Previous
+          </Button>
+          <span>Page {currentPage}</span>
+          <Button
+            onClick={() => setCurrentPage((prev) => prev + 1)}
+            disabled={sessions.length === 0}
+          >
+            Next
+          </Button>
+        </div>
       </CollapsibleContent>
     </Collapsible>
   )
@@ -98,57 +111,56 @@ const RoleView = ({ role, sessions, onSessionClick }) => {
 
 export default function History() {
   const [publicSessions, setPublicSessions] = useState([])
-  // const [adminSessions, setAdminSessions] = useState([])
   const [internalResearcherSessions, setInternalResearcherSessions] = useState([])
   const [externalResearcherSessions, setExternalResearcherSessions] = useState([])
   const [policyMakerSessions, setPolicyMakerSessions] = useState([])
   const [selectedSession, setSelectedSession] = useState(null)
   const [loading, setLoading] = useState(true)
   const [downloadLoading, setDownloadLoading] = useState(false)
+  const [startDate, setStartDate] = useState(null)
+  const [endDate, setEndDate] = useState(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+
+  const fetchSessions = async (userRole, setSession) => {
+    try {
+      const session = await fetchAuthSession()
+      const token = session.tokens.idToken
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_ENDPOINT}admin/conversation_sessions?user_role=${encodeURIComponent(userRole)}&start_date=${startDate ? startDate.toISOString() : ''}&end_date=${endDate ? endDate.toISOString() : ''}&page=${currentPage}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: token,
+            "Content-Type": "application/json",
+          },
+        }
+      )
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      data.sort((a, b) => new Date(b.last_message_time) - new Date(a.last_message_time))
+      setSession(data)
+    } catch (error) {
+      console.error(`Error fetching ${userRole} sessions:`, error)
+      setSession([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchSessions = async (userRole, setSession) => {
-      try {
-        const session = await fetchAuthSession()
-        const token = session.tokens.idToken
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_ENDPOINT}admin/conversation_sessions?user_role=${encodeURIComponent(
-            userRole,
-          )}`,
-          {
-            method: "GET",
-            headers: {
-              Authorization: token,
-              "Content-Type": "application/json",
-            },
-          },
-        )
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`)
-        }
-
-        const data = await response.json()
-        console.log(data)
-        data.sort((a, b) => new Date(b.last_message_time) - new Date(a.last_message_time))
-        setSession(data)
-      } catch (error) {
-        console.error(`Error fetching ${userRole} sessions:`, error)
-        setSession([])
-      } finally {
-        setLoading(false)
-      }
-    }
-
     const loadSessions = async () => {
       try {
         setLoading(true)
         await Promise.all([
-          fetchSessions("public", setPublicSessions), 
-          // fetchSessions("admin", setAdminSessions),
+          fetchSessions("public", setPublicSessions),
           fetchSessions("internal_researcher", setInternalResearcherSessions),
           fetchSessions("external_researcher", setExternalResearcherSessions),
-          fetchSessions("policy_maker", setPolicyMakerSessions)
+          fetchSessions("policy_maker", setPolicyMakerSessions),
         ])
       } catch (error) {
         console.error("Error loading sessions:", error)
@@ -156,13 +168,12 @@ export default function History() {
     }
 
     loadSessions()
-  }, [])
+  }, [startDate, endDate, currentPage])
 
   const handleDownloadAllData = async () => {
     setDownloadLoading(true)
     const allSessions = [
-      ...publicSessions, 
-      // ...adminSessions,
+      ...publicSessions,
       ...internalResearcherSessions,
       ...externalResearcherSessions,
       ...policyMakerSessions
@@ -175,16 +186,14 @@ export default function History() {
         const token = authSession.tokens.idToken
 
         const messagesResponse = await fetch(
-          `${process.env.NEXT_PUBLIC_API_ENDPOINT}admin/conversation_messages?session_id=${encodeURIComponent(
-            session.session_id,
-          )}`,
+          `${process.env.NEXT_PUBLIC_API_ENDPOINT}admin/conversation_messages?session_id=${encodeURIComponent(session.session_id)}`,
           {
             method: "GET",
             headers: {
               Authorization: token,
               "Content-Type": "application/json",
             },
-          },
+          }
         )
 
         if (!messagesResponse.ok) {
@@ -232,21 +241,70 @@ export default function History() {
     return <LoadingScreen />
   }
 
+  const roles = [
+    { key: "public", label: "General Public", sessions: publicSessions, icon: <Users className="mr-1 h-4 w-4" /> },
+    { key: "internal_researcher", label: "Internal Researcher", sessions: internalResearcherSessions, icon: <BookOpen className="mr-1 h-4 w-4" /> },
+    { key: "external_researcher", label: "External Researcher", sessions: externalResearcherSessions, icon: <GraduationCap className="mr-1 h-4 w-4" /> },
+    { key: "policy_maker", label: "Policy Maker", sessions: policyMakerSessions, icon: <Landmark className="mr-1 h-4 w-4" /> },
+  ]
+
   return (
-    <div className="w-full mx-auto space-y-4 p-4 overflow-y-auto mb-8">
-      <RoleView role="public" sessions={publicSessions} onSessionClick={handleSessionClick} />
-      <RoleView role="internal_researcher" sessions={internalResearcherSessions} onSessionClick={handleSessionClick} />
-      <RoleView role="external_researcher" sessions={externalResearcherSessions} onSessionClick={handleSessionClick} />
-      <RoleView role="policy_maker" sessions={policyMakerSessions} onSessionClick={handleSessionClick} />
-      {/* <RoleView role="admin" sessions={adminSessions} onSessionClick={handleSessionClick} /> */}
-      <Button
+    <div className="w-full mx-auto p-4 mb-8">
+      <Tabs defaultValue="public" className="w-full">
+        <TabsList className="mb-4 flex flex-wrap gap-2 rounded-md bg-gray-50">
+          {roles.map((role) => (
+            <TabsTrigger key={role.key} value={role.key} className="flex items-center gap-1">
+              {role.icon}
+              {role.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+
+        {/* Date range filter */}
+        <div className='flex flex-col background-white p-4 rounded-lg shadow-sm border'>
+          <p className='mb-3' style={{color:'GrayText'}}>Filter by Date Range</p>
+        <div className='flex justify-between items-center w-full'>
+        <div className="flex space-x-4 ">
+          <input
+            type="date"
+            value={startDate ? startDate.toISOString().split("T")[0] : ""}
+            onChange={(e) => setStartDate(new Date(e.target.value))}
+            className="p-2 border rounded"
+          />
+          <input
+            type="date"
+            value={endDate ? endDate.toISOString().split("T")[0] : ""}
+            onChange={(e) => setEndDate(new Date(e.target.value))}
+            className="p-2 border rounded"
+          />
+          <Button onClick={() => setCurrentPage(1)}>Apply Date Range</Button>
+          
+        </div>
+              <Button
         onClick={handleDownloadAllData}
         disabled={downloadLoading}
-        className="mb-4 bg-adminMain hover:bg-adminHover"
+        className="bg-adminMain hover:bg-adminHover"
       >
         {downloadLoading ? "Downloading..." : "Download All Messages"}
       </Button>
+      </div>
+      </div>
+        
+
+        {roles.map((role) => (
+          <TabsContent key={role.key} value={role.key}>
+            <RoleView
+              role={role.key}
+              sessions={role.sessions}
+              onSessionClick={handleSessionClick}
+              startDate={startDate}
+              endDate={endDate}
+              currentPage={currentPage}
+              setCurrentPage={setCurrentPage}
+            />
+          </TabsContent>
+        ))}
+      </Tabs>
     </div>
   )
 }
-
