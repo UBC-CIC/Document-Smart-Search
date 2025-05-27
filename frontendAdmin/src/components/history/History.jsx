@@ -6,6 +6,7 @@ import LoadingScreen from "../Loading/LoadingScreen";
 import { fetchAuthSession } from "aws-amplify/auth";
 import Session from "./Session";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import Pagination from '@mui/material/Pagination'; // Importing MUI Pagination
 
 const RoleView = ({ role, sessions, onSessionClick, startDate, endDate, currentPage, setCurrentPage, totalPages }) => {
   const [isOpen, setIsOpen] = useState(true);
@@ -86,20 +87,25 @@ const RoleView = ({ role, sessions, onSessionClick, startDate, endDate, currentP
             </div>
           </Button>
         ))}
-        {/* Pagination controls */}
-        <div className="flex justify-between mt-4">
-          <Button onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))} disabled={currentPage === 1}>
-            Previous
-          </Button>
-          <span>
-            Page {currentPage} of {totalPages}
-          </span>
-          <Button
-            onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-            disabled={currentPage === totalPages}
-          >
-            Next
-          </Button>
+        {/* MUI Pagination controls */}
+        <div className="flex justify-center mt-4">
+          <Pagination
+            count={totalPages}
+            page={currentPage}  
+            onChange={(event, value) => setCurrentPage(value)}
+            siblingCount={1} 
+            boundaryCount={1}
+            color="primary"
+            sx={{
+              "& .MuiPaginationItem-root": {
+                color: "#0f172a", 
+              },
+              "& .Mui-selected": {
+                backgroundColor: "#0f172a", 
+                color: "#ffffff",  
+              },
+            }}
+          />
         </div>
       </CollapsibleContent>
     </Collapsible>
@@ -137,7 +143,7 @@ export default function History() {
       const endDateStr = endDate ? endDate.toISOString() : "";
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_ENDPOINT}admin/conversation_sessions?user_role=${encodeURIComponent(userRole)}&start_date=${startDateStr}&end_date=${endDateStr}&page=${currentPage}&limit=10`,
+        `${process.env.NEXT_PUBLIC_API_ENDPOINT}admin/conversation_sessions?user_role=${encodeURIComponent(userRole)}&start_date=${startDateStr}&end_date=${endDateStr}&page=${currentPage}&limit=1`,
         {
           method: "GET",
           headers: {
@@ -312,9 +318,9 @@ export default function History() {
               onSessionClick={handleSessionClick}
               startDate={startDate}
               endDate={endDate}
-              currentPage={publicPage} // Pass the page state for each tab
-              setCurrentPage={setPublicPage} // Pass the set page function for each tab
-              totalPages={publicTotalPages} // Pass the totalPages for each tab
+              currentPage={publicPage}
+              setCurrentPage={setPublicPage} 
+              totalPages={publicTotalPages}
             />
           </TabsContent>
         ))}
