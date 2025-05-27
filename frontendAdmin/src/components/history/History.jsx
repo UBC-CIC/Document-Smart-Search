@@ -90,10 +90,10 @@ const RoleView = ({ role, sessions, onSessionClick, startDate, endDate, currentP
         {/* MUI Pagination controls */}
         <div className="flex justify-center mt-4">
           <Pagination
-            count={totalPages}
-            page={currentPage}  
+            count={totalPages} 
+            page={currentPage}
             onChange={(event, value) => setCurrentPage(value)}
-            siblingCount={1} 
+            siblingCount={1}
             boundaryCount={1}
             color="primary"
             sx={{
@@ -102,10 +102,14 @@ const RoleView = ({ role, sessions, onSessionClick, startDate, endDate, currentP
               },
               "& .Mui-selected": {
                 backgroundColor: "#0f172a", 
-                color: "#ffffff",  
+                color: "#ffffff",
               },
+              "& .MuiPaginationItem-previousNext": {
+                color: "#0f172a",
+              }
             }}
           />
+
         </div>
       </CollapsibleContent>
     </Collapsible>
@@ -143,7 +147,7 @@ export default function History() {
       const endDateStr = endDate ? endDate.toISOString() : "";
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_ENDPOINT}admin/conversation_sessions?user_role=${encodeURIComponent(userRole)}&start_date=${startDateStr}&end_date=${endDateStr}&page=${currentPage}&limit=1`,
+        `${process.env.NEXT_PUBLIC_API_ENDPOINT}admin/conversation_sessions?user_role=${encodeURIComponent(userRole)}&start_date=${startDateStr}&end_date=${endDateStr}&page=${currentPage}&limit=5`,
         {
           method: "GET",
           headers: {
@@ -161,7 +165,7 @@ export default function History() {
       if (Array.isArray(data.sessions)) {
         data.sessions.sort((a, b) => new Date(b.last_message_time) - new Date(a.last_message_time));
         setSession(data.sessions);
-        setTotalPages(data.totalPages);
+        setTotalPages(data.totalPages); // Set the total pages for each role tab
       } else {
         console.error("API response does not contain an array of sessions:", data);
         setSession([]);
@@ -318,9 +322,9 @@ export default function History() {
               onSessionClick={handleSessionClick}
               startDate={startDate}
               endDate={endDate}
-              currentPage={publicPage}
-              setCurrentPage={setPublicPage} 
-              totalPages={publicTotalPages}
+              currentPage={role.key === "public" ? publicPage : role.key === "internal_researcher" ? internalResearcherPage : role.key === "external_researcher" ? externalResearcherPage : policyMakerPage}
+              setCurrentPage={role.key === "public" ? setPublicPage : role.key === "internal_researcher" ? setInternalResearcherPage : role.key === "external_researcher" ? setExternalResearcherPage : setPolicyMakerPage}
+              totalPages={role.key === "public" ? publicTotalPages : role.key === "internal_researcher" ? internalResearcherTotalPages : role.key === "external_researcher" ? externalResearcherTotalPages : policyMakerTotalPages}
             />
           </TabsContent>
         ))}
