@@ -476,19 +476,19 @@ exports.handler = async (event) => {
           response.body = JSON.stringify({ error: "Internal server error" })
         }
         break
-      case "GET /admin/conversation_sessions":
+        case "GET /admin/conversation_sessions":
           if (event.queryStringParameters && event.queryStringParameters.user_role) {
-            const userRole = event.queryStringParameters.user_role
-            const startDate = event.queryStringParameters.start_date || null
-            const endDate = event.queryStringParameters.end_date || null
-            const page = parseInt(event.queryStringParameters.page) || 1
-            const limit = parseInt(event.queryStringParameters.limit) || 10
-            const offset = (page - 1) * limit
+            const userRole = event.queryStringParameters.user_role;
+            const startDate = event.queryStringParameters.start_date || null;
+            const endDate = event.queryStringParameters.end_date || null;
+            const page = parseInt(event.queryStringParameters.page) || 1;
+            const limit = parseInt(event.queryStringParameters.limit) || 10;
+            const offset = (page - 1) * limit;
         
             console.log(`Fetching sessions for user_role=${userRole}, start_date=${startDate}, end_date=${endDate}, page=${page}, limit=${limit}`);
         
             try {
-              // Correctly use the tagged template literal `sql` for the query
+              // Fetch the paginated sessions with LIMIT and OFFSET
               const sessions = await sqlConnectionTableCreator`
                 WITH ranked_messages AS (
                   SELECT 
@@ -527,9 +527,9 @@ exports.handler = async (event) => {
                 LEFT JOIN second_messages sm ON lm.session_id = sm.session_id
                 ORDER BY lm.last_message_time DESC
                 LIMIT ${limit} OFFSET ${offset};
-              `
+              `;
         
-              // Count the total number of sessions that match the filters (for pagination)
+              // Separate query to count the total number of matching sessions (without fetching the data)
               const totalCount = await sqlConnectionTableCreator`
                 WITH ranked_messages AS (
                   SELECT 
@@ -544,32 +544,33 @@ exports.handler = async (event) => {
                 )
                 SELECT COUNT(DISTINCT session_id) AS total_count
                 FROM ranked_messages;
-              `
+              `;
         
-              const totalPages = Math.ceil(totalCount[0].total_count / limit)
+              // Calculate total pages based on totalCount
+              const totalPages = Math.ceil(totalCount[0].total_count / limit);
         
               console.log(`Found ${totalCount[0].total_count} total sessions, with ${totalPages} pages.`);
-              
+        
               response.body = JSON.stringify({
                 sessions,
                 totalPages,
                 currentPage: page,
-                totalCount: totalCount[0].total_count
-              })
-              response.statusCode = 200 // OK
+                totalCount: totalCount[0].total_count,
+              });
+              response.statusCode = 200; // OK
             } catch (err) {
-              console.error("Error fetching sessions:", err)
-              response.statusCode = 500 // Internal Server Error
-              response.body = JSON.stringify({ error: "Internal server error" })
+              console.error("Error fetching sessions:", err);
+              response.statusCode = 500; // Internal Server Error
+              response.body = JSON.stringify({ error: "Internal server error" });
             }
           } else {
             console.error("Missing required parameter: user_role");
-            response.statusCode = 400 // Bad Request
+            response.statusCode = 400; // Bad Request
             response.body = JSON.stringify({
               error: "Missing required parameter: user_role",
-            })
+            });
           }
-          break
+          break;
       case "GET /admin/previous_prompts":
         try {
           // Subquery to get the latest non-null time_created for each role
