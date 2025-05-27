@@ -1,4 +1,6 @@
 const { initializeConnection } = require("./libadmin.js")
+const postgres = require('postgres');
+const sql = postgres();
 
 const { SM_DB_CREDENTIALS, RDS_PROXY_ENDPOINT } = process.env
 
@@ -475,136 +477,99 @@ exports.handler = async (event) => {
         }
         break
       case "GET /admin/conversation_sessions":
-        if (event.queryStringParameters && event.queryStringParameters.user_role) {
-          const userRole = event.queryStringParameters.user_role
-
-          try {
-            const sessions = await sqlConnectionTableCreator`
-       WITH ranked_messages AS (
-          SELECT 
-            session_id,
-            engagement_details,
-            timestamp,
-            ROW_NUMBER() OVER (PARTITION BY session_id ORDER BY timestamp) as msg_order,
-            ROW_NUMBER() OVER (PARTITION BY session_id ORDER BY timestamp DESC) as reverse_order
-          FROM user_engagement_log
-          WHERE 
-            session_id IS NOT NULL
-            AND engagement_type = 'message creation'
-            AND user_role = ${userRole}
-        ),
-        second_messages AS (
-          SELECT 
-            session_id,
-            engagement_details as second_message_details
-          FROM ranked_messages
-          WHERE msg_order = 2
-        ),
-        latest_messages AS (
-          SELECT 
-            session_id,
-            timestamp as last_message_time
-          FROM ranked_messages
-          WHERE reverse_order = 1
-        )
-        SELECT 
-          lm.session_id,
-          lm.last_message_time,
-          sm.second_message_details
-        FROM latest_messages lm
-        LEFT JOIN second_messages sm ON lm.session_id = sm.session_id
-        ORDER BY lm.last_message_time DESC;
-      `
-
-            response.body = JSON.stringify(sessions)
-            response.statusCode = 200 // OK
-          } catch (err) {
-            response.statusCode = 500 // Internal Server Error
-            console.error(err)
-            response.body = JSON.stringify({ error: "Internal server error" })
+          if (event.queryStringParameters && event.queryStringParameters.user_role) {
+            const userRole = event.queryStringParameters.user_role
+            const startDate = event.queryStringParameters.start_date || null
+            const endDate = event.queryStringParameters.end_date || null
+            const page = parseInt(event.queryStringParameters.page) || 1
+            const limit = parseInt(event.queryStringParameters.limit) || 10
+            const offset = (page - 1) * limit
+        
+            console.log(`Fetching sessions for user_role=${userRole}, start_date=${startDate}, end_date=${endDate}, page=${page}, limit=${limit}`);
+        
+            try {
+              // Correctly use the tagged template literal `sql` for the query
+              const sessions = await sqlConnectionTableCreator`
+                WITH ranked_messages AS (
+                  SELECT 
+                    session_id,
+                    engagement_details,
+                    timestamp,
+                    ROW_NUMBER() OVER (PARTITION BY session_id ORDER BY timestamp) as msg_order,
+                    ROW_NUMBER() OVER (PARTITION BY session_id ORDER BY timestamp DESC) as reverse_order
+                  FROM user_engagement_log
+                  WHERE 
+                    session_id IS NOT NULL
+                    AND engagement_type = 'message creation'
+                    AND user_role = ${userRole}
+                    ${startDate ? sql`AND timestamp >= ${startDate}` : sql``}
+                    ${endDate ? sql`AND timestamp <= ${endDate}` : sql``}
+                ),
+                second_messages AS (
+                  SELECT 
+                    session_id,
+                    engagement_details as second_message_details
+                  FROM ranked_messages
+                  WHERE msg_order = 2
+                ),
+                latest_messages AS (
+                  SELECT 
+                    session_id,
+                    timestamp as last_message_time
+                  FROM ranked_messages
+                  WHERE reverse_order = 1
+                )
+                SELECT 
+                  lm.session_id,
+                  lm.last_message_time,
+                  sm.second_message_details
+                FROM latest_messages lm
+                LEFT JOIN second_messages sm ON lm.session_id = sm.session_id
+                ORDER BY lm.last_message_time DESC
+                LIMIT ${limit} OFFSET ${offset};
+              `
+        
+              // Count the total number of sessions that match the filters (for pagination)
+              const totalCount = await sqlConnectionTableCreator`
+                WITH ranked_messages AS (
+                  SELECT 
+                    session_id
+                  FROM user_engagement_log
+                  WHERE 
+                    session_id IS NOT NULL
+                    AND engagement_type = 'message creation'
+                    AND user_role = ${userRole}
+                    ${startDate ? sql`AND timestamp >= ${startDate}` : sql``}
+                    ${endDate ? sql`AND timestamp <= ${endDate}` : sql``}
+                )
+                SELECT COUNT(DISTINCT session_id) AS total_count
+                FROM ranked_messages;
+              `
+        
+              const totalPages = Math.ceil(totalCount[0].total_count / limit)
+        
+              console.log(`Found ${totalCount[0].total_count} total sessions, with ${totalPages} pages.`);
+              
+              response.body = JSON.stringify({
+                sessions,
+                totalPages,
+                currentPage: page,
+                totalCount: totalCount[0].total_count
+              })
+              response.statusCode = 200 // OK
+            } catch (err) {
+              console.error("Error fetching sessions:", err)
+              response.statusCode = 500 // Internal Server Error
+              response.body = JSON.stringify({ error: "Internal server error" })
+            }
+          } else {
+            console.error("Missing required parameter: user_role");
+            response.statusCode = 400 // Bad Request
+            response.body = JSON.stringify({
+              error: "Missing required parameter: user_role",
+            })
           }
-        } else {
-          response.statusCode = 400 // Bad Request
-          response.body = JSON.stringify({
-            error: "Missing required parameter: user_role",
-          })
-        }
-        break
-      case "GET /admin/latest_prompt":
-        try {
-          console.log("Fetching latest prompts...");
-          
-          // Queries to get the most recent non-null entries for each role
-          const latestPublicPrompt = await sqlConnectionTableCreator`
-      SELECT public, time_created
-      FROM prompts
-      WHERE public IS NOT NULL
-      ORDER BY time_created DESC NULLS LAST
-      LIMIT 1;
-    `
-          console.log("Latest public prompt:", latestPublicPrompt);
-
-          const latestInternalResearcherPrompt = await sqlConnectionTableCreator`
-      SELECT internal_researcher, time_created
-      FROM prompts
-      WHERE internal_researcher IS NOT NULL
-      ORDER BY time_created DESC NULLS LAST
-      LIMIT 1;
-    `
-          console.log("Latest internal researcher prompt:", latestInternalResearcherPrompt);
-
-          const latestPolicyMakerPrompt = await sqlConnectionTableCreator`
-      SELECT policy_maker, time_created
-      FROM prompts
-      WHERE policy_maker IS NOT NULL
-      ORDER BY time_created DESC NULLS LAST
-      LIMIT 1;
-    `
-          console.log("Latest policy maker prompt:", latestPolicyMakerPrompt);
-
-          const latestExternalResearcherPrompt = await sqlConnectionTableCreator`
-      SELECT external_researcher, time_created
-      FROM prompts
-      WHERE external_researcher IS NOT NULL
-      ORDER BY time_created DESC NULLS LAST
-      LIMIT 1;
-    `
-          console.log("Latest external researcher prompt:", latestExternalResearcherPrompt);
-
-          // Building the response object with non-null values for each role
-          const latestPrompt = {
-            public: latestPublicPrompt.length > 0 ? {
-              prompt: latestPublicPrompt[0].public,
-              time_created: latestPublicPrompt[0].time_created
-            } : null,
-            internal_researcher: latestInternalResearcherPrompt.length > 0 ? {
-              prompt: latestInternalResearcherPrompt[0].internal_researcher,
-              time_created: latestInternalResearcherPrompt[0].time_created
-            } : null,
-            policy_maker: latestPolicyMakerPrompt.length > 0 ? {
-              prompt: latestPolicyMakerPrompt[0].policy_maker,
-              time_created: latestPolicyMakerPrompt[0].time_created
-            } : null,
-            external_researcher: latestExternalResearcherPrompt.length > 0 ? {
-              prompt: latestExternalResearcherPrompt[0].external_researcher,
-              time_created: latestExternalResearcherPrompt[0].time_created
-            } : null
-          };
-
-          console.log("Final response object:", latestPrompt);
-
-          response.statusCode = 200;
-          response.body = JSON.stringify(latestPrompt);
-        } catch (err) {
-          // Handle any errors that occur during the query
-          response.statusCode = 500;
-          console.error("Error in GET /admin/latest_prompt:", err);
-          response.body = JSON.stringify({ 
-            error: "Internal server error",
-            details: err.message 
-          });
-        }
-        break
+          break
       case "GET /admin/previous_prompts":
         try {
           // Subquery to get the latest non-null time_created for each role
