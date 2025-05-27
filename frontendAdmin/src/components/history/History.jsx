@@ -1,50 +1,48 @@
-"use client"
-
-import { useState, useEffect } from "react"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { Button } from "@/components/ui/button"
-import { ChevronDown, ChevronUp, Users, BookOpen, GraduationCap, Landmark } from "lucide-react"
-import LoadingScreen from "../Loading/LoadingScreen"
-import { fetchAuthSession } from "aws-amplify/auth"
-import Session from "./Session"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { useState, useEffect } from "react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Button } from "@/components/ui/button";
+import { ChevronDown, ChevronUp, Users, BookOpen, GraduationCap, Landmark } from "lucide-react";
+import LoadingScreen from "../Loading/LoadingScreen";
+import { fetchAuthSession } from "aws-amplify/auth";
+import Session from "./Session";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 const RoleView = ({ role, sessions, onSessionClick, startDate, endDate, currentPage, setCurrentPage, totalPages }) => {
-  const [isOpen, setIsOpen] = useState(true)
+  const [isOpen, setIsOpen] = useState(true);
 
   const getRoleIcon = (role) => {
     switch (role) {
       case "public":
-        return <Users className="mr-2" />
+        return <Users className="mr-2" />;
       case "internal_researcher":
-        return <BookOpen className="mr-2" />
+        return <BookOpen className="mr-2" />;
       case "external_researcher":
-        return <GraduationCap className="mr-2" />
+        return <GraduationCap className="mr-2" />;
       case "policy_maker":
-        return <Landmark className="mr-2" />
+        return <Landmark className="mr-2" />;
       default:
-        return null
+        return null;
     }
-  }
+  };
 
   const getRoleLabel = (role) => {
     switch (role) {
       case "public":
-        return "General Public"
+        return "General Public";
       case "internal_researcher":
-        return "Internal Researcher"
+        return "Internal Researcher";
       case "external_researcher":
-        return "External Researcher"
+        return "External Researcher";
       case "policy_maker":
-        return "Policy Maker"
+        return "Policy Maker";
       default:
-        return role
+        return role;
     }
-  }
+  };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleString()
-  }
+    return new Date(dateString).toLocaleString();
+  };
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen} className="w-full">
@@ -90,13 +88,12 @@ const RoleView = ({ role, sessions, onSessionClick, startDate, endDate, currentP
         ))}
         {/* Pagination controls */}
         <div className="flex justify-between mt-4">
-          <Button
-            onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-            disabled={currentPage === 1}
-          >
+          <Button onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))} disabled={currentPage === 1}>
             Previous
           </Button>
-          <span>Page {currentPage} of {totalPages}</span>
+          <span>
+            Page {currentPage} of {totalPages}
+          </span>
           <Button
             onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
             disabled={currentPage === totalPages}
@@ -106,96 +103,103 @@ const RoleView = ({ role, sessions, onSessionClick, startDate, endDate, currentP
         </div>
       </CollapsibleContent>
     </Collapsible>
-  )
-}
+  );
+};
 
 export default function History() {
-  const [publicSessions, setPublicSessions] = useState([])
-  const [internalResearcherSessions, setInternalResearcherSessions] = useState([])
-  const [externalResearcherSessions, setExternalResearcherSessions] = useState([])
-  const [policyMakerSessions, setPolicyMakerSessions] = useState([])
-  const [selectedSession, setSelectedSession] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [downloadLoading, setDownloadLoading] = useState(false)
-  const [startDate, setStartDate] = useState(null)
-  const [endDate, setEndDate] = useState(null)
-  const [currentPage, setCurrentPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
+  const [publicSessions, setPublicSessions] = useState([]);
+  const [internalResearcherSessions, setInternalResearcherSessions] = useState([]);
+  const [externalResearcherSessions, setExternalResearcherSessions] = useState([]);
+  const [policyMakerSessions, setPolicyMakerSessions] = useState([]);
+  const [selectedSession, setSelectedSession] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [downloadLoading, setDownloadLoading] = useState(false);
+  const [startDate, setStartDate] = useState(null);
+  const [endDate, setEndDate] = useState(null);
 
-const fetchSessions = async (userRole, setSession) => {
-  try {
-    const session = await fetchAuthSession();
-    const token = session.tokens.idToken;
+  // Separate state for pagination for each role/tab
+  const [publicPage, setPublicPage] = useState(1);
+  const [internalResearcherPage, setInternalResearcherPage] = useState(1);
+  const [externalResearcherPage, setExternalResearcherPage] = useState(1);
+  const [policyMakerPage, setPolicyMakerPage] = useState(1);
 
-    const startDateStr = startDate ? startDate.toISOString() : '';
-    const endDateStr = endDate ? endDate.toISOString() : '';
+  const [publicTotalPages, setPublicTotalPages] = useState(1);
+  const [internalResearcherTotalPages, setInternalResearcherTotalPages] = useState(1);
+  const [externalResearcherTotalPages, setExternalResearcherTotalPages] = useState(1);
+  const [policyMakerTotalPages, setPolicyMakerTotalPages] = useState(1);
 
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_ENDPOINT}admin/conversation_sessions?user_role=${encodeURIComponent(userRole)}&start_date=${startDateStr}&end_date=${endDateStr}&page=${currentPage}&limit=10`,
-      {
-        method: "GET",
-        headers: {
-          Authorization: token,
-          "Content-Type": "application/json",
-        },
+  const fetchSessions = async (userRole, setSession, currentPage, setTotalPages) => {
+    try {
+      const session = await fetchAuthSession();
+      const token = session.tokens.idToken;
+
+      const startDateStr = startDate ? startDate.toISOString() : "";
+      const endDateStr = endDate ? endDate.toISOString() : "";
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_ENDPOINT}admin/conversation_sessions?user_role=${encodeURIComponent(userRole)}&start_date=${startDateStr}&end_date=${endDateStr}&page=${currentPage}&limit=10`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: token,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-    );
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      if (Array.isArray(data.sessions)) {
+        data.sessions.sort((a, b) => new Date(b.last_message_time) - new Date(a.last_message_time));
+        setSession(data.sessions);
+        setTotalPages(data.totalPages);
+      } else {
+        console.error("API response does not contain an array of sessions:", data);
+        setSession([]);
+      }
+    } catch (error) {
+      console.error(`Error fetching ${userRole} sessions:`, error);
+      setSession([]);
+    } finally {
+      setLoading(false);
     }
-
-    const data = await response.json();
-
-    // Ensure the sessions are in an array format
-    if (Array.isArray(data.sessions)) {
-      data.sessions.sort((a, b) => new Date(b.last_message_time) - new Date(a.last_message_time));
-      setSession(data.sessions);  // Update the state with the sorted sessions
-      setTotalPages(data.totalPages);  // Set totalPages from the API response
-    } else {
-      console.error('API response does not contain an array of sessions:', data);
-      setSession([]);  // Default to an empty array if data.sessions is not an array
-    }
-  } catch (error) {
-    console.error(`Error fetching ${userRole} sessions:`, error);
-    setSession([]);  // Set to empty if there's an error
-  } finally {
-    setLoading(false);  // Set loading to false once the data is fetched
-  }
-};
+  };
 
   useEffect(() => {
     const loadSessions = async () => {
       try {
-        setLoading(true)
+        setLoading(true);
         await Promise.all([
-          fetchSessions("public", setPublicSessions),
-          fetchSessions("internal_researcher", setInternalResearcherSessions),
-          fetchSessions("external_researcher", setExternalResearcherSessions),
-          fetchSessions("policy_maker", setPolicyMakerSessions),
-        ])
+          fetchSessions("public", setPublicSessions, publicPage, setPublicTotalPages),
+          fetchSessions("internal_researcher", setInternalResearcherSessions, internalResearcherPage, setInternalResearcherTotalPages),
+          fetchSessions("external_researcher", setExternalResearcherSessions, externalResearcherPage, setExternalResearcherTotalPages),
+          fetchSessions("policy_maker", setPolicyMakerSessions, policyMakerPage, setPolicyMakerTotalPages),
+        ]);
       } catch (error) {
-        console.error("Error loading sessions:", error)
+        console.error("Error loading sessions:", error);
       }
-    }
+    };
 
-    loadSessions()
-  }, [startDate, endDate, currentPage])
+    loadSessions();
+  }, [startDate, endDate, publicPage, internalResearcherPage, externalResearcherPage, policyMakerPage]);
 
   const handleDownloadAllData = async () => {
-    setDownloadLoading(true)
+    setDownloadLoading(true);
     const allSessions = [
       ...publicSessions,
       ...internalResearcherSessions,
       ...externalResearcherSessions,
-      ...policyMakerSessions
-    ]
-    const csvData = []
+      ...policyMakerSessions,
+    ];
+    const csvData = [];
 
     for (const session of allSessions) {
       try {
-        const authSession = await fetchAuthSession()
-        const token = authSession.tokens.idToken
+        const authSession = await fetchAuthSession();
+        const token = authSession.tokens.idToken;
 
         const messagesResponse = await fetch(
           `${process.env.NEXT_PUBLIC_API_ENDPOINT}admin/conversation_messages?session_id=${encodeURIComponent(session.session_id)}`,
@@ -206,14 +210,14 @@ const fetchSessions = async (userRole, setSession) => {
               "Content-Type": "application/json",
             },
           }
-        )
+        );
 
         if (!messagesResponse.ok) {
-          throw new Error(`HTTP error! status: ${messagesResponse.status}`)
+          throw new Error(`HTTP error! status: ${messagesResponse.status}`);
         }
 
-        const messagesData = await messagesResponse.json()
-        const messages = messagesData.messages
+        const messagesData = await messagesResponse.json();
+        const messages = messagesData.messages;
 
         messages.forEach((message) => {
           csvData.push({
@@ -223,34 +227,34 @@ const fetchSessions = async (userRole, setSession) => {
             MessageContent: message.Content,
             MessageOptions: JSON.stringify(message.Options),
             Timestamp: message.Timestamp,
-          })
-        })
+          });
+        });
       } catch (error) {
-        console.error("Error fetching session data:", error)
+        console.error("Error fetching session data:", error);
       }
     }
 
     const csvString =
-      Object.keys(csvData[0]).join(",") + "\n" + csvData.map((row) => Object.values(row).join(",")).join("\n")
+      Object.keys(csvData[0]).join(",") + "\n" + csvData.map((row) => Object.values(row).join(",")).join("\n");
 
-    const link = document.createElement("a")
-    link.href = URL.createObjectURL(new Blob([csvString], { type: "text/csv" }))
-    link.download = "conversation_data.csv"
-    link.click()
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob([csvString], { type: "text/csv" }));
+    link.download = "conversation_data.csv";
+    link.click();
 
-    setDownloadLoading(false)
-  }
+    setDownloadLoading(false);
+  };
 
   const handleSessionClick = (role, session) => {
-    setSelectedSession({ role, ...session })
-  }
+    setSelectedSession({ role, ...session });
+  };
 
   if (selectedSession) {
-    return <Session session={selectedSession} onBack={() => setSelectedSession(null)} from={"History"} />
+    return <Session session={selectedSession} onBack={() => setSelectedSession(null)} from={"History"} />;
   }
 
   if (loading) {
-    return <LoadingScreen />
+    return <LoadingScreen />;
   }
 
   const roles = [
@@ -258,7 +262,7 @@ const fetchSessions = async (userRole, setSession) => {
     { key: "internal_researcher", label: "Internal Researcher", sessions: internalResearcherSessions, icon: <BookOpen className="mr-1 h-4 w-4" /> },
     { key: "external_researcher", label: "External Researcher", sessions: externalResearcherSessions, icon: <GraduationCap className="mr-1 h-4 w-4" /> },
     { key: "policy_maker", label: "Policy Maker", sessions: policyMakerSessions, icon: <Landmark className="mr-1 h-4 w-4" /> },
-  ]
+  ];
 
   return (
     <div className="w-full mx-auto p-4 mb-8">
@@ -288,7 +292,7 @@ const fetchSessions = async (userRole, setSession) => {
                 onChange={(e) => setEndDate(new Date(e.target.value))}
                 className="p-2 border rounded"
               />
-              <Button onClick={() => setCurrentPage(1)}>Apply Date Range</Button>
+              <Button onClick={() => setPublicPage(1)}>Apply Date Range</Button>
             </div>
             <Button
               onClick={handleDownloadAllData}
@@ -308,13 +312,13 @@ const fetchSessions = async (userRole, setSession) => {
               onSessionClick={handleSessionClick}
               startDate={startDate}
               endDate={endDate}
-              currentPage={currentPage}
-              setCurrentPage={setCurrentPage}
-              totalPages={totalPages}
+              currentPage={publicPage} // Pass the page state for each tab
+              setCurrentPage={setPublicPage} // Pass the set page function for each tab
+              totalPages={publicTotalPages} // Pass the totalPages for each tab
             />
           </TabsContent>
         ))}
       </Tabs>
     </div>
-  )
+  );
 }
