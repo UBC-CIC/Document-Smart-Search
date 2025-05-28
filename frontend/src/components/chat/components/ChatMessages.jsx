@@ -215,14 +215,14 @@ const ChatMessages = ({
 
                 {/* Render options if available AND no role has been selected yet */}
                 {message.options && message.options.length > 0 && (!hasSelectedRole || message.id !== "initial") && (
-                  <div className="mt-2 space-y-2">
+                  <div className="mt-3 flex flex-col gap-2 items-start">
                     {message.options.map((option, optIndex) => (
                       <button
                         key={`${message.id}-option-${optIndex}`}
                         onClick={() => sendMessage && sendMessage(option, true)}
-                        className="inline-block bg-blue-100 hover:bg-blue-200 rounded-xl py-1.5 px-3 text-blue-800 text-sm mr-2 mb-2"
+                        className="inline-flex text-left bg-blue-100 hover:bg-blue-200 rounded-xl py-2 px-3.5 text-blue-800 text-sm transition-colors items-center"
                       >
-                        {option}
+                        <span className="whitespace-normal break-words">{option}</span>
                       </button>
                     ))}
                   </div>
