@@ -20,96 +20,44 @@ import { Button } from "@/components/ui/button";
 import LoadingScreen from "../Loading/LoadingScreen";
 import { fetchAuthSession } from "aws-amplify/auth";
 import Session from "../history/Session";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import Pagination from "@mui/material/Pagination";
 
-const EmptyFeedbackView = ({ role }) => {
-  const getRoleIcon = (role) => {
-    switch (role) {
-      case "public":
-        return <Users className="mr-2" />;
-      case "internal_researcher":
-        return <BookOpen className="mr-2" />;
-      case "external_researcher":
-        return <GraduationCap className="mr-2" />;
-      case "policy_maker":
-        return <Landmark className="mr-2" />;
-      case "admin":
-        return <ShieldCheck className="mr-2" />;
-      default:
-        return null;
-    }
-  };
+const getRoleIcon = (role) => {
+  switch (role) {
+    case "public":
+      return <Users className="mr-1 h-4 w-4" />;
+    case "internal_researcher":
+      return <BookOpen className="mr-1 h-4 w-4" />;
+    case "external_researcher":
+      return <GraduationCap className="mr-1 h-4 w-4" />;
+    case "policy_maker":
+      return <Landmark className="mr-1 h-4 w-4" />;
+    default:
+      return null;
+  }
+};
 
-  const getRoleLabel = (role) => {
-    switch (role) {
-      case "public":
-        return "General Public";
-      case "internal_researcher":
-        return "Internal Researcher";
-      case "external_researcher":
-        return "External Researcher";
-      case "policy_maker":
-        return "Policy Maker";
-      case "admin":
-        return "Admin";
-      default:
-        return role;
-    }
-  };
-
-  return (
-    <div className="w-full">
-      <div className="flex items-center space-x-4 px-4 py-3 bg-gray-50 rounded-t-lg">
-        <div className="flex items-center">
-          {getRoleIcon(role)}
-          <h2 className="text-lg font-semibold capitalize">
-            {getRoleLabel(role)} Feedback
-          </h2>
-          <span className="ml-2 text-gray-500">(Avg Rating: 0, Total: 0)</span>
-        </div>
-      </div>
-      <div className="p-8 text-center border-b border-x rounded-b-lg bg-white">
-        <p className="text-gray-500">No feedback available for this role yet</p>
-      </div>
-    </div>
-  );
+const getRoleLabel = (role) => {
+  switch (role) {
+    case "public":
+      return "General Public";
+    case "internal_researcher":
+      return "Internal Researcher";
+    case "external_researcher":
+      return "External Researcher";
+    case "policy_maker":
+      return "Policy Maker";
+    default:
+      return role;
+  }
 };
 
 const FeedbackView = ({ role, feedbackData, onFeedbackClick }) => {
   const [isOpen, setIsOpen] = useState(true);
 
-  const getRoleIcon = (role) => {
-    switch (role) {
-      case "public":
-        return <Users className="mr-2" />;
-      case "internal_researcher":
-        return <BookOpen className="mr-2" />;
-      case "external_researcher":
-        return <GraduationCap className="mr-2" />;
-      case "policy_maker":
-        return <Landmark className="mr-2" />;
-      default:
-        return null;
-    }
-  };
-
-  const getRoleLabel = (role) => {
-    switch (role) {
-      case "public":
-        return "General Public";
-      case "internal_researcher":
-        return "Internal Researcher";
-      case "external_researcher":
-        return "External Researcher";
-      case "policy_maker":
-        return "Policy Maker";
-      default:
-        return role;
-    }
-  };
-
   const formatDate = (dateString) => {
     const utcDate = new Date(dateString + "Z");
-
     return utcDate.toLocaleString(undefined, {
       month: "2-digit",
       day: "2-digit",
@@ -121,11 +69,23 @@ const FeedbackView = ({ role, feedbackData, onFeedbackClick }) => {
     });
   };
 
-  if (
-    !feedbackData.feedback_details ||
-    feedbackData.feedback_details.length === 0
-  ) {
-    return <EmptyFeedbackView role={role} />;
+  if (!feedbackData || !Array.isArray(feedbackData.feedback_details) || feedbackData.feedback_details.length === 0) {
+    return (
+      <div className="w-full">
+        <div className="flex items-center space-x-4 px-4 py-3 bg-gray-50 rounded-t-lg">
+          <div className="flex items-center">
+            {getRoleIcon(role)}
+            <h2 className="text-lg font-semibold capitalize">
+              {getRoleLabel(role)} Feedback
+            </h2>
+            <span className="ml-2 text-gray-500">(Avg Rating: 0, Total: 0)</span>
+          </div>
+        </div>
+        <div className="p-8 text-center border-b border-x rounded-b-lg bg-white">
+          <p className="text-gray-500">No feedback available for this role yet</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -138,17 +98,11 @@ const FeedbackView = ({ role, feedbackData, onFeedbackClick }) => {
               {getRoleLabel(role)} Feedback
             </h2>
             <span className="ml-2 text-gray-500">
-              (Avg Rating: {Number(feedbackData.average_rating).toFixed(1)},
-              Total: {feedbackData.feedback_count})
+              (Avg Rating: {Number(feedbackData.average_rating).toFixed(1)}, Total: {feedbackData.feedback_count})
             </span>
           </div>
           <Button variant="ghost" size="sm" className="w-9 p-0">
-            {isOpen ? (
-              <ChevronUp className="h-4 w-4" />
-            ) : (
-              <ChevronDown className="h-4 w-4" />
-            )}
-            <span className="sr-only">Toggle</span>
+            {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </Button>
         </div>
       </CollapsibleTrigger>
@@ -164,9 +118,7 @@ const FeedbackView = ({ role, feedbackData, onFeedbackClick }) => {
               <div className="flex flex-col space-y-3">
                 <div className="flex items-center space-x-2">
                   <span className="text-gray-500">Session ID:</span>
-                  <code className="bg-gray-50 px-2 py-1 rounded text-sm">
-                    {feedback.session_id}
-                  </code>
+                  <code className="bg-gray-50 px-2 py-1 rounded text-sm">{feedback.session_id}</code>
                   <div
                     className={`ml-2 px-2 py-1 rounded text-xs font-semibold ${
                       feedback.feedback_rating >= 4
@@ -181,18 +133,11 @@ const FeedbackView = ({ role, feedbackData, onFeedbackClick }) => {
                 </div>
                 <div className="flex items-center space-x-2">
                   <span className="text-gray-500">Feedback:</span>
-                  <span className="text-sm">
-                    {feedback.feedback_description &&
-                    feedback.feedback_description !== "null"
-                      ? feedback.feedback_description
-                      : "None"}
-                  </span>
+                  <span className="text-sm">{feedback.feedback_description || "None"}</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <span className="text-gray-500">Submitted:</span>
-                  <span className="text-sm">
-                    {formatDate(feedback.feedback_time)}
-                  </span>
+                  <span className="text-sm">{formatDate(feedback.feedback_time)}</span>
                 </div>
               </div>
             </div>
@@ -204,119 +149,68 @@ const FeedbackView = ({ role, feedbackData, onFeedbackClick }) => {
 };
 
 const Feedback = () => {
-  const [feedbackData, setFeedbackData] = useState([]);
+  const [feedbackDataByRole, setFeedbackDataByRole] = useState({});
+  const [paginationState, setPaginationState] = useState({
+    public: 1,
+    internal_researcher: 1,
+    external_researcher: 1,
+    policy_maker: 1,
+  });
+  const [totalPagesByRole, setTotalPagesByRole] = useState({});
   const [loading, setLoading] = useState(true);
   const [selectedSession, setSelectedSession] = useState(null);
+  const roles = ["public", "internal_researcher", "external_researcher", "policy_maker"];
 
-  // Define role order explicitly
-  const ROLE_ORDER = [
-    "public",
-    "internal_researcher",
-    "external_researcher",
-    "policy_maker",
-  ];
+  const fetchFeedbackData = async (role) => {
+    try {
+      const session = await fetchAuthSession();
+      const token = session.tokens.idToken;
+      const page = paginationState[role];
 
-  function sortFeedbackByTimestamp(data) {
-    // First, sort the data by the predefined role order
-    const sortedByRole = data.sort((a, b) =>
-      ROLE_ORDER.indexOf(a.user_role) - ROLE_ORDER.indexOf(b.user_role)
-    );
-
-    return sortedByRole.map((roleData) => {
-      const sortedData = { ...roleData };
-      if (
-        sortedData.feedback_details &&
-        Array.isArray(sortedData.feedback_details)
-      ) {
-        // Sort feedback details by timestamp (most recent first)
-        sortedData.feedback_details = sortedData.feedback_details.sort(
-          (a, b) => new Date(b.feedback_time) - new Date(a.feedback_time)
-        );
-      }
-      return sortedData;
-    });
-  }
-
-  // // Function to ensure all roles are represented in the data
-  // function ensureAllRolesArePresent(data) {
-  //   const result = [...data];
-
-  //   // Check if each role exists in the data
-  //   ROLE_ORDER.forEach((role) => {
-  //     const roleExists = result.some((item) => item.user_role === role);
-
-  //     // If the role doesn't exist, add an empty entry for it
-  //     if (!roleExists) {
-  //       result.push({
-  //         user_role: role,
-  //         feedback_count: 0,
-  //         average_rating: 0,
-  //         feedback_details: [],
-  //       });
-  //     }
-  //   });
-
-  //   // Sort again to maintain proper order
-  //   return result.sort((a, b) =>
-  //     ROLE_ORDER.indexOf(a.user_role) - ROLE_ORDER.indexOf(b.user_role)
-  //   );
-  // }
-
-  useEffect(() => {
-    const fetchFeedbackData = async () => {
-      try {
-        const session = await fetchAuthSession();
-        const token = session.tokens.idToken;
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_ENDPOINT}admin/feedback_by_role`,
-          {
-            method: "GET",
-            headers: {
-              Authorization: token,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_ENDPOINT}admin/feedback_by_role?user_role=${encodeURIComponent(role)}&page=${page}&limit=10`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: token,
+            "Content-Type": "application/json",
+          },
         }
-
-        const data = await response.json();
-        const sortedData = sortFeedbackByTimestamp(data);
-        // // Apply the function to ensure all roles are present
-        // const completeData = ensureAllRolesArePresent(sortedData);
-        // setFeedbackData(completeData);
-        setFeedbackData(sortedData);
-      } catch (error) {
-        console.error("Error fetching feedback:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchFeedbackData();
-  }, []);
-
-  const handleSessionClick = (sessionId) => {
-    for (const roleData of feedbackData) {
-      const session = roleData.feedback_details.find(
-        (feedback) => feedback.session_id === sessionId
       );
 
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+      const data = await response.json();
+      setFeedbackDataByRole((prev) => ({ ...prev, [role]: data }));
+      setTotalPagesByRole((prev) => ({ ...prev, [role]: data.totalPages || 1 }));
+    } catch (error) {
+      console.error(`Error fetching feedback for ${role}:`, error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    setLoading(true);
+    roles.forEach((role) => fetchFeedbackData(role));
+  }, [paginationState]);
+
+  const handleSessionClick = (sessionId) => {
+    for (const role of roles) {
+      const roleData = feedbackDataByRole[role];
+      const session = roleData?.feedback_details?.find((f) => f.session_id === sessionId);
       if (session) {
-        setSelectedSession({
-          session_id: sessionId,
-          role: roleData.user_role,
-        });
+        setSelectedSession({ session_id: sessionId, role });
         break;
       }
     }
   };
 
-  if (loading) {
-    return <LoadingScreen />;
-  }
+  const handlePageChange = (role, value) => {
+    setPaginationState((prev) => ({ ...prev, [role]: value }));
+  };
+
+  if (loading) return <LoadingScreen />;
 
   if (selectedSession) {
     return (
@@ -328,31 +222,46 @@ const Feedback = () => {
     );
   }
 
-  if (!feedbackData || feedbackData.length === 0) {
-    return (
-      <div className="w-full h-[50vh] flex flex-col items-center justify-center p-4 space-y-4">
-        <MessageSquare className="w-16 h-16 text-gray-300" />
-        <h2 className="text-xl font-semibold text-gray-600">
-          No Feedback Available
-        </h2>
-        <p className="text-gray-500 text-center max-w-md">
-          There is currently no feedback from any user roles. Feedback will
-          appear here once users start providing it.
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div className="w-full mx-auto space-y-4 p-4 overflow-y-auto mb-8">
-      {feedbackData.map((roleData, index) => (
-        <FeedbackView
-          key={roleData.user_role + index}
-          role={roleData.user_role}
-          feedbackData={roleData}
-          onFeedbackClick={handleSessionClick}
-        />
-      ))}
+    <div className="w-full mx-auto p-4 space-y-4">
+      <Tabs defaultValue="public" className="w-full">
+        <TabsList className="mb-4 flex flex-wrap gap-2 rounded-md bg-gray-50">
+          {roles.map((role) => (
+            <TabsTrigger key={role} value={role} className="flex items-center gap-1">
+              {getRoleIcon(role)}
+              {getRoleLabel(role)}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+
+        {roles.map((role) => (
+          <TabsContent key={role} value={role}>
+            <FeedbackView
+              role={role}
+              feedbackData={feedbackDataByRole[role] || { feedback_details: [] }}
+              onFeedbackClick={handleSessionClick}
+            />
+            <div className="flex justify-center mt-4">
+              <Pagination
+                count={totalPagesByRole[role] || 1}
+                page={paginationState[role]}
+                onChange={(e, value) => handlePageChange(role, value)}
+                siblingCount={1}
+                boundaryCount={1}
+                color="primary"
+                sx={{
+                  "& .MuiPaginationItem-root": { color: "#0f172a" },
+                  "& .MuiPaginationItem-root.Mui-selected": {
+                    backgroundColor: "#0f172a",
+                    color: "#fff",
+                    "&:hover": { backgroundColor: "#0f172a" },
+                  },
+                }}
+              />
+            </div>
+          </TabsContent>
+        ))}
+      </Tabs>
     </div>
   );
 };
