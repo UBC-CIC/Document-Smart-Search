@@ -14,16 +14,8 @@ from langchain_aws import ChatBedrockConverse
 
 from helpers.tools.tool_wrapper import get_tool_calls_summary, reset_all_tool_wrappers
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
-
-# Define the initial greeting message once to avoid duplication
-INITIAL_GREETING = {
-    "message": ("Hello! I am a Smart Agent specialized in Fisheries and Oceans Canada (DFO). "
-                "I can help you with questions related to DFO documents, science advice, and more!"
-                "\nPlease select the best role below that fits you. We can better answer your questions."
-                "Do not include personal details such as your name and private content."),
-    "options": ["General Public", "Internal Researcher", "Policy Maker", "External Researcher"]
-}
 
 # Define the welcome message after role selection
 ROLE_SELECTION_RESPONSE = "Thank you for selecting your role. How can I help you with your questions about Fisheries and Oceans Canada today?"
@@ -131,19 +123,6 @@ def get_llm_output(response: str) -> dict:
         "llm_output": main_content,
         "options": questions
     }
-
-def get_initial_user_query():
-    """
-    Generate an initial greeting to the user.
-    List what the agent can do.
-    And suggests the user a few options to start the conversation.
-    
-    Returns:
-    --------
-    str
-        JSON string with initial message and role options
-    """
-    return json.dumps(INITIAL_GREETING, indent=4)
 
 def create_agent_prompt(user_prompt: Optional[str]) -> PromptTemplate:
     """
@@ -306,6 +285,60 @@ def chat_with_agent(
     reset_all_tool_wrappers(tool_wrappers)
     
     return response, tools_summary, duration
+
+def no_existing_messages(table_name: str, session_id: str) -> bool:
+    """
+    Check if there is no existing message in the chat history.
+    
+    Parameters:
+    -----------
+    table_name : str
+        DynamoDB table name for chat history
+    session_id : str
+        Unique session identifier
+        
+    Returns:
+    --------
+    bool
+        True if no existing messages, False otherwise
+    """
+    # Creates the dynamoDB chat history client
+    chat_history = DynamoDBChatMessageHistory(
+        table_name=table_name,
+        session_id=session_id
+    )
+    
+    return len(chat_history.messages) == 0
+
+def set_role_message(role_display_name: str, table_name: str, session_id: str) -> None:
+    """
+    Set the first user message to the given role.
+    This message is used to set the context for the agent.
+
+    Parameters:
+    -----------
+    role_display_name : str
+        The user role's display name (e.g., "General Public", "Internal Researcher")
+    table_name : str
+        DynamoDB table name for chat history
+    session_id : str
+        Unique session identifier
+    """
+    # Creates the dynamoDB chat history client
+    chat_history = DynamoDBChatMessageHistory(
+        table_name=table_name,
+        session_id=session_id
+    )
+
+    # Set the first user message
+    chat_history.add_user_message(
+       role_display_name
+    )
+
+    # Add a system message of a generic response
+    chat_history.add_ai_message(
+        ROLE_SELECTION_RESPONSE
+    )
 
 def get_prompt_for_role(conn, user_role: str) -> Optional[str]:
     """
