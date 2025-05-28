@@ -784,6 +784,7 @@ exports.handler = async (event) => {
               totalPages,
               currentPage: page,
             });
+            
             response.statusCode = 200;
           } catch (err) {
             console.error("Error fetching feedback:", err);

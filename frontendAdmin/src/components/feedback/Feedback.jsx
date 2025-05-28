@@ -56,18 +56,22 @@ const getRoleLabel = (role) => {
 const FeedbackView = ({ role, feedbackData, onFeedbackClick }) => {
   const [isOpen, setIsOpen] = useState(true);
 
-  const formatDate = (dateString) => {
-    const utcDate = new Date(dateString + "Z");
-    return utcDate.toLocaleString(undefined, {
-      month: "2-digit",
-      day: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: true,
-    });
-  };
+const formatDate = (dateString) => {
+  const date = new Date(dateString);
+  if (isNaN(date)) return "Invalid Date";
+
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = String(date.getFullYear()).slice(-2);
+
+  let hours = date.getHours();
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12 || 12;
+
+  return `${day}/${month}/${year}, ${hours}:${minutes} ${ampm}`;
+};
+
 
   if (!feedbackData || !Array.isArray(feedbackData.feedback_details) || feedbackData.feedback_details.length === 0) {
     return (
@@ -181,6 +185,7 @@ const Feedback = () => {
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
       const data = await response.json();
+      
       setFeedbackDataByRole((prev) => ({ ...prev, [role]: data }));
       setTotalPagesByRole((prev) => ({ ...prev, [role]: data.totalPages || 1 }));
     } catch (error) {

@@ -9,6 +9,7 @@ import { VpcStack }         from "../lib/vpc-stack";
 import { OpenSearchStack }  from "../lib/opensearch-stack";
 import { DBFlowStack }      from "../lib/dbFlow-stack";
 import { DataPipelineStack } from "../lib/data-pipeline-stack";
+import { WafShieldStack }   from "../lib/waf-shield-stack";
 
 const app = new cdk.App();
 
@@ -25,7 +26,7 @@ const vpcStack = new VpcStack(app, `${StackPrefix}-VpcStack`, { env });
 // 2) RDS
 const dbStack = new DatabaseStack(app, `${StackPrefix}-Database`, vpcStack, { env });
 
-// 4) OpenSearch
+// 3) OpenSearch
 const osStack = new OpenSearchStack(
   app,
   `${StackPrefix}-OpenSearch`,
@@ -33,10 +34,8 @@ const osStack = new OpenSearchStack(
   { env }
 );
 
-// 3) API Gateway
+// 4) API Gateway
 const apiStack = new ApiGatewayStack(app, `${StackPrefix}-Api`, dbStack, vpcStack, osStack, { env });
-
-// apiStack.addDependency(osStack);
 
 // 5) DBFlow (wires in the RDS _and_ the OpenSearch initializers)
 const dbFlowStack = new DBFlowStack(
@@ -54,5 +53,14 @@ const amplifyStack = new AmplifyStack(app, `${StackPrefix}-Amplify`, apiStack, {
 
 // 7) Data Pipeline
 const dataPipelineStack = new DataPipelineStack(app, `${StackPrefix}-DataPipeline`, vpcStack, dbStack, osStack, { env });
+
+// 8) WAF and Shield Protection
+const wafShieldStack = new WafShieldStack(app, `${StackPrefix}-WafShield`, {
+  env,
+  apiGateway: apiStack.api,
+});
+
+// Add dependencies
+wafShieldStack.addDependency(apiStack);
 
 Tags.of(app).add("app", "DFO-Smart-Search");
