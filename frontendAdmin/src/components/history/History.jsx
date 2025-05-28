@@ -60,7 +60,6 @@ const RoleView = ({ role, sessions, onSessionClick, startDate, endDate, currentP
     return `${day}/${month}/${year}, ${hours}:${minutes} ${ampm}`;
   };
 
-
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen} className="w-full">
       <CollapsibleTrigger asChild className="hover:cursor-pointer">

@@ -29,8 +29,7 @@ const PostAuthHeader = () => {
           />
           {/* Government of Canada Wordmark */}
           <div className="leading-tight">
-            <p className="text-black font-bold text-xs sm:text-base">Government of Canada</p>
-            <p className="text-black font-bold text-xs sm:text-base">Gouvernement du Canada</p>
+            <p className="text-black font-bold text-xs sm:text-base">Fisheries and Oceans Canada</p>
           </div>
         </div>
 
