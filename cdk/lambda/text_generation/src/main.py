@@ -13,15 +13,14 @@ from langchain_aws import BedrockEmbeddings
 # from helpers.db import get_rds_connection
 from helpers.chat import (
     get_bedrock_llm, 
+    set_role_message,
+    no_existing_messages,
     create_dynamodb_history_table,
     get_llm_output, 
     chat_with_agent, 
     get_prompt_for_role, 
-    INITIAL_GREETING,
-    ROLE_SELECTION_RESPONSE
 )
 from helpers.vectorstore import create_hybrid_search_pipeline
-# , initialize_opensearch_and_db
 from helpers.tools.setup import initialize_tools
 
 # Set up basic logging
@@ -125,6 +124,28 @@ def log_user_engagement(conn, session_id: str, message: str, user_role: str = No
         if conn:
             conn.rollback()
 
+def map_role_to_display_name(role: str) -> str:
+    """
+    Map the role value to a display name.
+    
+    Parameters:
+    -----------
+    role : str
+        The role value
+        
+    Returns:
+    --------
+    str
+        The display name for the role
+    """
+    role_mapping = {
+        "public": "General Public",
+        "internal_researcher": "Internal Researcher",
+        "policy_maker": "Policy Maker",
+        "external_researcher": "External Researcher"
+    }
+    return role_mapping.get(role, "General Public")
+
 def handler(event, context):
     """Lambda handler function"""
     logger.info("Text Generation Lambda function is called!")
@@ -149,53 +170,27 @@ def handler(event, context):
     body = {} if event.get("body") is None else json.loads(event.get("body"))
     question = body.get("message_content", "")
     user_role = body.get("user_role", "")
-    is_role_selection = body.get("is_role_selection", False)
     
     # Create DynamoDB table if it doesn't exist
     dynamodb_table_name = get_parameter(TABLE_NAME_PARAM)
     create_dynamodb_history_table(dynamodb_table_name, REGION)
 
-    # If no question, return initial greeting
+    # If no question, return error
     if not question:
-        logger.info("Start of conversation. Creating conversation history table in DynamoDB.")
+        logger.error("Missing required parameter: message_content")
         return {
-            "statusCode": 200,
+            'statusCode': 400,
             "headers": {
                 "Content-Type": "application/json",
                 "Access-Control-Allow-Headers": "*",
                 "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Methods": "*",
             },
-            "body": json.dumps({
-                "type": "ai",
-                "content": INITIAL_GREETING["message"],
-                "options": INITIAL_GREETING["options"],
-                "user_role": user_role
-            })
+            'body': json.dumps('Missing required parameter: message_content')
         }
-    
-    # Handle role selection - respond directly without calling the LLM
-    if is_role_selection:
-        logger.info(f"User selected role: {user_role}")
         
-        return {
-            "statusCode": 200,
-            "headers": {
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Headers": "*",
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "*",
-            },
-            "body": json.dumps({
-                "type": "ai",
-                "content": ROLE_SELECTION_RESPONSE,
-                "options": [],
-                "user_role": user_role
-            })
-        }
-    
     # Check for user role
-    if not user_role and question:
+    if not user_role:
         logger.error("Missing required parameter: user_role")
         return {
             'statusCode': 400,
@@ -208,6 +203,16 @@ def handler(event, context):
             'body': json.dumps('Missing required parameter: user_role')
         }
     
+    # Check if this is the first message for this session
+    if no_existing_messages(dynamodb_table_name, session_id):
+        logger.info(f"First message detected with user_role: {user_role}")
+        
+        # Override the question with the role selection
+        role_display_name = map_role_to_display_name(user_role)
+        
+        # Create the role message
+        set_role_message(role_display_name, dynamodb_table_name, session_id)
+
     try:
         # Initialize OpenSearch, DB, and get configuration values
         # Set up OpenSearch client - This is hard coded to a test database for now
@@ -259,26 +264,20 @@ def handler(event, context):
             region_name=REGION
         )
                 
-        # Get role-specific prompt from database -> Note right now user_promp is not used
-        # Create RDS database connection
+        # Get role-specific prompt from database
         user_prompt = get_prompt_for_role(rds_conn, user_role)
         if not user_prompt:
             logger.error(f"Failed to retrieve prompt for role: {user_role}")
-            # For now we will not fail the request if we cannot get the prompt 
-            # But we will log the error
-            # return {
-            #     'statusCode': 500,
-            #     "headers": {
-            #         "Content-Type": "application/json",
-            #         "Access-Control-Allow-Headers": "*",
-            #         "Access-Control-Allow-Origin": "*",
-            #         "Access-Control-Allow-Methods": "*",
-            #     },
-            #     'body': json.dumps('Error getting prompt for specified role')
-            # }
-        
-        print("User Role:", user_role)
-        print("User Prompt:", user_prompt)
+            return {
+                'statusCode': 500,
+                "headers": {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Headers": "*",
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "*",
+                },
+                'body': json.dumps('Error getting prompt for specified role')
+            }
 
         # Log the user's question -> Doesnt work right now (No database table exists)
         log_user_engagement(rds_conn, session_id, question, user_role, user_info)
@@ -295,8 +294,6 @@ def handler(event, context):
             region=REGION
         )
         
-        # print("\nInitialize LLM\n")
-
         # Initialize LLM
         # bedrock_inference_profile = get_parameter(BEDROCK_LLM_PARAM)
         bedrock_inference_profile = BEDROCK_INFERENCE_PROFILE # Using this for now as the one in SSM is not correct
@@ -306,9 +303,6 @@ def handler(event, context):
             region=REGION
         )
         
-        
-        print("\nLLM Initialized\n")
-
         # Process the question with the agent
         response, tools_summary, duration = chat_with_agent(
             user_query=question,

@@ -3,6 +3,7 @@ from opensearchpy import OpenSearch, NotFoundError
 # from typing import Dict, Tuple, Any
 # from langchain_aws import BedrockEmbeddings
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
 
 # def get_opensearch_client(

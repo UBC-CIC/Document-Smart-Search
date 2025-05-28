@@ -4,6 +4,7 @@ import psycopg2
 import boto3
 from typing import Any, Dict, List, Optional, Tuple
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
 
 # def get_secret(secret_name: str, secrets_manager_client=None, expect_json=True) -> Dict:
