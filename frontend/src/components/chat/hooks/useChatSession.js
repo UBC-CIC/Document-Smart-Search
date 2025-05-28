@@ -7,8 +7,8 @@ import { toast } from "react-toastify";
 const INITIAL_GREETING =
   "Hello! I am a Smart Agent specialized in Fisheries and Oceans Canada (DFO). " +
   "I can help you with questions related to DFO documents, science advice, and more! " +
-  "Please select the best role below that fits you. We can better answer your questions. " +
-  "Do not include personal details such as your name and private content.";
+  "Please select the role that best describes you so I can better assist with your questions. " +
+  "Do not include personal details such as your name or other private information.";
 
 export function useChatSession() {
   const [fingerprint, setFingerprint] = useState("");
@@ -41,8 +41,8 @@ export function useChatSession() {
       const parsedSession = JSON.parse(existingSession);
       setSession(parsedSession);
       setIsNewSession(false); // Not a new session
-      // Don't show disclaimer for existing sessions
-      setShowDisclaimer(false);
+      // // Don't show disclaimer for existing sessions
+      // setShowDisclaimer(false);
     } else {
       // Show disclaimer for new sessions
       setShowDisclaimer(true);
@@ -127,11 +127,6 @@ export function useChatSession() {
     if (!sessionId) return;
 
     try {
-      // Only hide disclaimer when loading existing chat history
-      if (!isNewSession) {
-        setShowDisclaimer(false);
-      }
-
       const data = await fetchChatMessages(sessionId);
       const messagesList = data.messages || [];
 
@@ -178,6 +173,17 @@ export function useChatSession() {
       }
 
       setMessages(convertedMessages);
+
+      // Check if there are any user messages (actual conversation history)
+      const hasUserMessages = convertedMessages.some(msg => msg.role === "user");
+      
+      // Only hide the disclaimer when there's actual conversation history
+      // Otherwise show disclaimer even for existing sessions with no conversation
+      if (!isNewSession && hasUserMessages) {
+        setShowDisclaimer(false);
+      } else {
+        setShowDisclaimer(true);
+      }
     } catch (error) {
       console.error("Error loading chat history:", error);
       setMessages([
@@ -189,6 +195,8 @@ export function useChatSession() {
           user_role: "",
         },
       ]);
+      // Show disclaimer if we couldn't load history properly
+      setShowDisclaimer(true);
     }
   };
 

@@ -136,7 +136,7 @@ class TopicTools:
                     "top_related_documents": documents,
                 },
                 "metadata": {
-                    "description": f"LLM‑categorized documents that relate to topic: {topic_name}",
+                    "description": f"LLM categorized documents that relate to topic: {topic_name}",
                     "sources": sources,
                 },
             })
@@ -148,7 +148,7 @@ class TopicTools:
                     "error": str(e)
                 },
                 "metadata": {
-                    "description": f"LLM‑categorized documents that relate to topic: {topic_name}",
+                    "description": f"LLM categorized documents that relate to topic: {topic_name}",
                     "sources": []
                 }
             })

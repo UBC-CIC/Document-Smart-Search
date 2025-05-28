@@ -25,14 +25,14 @@ class SearchTools:
     def semantic_html_search_tool(self, user_query: str) -> str:
         """
         Hybrid (semantic + lexical) search over CSAS HTML documents.
-        Uses two searches: one for Terms‑of‑Reference (TOR) only and
-        another for all other docs (non‑TOR).
+        Uses two searches: one for Terms of Reference (TOR) only and
+        another for all other docs (non TOR).
         """
         num_docs = 10  # Default num_docs per search
         language = "English"  # Default language filter
         
         def _post_filter(tor_only: bool) -> Dict[str, Any]:
-            """Construct post‑filter for TOR / non‑TOR cases."""
+            """Construct post filter for TOR / non TOR cases."""
             must = [{"term": {"language": language}}]
             if tor_only:
                 must.append({"term": {"html_doc_type": "Terms of Reference"}})

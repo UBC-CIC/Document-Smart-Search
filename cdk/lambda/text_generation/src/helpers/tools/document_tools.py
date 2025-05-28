@@ -160,8 +160,6 @@ class DocumentTools:
                 }
             )
 
-            # print(f"Document categorization results: {base_results}")
-
             return json.dumps(
                 {
                     "output": base_results,
@@ -180,7 +178,7 @@ class DocumentTools:
             return json.dumps({
                 "output": {"Error": f"Document categorization failed: {str(e)}"},
                 "metadata": {
-                    "description": f"Opensearch and SQL query of LLM‑categorized documents that relate to document: {document_url}",
+                    "description": f"Opensearch and SQL query of LLM categorized documents that relate to document: {document_url}",
                     "sources": [{"name": "Unknown", "url": document_url}]
                 }
             })
