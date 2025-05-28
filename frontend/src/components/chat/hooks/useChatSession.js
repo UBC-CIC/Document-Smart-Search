@@ -96,6 +96,32 @@ export function useChatSession() {
     }
   };
 
+  // Extract user role from messages
+  const extractUserRoleFromMessages = (messages) => {
+    // First check for explicit user_role property
+    const messageWithRole = messages.find(msg => msg.user_role && msg.user_role !== '');
+    if (messageWithRole) {
+      return messageWithRole.user_role;
+    }
+    
+    // If no explicit role, try to infer from content of first user message
+    const firstUserMessage = messages.find(msg => 
+      (msg.role === "user" || msg.Type === "human") && 
+      msg.content && 
+      msg.content.length > 0
+    );
+    
+    if (firstUserMessage) {
+      const content = firstUserMessage.content.toLowerCase();
+      if (content.includes("general public")) return "public";
+      if (content.includes("internal researcher")) return "internal_researcher";
+      if (content.includes("policy maker")) return "policy_maker";
+      if (content.includes("external researcher")) return "external_researcher";
+    }
+    
+    return "";
+  };
+
   // Load chat history from an existing session
   const loadChatHistory = async (sessionId) => {
     if (!sessionId) return;
@@ -125,6 +151,17 @@ export function useChatSession() {
         Options: msg.Options,
       }));
 
+      // Process messages to ensure correct user_role propagation
+      const userRole = extractUserRoleFromMessages(convertedMessages);
+      if (userRole) {
+        // Ensure all assistant messages have the user_role
+        convertedMessages.forEach(msg => {
+          if (msg.role === "assistant" && !msg.user_role) {
+            msg.user_role = userRole;
+          }
+        });
+      }
+
       const hasInitialMessage =
         convertedMessages.length > 0 &&
         convertedMessages[0].role === "assistant" &&
@@ -136,7 +173,7 @@ export function useChatSession() {
           role: "assistant",
           content: INITIAL_GREETING,
           options: ["General Public", "Internal Researcher", "Policy Maker", "External Researcher"],
-          user_role: "",
+          user_role: userRole || "",
         });
       }
 

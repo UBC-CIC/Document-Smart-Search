@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { User, Search, Copy, Volume2, StopCircle, UserRound } from 'lucide-react';
+import { User, Search, Copy, Volume2, StopCircle, UserRound, AlertTriangle } from 'lucide-react';
 import Image from 'next/image';
 import Markdown from 'react-markdown';
 import mapleLeaf from '../../../app/maple_leaf.png';
@@ -85,14 +85,19 @@ const ChatMessages = ({
   
   return (
     <div className="space-y-4 md:space-y-6 mb-6 md:mb-8 flex-grow overflow-y-auto">
-      {/* Role indicator area - always present for UI consistency */}
+      {/* Role indicator area - always present with conditional styling */}
       <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm py-2 border-b border-gray-100 flex justify-center">
         {hasSelectedRole ? (
           <div className="inline-flex items-center px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-sm">
             <UserRound size={14} className="mr-1" />
             <span>Role: {formatRole(userRole)}</span>
           </div>
-        ) : null}
+        ) : (
+          <div className="inline-flex items-center px-3 py-1 rounded-full bg-yellow-50 text-yellow-700 text-sm">
+            <AlertTriangle size={14} className="mr-1" />
+            <span>No role selected</span>
+          </div>
+        )}
       </div>
       
       {messages.map((message, index) => (
