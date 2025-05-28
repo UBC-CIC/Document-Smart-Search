@@ -18,8 +18,11 @@ export function useFeedback(fingerprint, session, messages) {
     return "";
   };
 
-  const submitFeedback = async () => {
-    if (!feedback.rating || isSendingFeedback || !fingerprint || !session) return;
+  const submitFeedback = async (updatedFeedback = null) => {
+    // Use the directly passed feedback if available, otherwise use state
+    const feedbackToSubmit = updatedFeedback || feedback;
+    
+    if (!feedbackToSubmit.rating || isSendingFeedback || !fingerprint || !session) return;
 
     setIsSendingFeedback(true);
     let userRole = getUserRole(messages);
@@ -28,25 +31,17 @@ export function useFeedback(fingerprint, session, messages) {
     if (!userRole) userRole = "public";
     
     // Ensure description is never empty
-    const description = feedback.description?.length 
-      ? feedback.description.join(", ") 
+    const description = feedbackToSubmit.description?.length 
+      ? feedbackToSubmit.description.join(", ") 
       : "No specific feedback provided";
 
     try {
-      // console.log("Submitting feedback with:", {
-      //   fingerprint,
-      //   session,
-      //   userRole,
-      //   rating: feedback.rating,
-      //   description
-      // });
-      
       // Send feedback to the API
       await sendFeedback(
         fingerprint, 
         session, 
         userRole, 
-        feedback.rating, 
+        feedbackToSubmit.rating, 
         description
       );
 

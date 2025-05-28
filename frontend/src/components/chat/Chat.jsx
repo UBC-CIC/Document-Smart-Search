@@ -91,8 +91,8 @@ export default function Chat() {
   }, [messages]);
 
   // Handle feedback submission
-  const handleFeedbackSubmit = async () => {
-    if (await submitFeedback()) {
+  const handleFeedbackSubmit = async (updatedFeedback = null) => {
+    if (await submitFeedback(updatedFeedback)) {
       setMessages((prev) => [
         ...prev,
         {
@@ -155,7 +155,11 @@ export default function Chat() {
           isCreatingSession={isCreatingSession}
           currentMessageId={currentMessageId}
           setCurrentMessageId={setCurrentMessageId}
-          onShowFeedback={() => setShowFeedback(true)}
+          onShowFeedback={() => {
+            // Reset feedback state before showing the feedback component
+            setFeedback({ rating: 0, description: [] });
+            setShowFeedback(true);
+          }}
           onOpenSidebar={(messageId) => {
             // If we're viewing the same message's sources, toggle the sidebar
             if (currentMessageId === messageId) {

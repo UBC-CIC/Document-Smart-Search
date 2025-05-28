@@ -1,13 +1,18 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { X } from "lucide-react"
 
 const FeedbackComponent = ({ feedback, setFeedback, onSubmit, isSubmitting, onClose }) => {
-  const [hoverRating, setHoverRating] = useState(0)
-  const [customFeedback, setCustomFeedback] = useState("")
+  const [hoverRating, setHoverRating] = useState(0);
+  const [customFeedback, setCustomFeedback] = useState("");
+
+  // Clear custom feedback when component mounts
+  useEffect(() => {
+    setCustomFeedback("");
+  }, []);
 
   const options = ["Not enough information", "Confusing to use", "Inaccurate reviews"]
 
@@ -25,21 +30,34 @@ const FeedbackComponent = ({ feedback, setFeedback, onSubmit, isSubmitting, onCl
   }
 
   const handleSubmit = () => {
+    // Create a new feedback object that includes custom feedback
+    const updatedFeedback = {...feedback};
+    
     // Add custom feedback to description if it exists
     if (customFeedback.trim()) {
-      setFeedback((prev) => ({
-        ...prev,
-        description: [...prev.description, customFeedback.trim()]
-      }))
+      updatedFeedback.description = [...feedback.description, customFeedback.trim()];
+      
+      // Update the parent component's state
+      setFeedback(updatedFeedback);
     }
     
-    // Call the parent submit handler
-    onSubmit()
-  }
+    // Pass the updated feedback directly to ensure it includes custom feedback
+    onSubmit(updatedFeedback);
+  };
+
+  // Update the handleClose function to clear state
+  const handleClose = () => {
+    // Reset local state
+    setCustomFeedback("");
+    setHoverRating(0);
+    
+    // Call the parent onClose handler
+    onClose();
+  };
 
   return (
-    <div className="relative mt-4 mb-2 pl-4 pr-8 py-4 whitespace-pre-line bg-customMessage w-9/12 border border-customMain rounded-tr-lg rounded-br-lg rounded-bl-lg">
-      <Button variant="ghost" size="icon" className="absolute top-2 right-2" onClick={onClose}>
+    <div className="relative -mt-4 mb-2 pl-4 pr-8 py-4 whitespace-pre-line bg-customMessage w-9/12 mx-auto border border-customMain rounded-tr-lg rounded-br-lg rounded-bl-lg">
+      <Button variant="ghost" size="icon" className="absolute top-2 right-2" onClick={handleClose}>
         <X className="h-4 w-4" />
         <span className="sr-only">Close</span>
       </Button>

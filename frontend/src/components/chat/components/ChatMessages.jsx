@@ -211,31 +211,37 @@ const ChatMessages = ({
                       </>
                     )}
                   </button>
+                  
+                  {/* New Feedback button - more subtle and contextual */}
+                  {message.role === "assistant" && index >= 4 && !message.content.includes("Thank you! Your feedback will help improve") && (
+                    <button
+                      onClick={onShowFeedback}
+                      className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors flex items-center"
+                      aria-label="Rate this answer"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
+                        <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                      </svg>
+                      <span className="text-xs">Rate</span>
+                    </button>
+                  )}
                 </div>
 
-                {/* Render options if available AND no role has been selected yet */}
+                {/* Render options if available */}
                 {message.options && message.options.length > 0 && (!hasSelectedRole || message.id !== "initial") && (
-                  <div className="mt-3 flex flex-col gap-2 items-start">
+                  <div className={`mt-3 ${message.id === "initial" ? "flex flex-row flex-wrap gap-2" : "flex flex-col gap-2 items-start"}`}>
                     {message.options.map((option, optIndex) => (
                       <button
                         key={`${message.id}-option-${optIndex}`}
                         onClick={() => sendMessage && sendMessage(option, true)}
-                        className="inline-flex text-left bg-blue-100 hover:bg-blue-200 rounded-xl py-2 px-3.5 text-blue-800 text-sm transition-colors items-center"
+                        className={`text-left bg-blue-100 hover:bg-blue-200 rounded-xl py-2 px-3.5 text-blue-800 text-sm transition-colors items-center ${
+                          message.id === "initial" ? "mb-2 mr-2" : "inline-flex"
+                        }`}
                       >
                         <span className="whitespace-normal break-words">{option}</span>
                       </button>
                     ))}
                   </div>
-                )}
-
-                {/* Show feedback button after a few messages */}
-                {index >= 4 && !message.content.includes("Thank you! Your feedback will help improve") && (
-                  <button
-                    onClick={onShowFeedback}
-                    className="mt-2 inline-block bg-blue-100 hover:bg-blue-200 rounded-xl py-1.5 px-3 text-blue-800 text-sm"
-                  >
-                    My task is done
-                  </button>
                 )}
 
                 {/* Sources button for messages with citations */}
