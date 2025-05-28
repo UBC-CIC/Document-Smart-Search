@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { User, Search, Copy, Volume2, StopCircle } from 'lucide-react';
+import { User, Search, Copy, Volume2, StopCircle, UserRound } from 'lucide-react';
 import Image from 'next/image';
 import Markdown from 'react-markdown';
 import mapleLeaf from '../../../app/maple_leaf.png';
@@ -19,6 +19,25 @@ const ChatMessages = ({
   const [speaking, setSpeaking] = useState(null);
   const speechSynthesisRef = useRef(null);
   
+  // Extract user role from messages
+  const userRole = messages.find(m => m.user_role)?.user_role || '';
+  
+  // Format role for display
+  const formatRole = (role) => {
+    if (!role) return '';
+    
+    switch(role) {
+      case 'public': return 'General Public';
+      case 'internal_researcher': return 'Internal Researcher';
+      case 'policy_maker': return 'Policy Maker';
+      case 'external_researcher': return 'External Researcher';
+      default: return role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    }
+  };
+  
+  // Determine if role has been selected
+  const hasSelectedRole = userRole !== '';
+
   // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -66,6 +85,16 @@ const ChatMessages = ({
   
   return (
     <div className="space-y-4 md:space-y-6 mb-6 md:mb-8 flex-grow overflow-y-auto">
+      {/* Role indicator area - always present for UI consistency */}
+      <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm py-2 border-b border-gray-100 flex justify-center">
+        {hasSelectedRole ? (
+          <div className="inline-flex items-center px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-sm">
+            <UserRound size={14} className="mr-1" />
+            <span>Role: {formatRole(userRole)}</span>
+          </div>
+        ) : null}
+      </div>
+      
       {messages.map((message, index) => (
         <div key={message.id} className="space-y-2">
           {message.role === "user" ? (
@@ -75,10 +104,16 @@ const ChatMessages = ({
                   {message.content}
                 </div>
               </div>
-              <div className="ml-2 mt-1">
+              <div className="ml-2 mt-1 flex flex-col items-center">
                 <div className="bg-white p-1.5 md:p-2 rounded-full border">
                   <User className="h-4 w-4 md:h-5 md:w-5" />
                 </div>
+                {/* Add role indicator under user icon */}
+                {hasSelectedRole && index > 0 && (
+                  <div className="text-[10px] text-gray-500 mt-1 bg-gray-50 px-1 rounded-md whitespace-nowrap">
+                    {formatRole(userRole)}
+                  </div>
+                )}
               </div>
             </div>
           ) : (
@@ -149,8 +184,8 @@ const ChatMessages = ({
                   </button>
                 </div>
 
-                {/* Render options if available */}
-                {message.options && message.options.length > 0 && (
+                {/* Render options if available AND no role has been selected yet */}
+                {message.options && message.options.length > 0 && (!hasSelectedRole || message.id !== "initial") && (
                   <div className="mt-2 space-y-2">
                     {message.options.map((option, optIndex) => (
                       <button
