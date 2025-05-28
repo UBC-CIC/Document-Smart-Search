@@ -14,7 +14,12 @@ const FeedbackComponent = ({ feedback, setFeedback, onSubmit, isSubmitting, onCl
     setCustomFeedback("");
   }, []);
 
-  const options = ["Not enough information", "Confusing to use", "Inaccurate reviews"]
+  const options = [
+    "Not enough information", 
+    "Confusing to use", 
+    "Inaccurate information", 
+    "Unhelpful responses",
+  ];
 
   const handleOptionClick = (option) => {
     setFeedback((prev) => ({

@@ -120,13 +120,12 @@ export default function Chat() {
           }`}
         >
           <CitationsSidebar
+            key={session} // Add key prop to force remount when session changes
             isOpen={isSidebarOpen}
             onClose={() => setIsSidebarOpen(false)}
             toolsUsed={
-              messages.length > 0
-                ? currentMessageId
-                  ? messages.find((m) => m.id === currentMessageId)?.tools_used
-                  : messages[messages.length - 1]?.tools_used
+              messages.length > 0 && currentMessageId
+                ? messages.find((m) => m.id === currentMessageId)?.tools_used || {}
                 : {}
             }
             currentMessageId={currentMessageId}
@@ -198,6 +197,8 @@ export default function Chat() {
           resetSession={() => {
             // Close the sidebar when creating a new session
             setIsSidebarOpen(false);
+            // Clear any selected message ID
+            setCurrentMessageId(null);
             // Then call the original reset function
             resetSession();
           }}
