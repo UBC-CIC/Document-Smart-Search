@@ -7,6 +7,9 @@ import { fetchAuthSession } from "aws-amplify/auth";
 import Session from "./Session";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import Pagination from '@mui/material/Pagination'; // Importing MUI Pagination
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 
 const RoleView = ({ role, sessions, onSessionClick, startDate, endDate, currentPage, setCurrentPage, totalPages }) => {
   const [isOpen, setIsOpen] = useState(true);
@@ -90,7 +93,7 @@ const RoleView = ({ role, sessions, onSessionClick, startDate, endDate, currentP
         {/* MUI Pagination controls */}
         <div className="flex justify-center mt-4">
           <Pagination
-            count={totalPages} 
+            count={totalPages}
             page={currentPage}
             onChange={(event, value) => setCurrentPage(value)}
             siblingCount={1}
@@ -98,17 +101,21 @@ const RoleView = ({ role, sessions, onSessionClick, startDate, endDate, currentP
             color="primary"
             sx={{
               "& .MuiPaginationItem-root": {
-                color: "#0f172a", 
-              },
-              "& .Mui-selected": {
-                backgroundColor: "#0f172a", 
-                color: "#ffffff",
-              },
-              "& .MuiPaginationItem-previousNext": {
                 color: "#0f172a",
-              }
+              },
+              "& .MuiPaginationItem-root.Mui-selected": {
+                backgroundColor: "#0f172a",
+                color: "#ffffff",
+                "&:hover": {
+                  backgroundColor: "#0f172a",
+                },
+              },
+              "& .MuiPaginationItem-root.MuiPaginationItem-previousNext": {
+                color: "#0f172a",
+              },
             }}
           />
+
 
         </div>
       </CollapsibleContent>
@@ -147,7 +154,7 @@ export default function History() {
       const endDateStr = endDate ? endDate.toISOString() : "";
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_ENDPOINT}admin/conversation_sessions?user_role=${encodeURIComponent(userRole)}&start_date=${startDateStr}&end_date=${endDateStr}&page=${currentPage}&limit=5`,
+        `${process.env.NEXT_PUBLIC_API_ENDPOINT}admin/conversation_sessions?user_role=${encodeURIComponent(userRole)}&start_date=${startDateStr}&end_date=${endDateStr}&page=${currentPage}&limit=10`,
         {
           method: "GET",
           headers: {
@@ -290,25 +297,37 @@ export default function History() {
         <div className="flex flex-col background-white p-4 rounded-lg shadow-sm border mb-4">
           <div className="flex justify-between items-center w-full">
             <div className="flex space-x-4">
-              <input
-                type="date"
-                value={startDate ? startDate.toISOString().split("T")[0] : ""}
-                onChange={(e) => setStartDate(new Date(e.target.value))}
-                className="p-2 border rounded"
-              />
-              <input
-                type="date"
-                value={endDate ? endDate.toISOString().split("T")[0] : ""}
-                onChange={(e) => setEndDate(new Date(e.target.value))}
-                className="p-2 border rounded"
-              />
-              <Button onClick={() => setPublicPage(1)}>Apply Date Range</Button>
+              <div className="flex flex-col">
+  <label className="block text-sm mb-1">Start Date</label>
+  <DatePicker
+    selected={startDate}
+    onChange={(date) => setStartDate(date)}
+    placeholderText="dd/mm/yyyy"
+    className="p-2 border rounded"
+    dateFormat="dd/MM/yyyy"
+  />
+</div>
+
+<div className="flex flex-col">
+  <label className="block text-sm mb-1">End Date</label>
+  <DatePicker
+    selected={endDate}
+    onChange={(date) => setEndDate(date)}
+    placeholderText="dd/mm/yyyy"
+    className="p-2 border rounded"
+    dateFormat="dd/MM/yyyy"
+  />
+</div>
+
+ 
+              {/* <Button onClick={() => setPublicPage(1)}>Apply Date Range</Button> */}
             </div>
-            <Button
-              onClick={handleDownloadAllData}
-              disabled={downloadLoading}
-              className="bg-adminMain hover:bg-adminHover"
-            >
+              <Button
+                onClick={handleDownloadAllData}
+                disabled={downloadLoading}
+                className="bg-adminMain hover:bg-adminHover flex items-center gap-2"
+              >
+                <FileDownloadIcon />
               {downloadLoading ? "Downloading..." : "Download All Messages"}
             </Button>
           </div>
