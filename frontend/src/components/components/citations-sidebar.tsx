@@ -1,6 +1,10 @@
-import { X, ChevronDown, ChevronUp, ExternalLink } from "lucide-react"
+import { X, ChevronDown, ChevronUp, ExternalLink, Info, FileText } from "lucide-react"
+import Link from "next/link"
 import React from "react"
 import { useState, useEffect } from "react"
+
+// Relevancy explanation tooltip
+const relevancyExplanation = "Relevancy represents a hybrid score combining semantic similarity (70%) and keyword matching (30%) based on a given query. Since semantic scoring is relative to all documents in the database, a high percentage doesn't always guarantee relevance to your specific question."
 
 interface Source {
   title?: string
@@ -8,6 +12,7 @@ interface Source {
   url?: string
   text?: string
   relevancy_score?: number
+  document_id?: string // Added document_id field
 }
 
 interface Tool {
@@ -32,6 +37,7 @@ export function CitationsSidebar({ isOpen, onClose, toolsUsed, currentMessageId 
   const [currentTab, setCurrentTab] = useState<"sources" | "tools">("tools")
   const [expandedTools, setExpandedTools] = useState<Record<string, boolean>>({})
   const [messageToolsMap, setMessageToolsMap] = useState<Record<string, ToolsUsed>>({})
+  const [showTooltip, setShowTooltip] = useState<string | null>(null)
   
   // Keep track of which message's tools are currently being displayed
   const [activeMessageId, setActiveMessageId] = useState<string | null>(null)
@@ -261,8 +267,8 @@ export function CitationsSidebar({ isOpen, onClose, toolsUsed, currentMessageId 
                     <h3 className="font-medium text-sm dark:text-white">
                       {source.name || source.title || "Source"}
                     </h3>
-                    {source.url && (
-                      <div className="flex items-center mt-1">
+                    <div className="flex items-center mt-1 gap-2">
+                      {source.url && (
                         <button
                           onClick={() => openSourceUrl(source.url)}
                           className="text-blue-600 dark:text-blue-400 hover:underline text-xs flex items-center"
@@ -270,8 +276,17 @@ export function CitationsSidebar({ isOpen, onClose, toolsUsed, currentMessageId 
                           <span className="truncate max-w-[250px]">{source.url}</span>
                           <ExternalLink className="h-3 w-3 ml-1 flex-shrink-0" />
                         </button>
-                      </div>
-                    )}
+                      )}
+                      {source.document_id && (
+                        <Link 
+                          href={`/documents/${source.document_id}`}
+                          className="text-blue-600 dark:text-blue-400 hover:underline text-xs flex items-center"
+                        >
+                          <span>View Document Details</span>
+                          <FileText className="h-3 w-3 ml-1 flex-shrink-0" />
+                        </Link>
+                      )}
+                    </div>
                     {source.relevancy_score !== undefined && (
                       <div className="mt-1 flex items-center">
                         <span className="text-xs text-gray-500 dark:text-gray-400">
@@ -283,8 +298,20 @@ export function CitationsSidebar({ isOpen, onClose, toolsUsed, currentMessageId 
                             style={{ width: `${Math.min(source.relevancy_score * 100, 100)}%` }}
                           ></div>
                         </div>
-                        <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">
-                          {(source.relevancy_score).toFixed(2)}
+                        <span className="ml-1 text-xs text-gray-500 dark:text-gray-400 flex items-center">
+                          {(source.relevancy_score * 100).toFixed(0)}%
+                          <div 
+                            className="ml-1 relative cursor-help"
+                            onMouseEnter={() => setShowTooltip(`sources-${index}`)}
+                            onMouseLeave={() => setShowTooltip(null)}
+                          >
+                            <Info className="h-3 w-3 text-gray-400" />
+                            {showTooltip === `sources-${index}` && (
+                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg z-50">
+                                {relevancyExplanation}
+                              </div>
+                            )}
+                          </div>
                         </span>
                       </div>
                     )}
@@ -357,8 +384,8 @@ export function CitationsSidebar({ isOpen, onClose, toolsUsed, currentMessageId 
                                   {source.name || source.title || "Source"}
                                 </h4>
                                 
-                                {source.url && (
-                                  <div className="flex items-center mt-1">
+                                <div className="flex items-center mt-1 gap-2">
+                                  {source.url && (
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation(); // Prevent toggle from firing
@@ -369,13 +396,23 @@ export function CitationsSidebar({ isOpen, onClose, toolsUsed, currentMessageId 
                                       <span className="truncate max-w-[220px]">{source.url}</span>
                                       <ExternalLink className="h-3 w-3 ml-1 flex-shrink-0" />
                                     </button>
-                                  </div>
-                                )}
+                                  )}
+                                  {source.document_id && (
+                                    <Link 
+                                      href={`/documents/${source.document_id}`}
+                                      className="text-blue-600 dark:text-blue-400 hover:underline text-xs flex items-center"
+                                      onClick={(e) => e.stopPropagation()} // Prevent toggle from firing
+                                    >
+                                      <span>View Document Details</span>
+                                      <FileText className="h-3 w-3 ml-1 flex-shrink-0" />
+                                    </Link>
+                                  )}
+                                </div>
                                 
                                 {source.relevancy_score !== undefined && (
                                   <div className="mt-1 flex items-center">
                                     <span className="text-xs text-gray-500 dark:text-gray-400">
-                                      Relevancy: 
+                                      Relevancy:
                                     </span>
                                     <div className="ml-1 bg-gray-200 dark:bg-gray-600 rounded-full h-2 w-16">
                                       <div 
@@ -383,8 +420,20 @@ export function CitationsSidebar({ isOpen, onClose, toolsUsed, currentMessageId 
                                         style={{ width: `${Math.min(source.relevancy_score * 100, 100)}%` }}
                                       ></div>
                                     </div>
-                                    <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">
-                                      {(source.relevancy_score).toFixed(2)}
+                                    <span className="ml-1 text-xs text-gray-500 dark:text-gray-400 flex items-center">
+                                      {(source.relevancy_score * 100).toFixed(0)}%
+                                      <div 
+                                        className="ml-1 relative cursor-help"
+                                        onMouseEnter={() => setShowTooltip(`tool-${index}-source-${sourceIndex}`)}
+                                        onMouseLeave={() => setShowTooltip(null)}
+                                      >
+                                        <Info className="h-3 w-3 text-gray-400" />
+                                        {showTooltip === `tool-${index}-source-${sourceIndex}` && (
+                                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg z-50">
+                                            {relevancyExplanation}
+                                          </div>
+                                        )}
+                                      </div>
                                     </span>
                                   </div>
                                 )}
