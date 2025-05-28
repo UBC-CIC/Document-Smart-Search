@@ -136,11 +136,11 @@ const ChatMessages = ({
               </div>
               <div className="flex-grow">
                 <div className="inline-block bg-gray-200 rounded-2xl py-2 px-3 md:px-4 max-w-[90%] text-sm md:text-base">
-                  {/* Markdown renderer with better list formatting */}
+                  {/* Markdown renderer with improved spacing */}
                   <Markdown
-                    className="text-gray-800 prose prose-sm max-w-none"
+                    className="text-gray-800 prose prose-sm max-w-none leading-relaxed"
                     components={{
-                      p: ({ children }) => <p className="mb-3 last:mb-0">{children}</p>,
+                      p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
                       a: ({ href, children }) => (
                         <a
                           href={href}
@@ -151,10 +151,10 @@ const ChatMessages = ({
                           {children}
                         </a>
                       ),
-                      ul: ({ children }) => <ul className="list-disc pl-5 mb-3 mt-1">{children}</ul>,
-                      ol: ({ children }) => <ol className="list-decimal pl-5 mb-3 mt-1">{children}</ol>,
-                      li: ({ children }) => <li className="mb-1">{children}</li>,
-                      h1: ({ children }) => <h1 className="text-xl font-bold mb-3 mt-2">{children}</h1>,
+                      ul: ({ children }) => <ul className="list-disc pl-5 mb-2 mt-1">{children}</ul>,
+                      ol: ({ children }) => <ol className="list-decimal pl-5 mb-2 mt-1">{children}</ol>,
+                      li: ({ children }) => <li className="mb-0.5">{children}</li>,
+                      h1: ({ children }) => <h1 className="text-xl font-bold mb-2 mt-2">{children}</h1>,
                       h2: ({ children }) => <h2 className="text-lg font-bold mb-2 mt-2">{children}</h2>,
                       h3: ({ children }) => <h3 className="text-base font-bold mb-2 mt-2">{children}</h3>,
                       blockquote: ({ children }) => (
@@ -162,16 +162,19 @@ const ChatMessages = ({
                       ),
                     }}
                   >
-                    {/* Improved content preprocessing to handle lists better */}
+                    {/* Improved content preprocessing with tighter spacing */}
                     {message.content
                       // First, normalize all line breaks
                       .replace(/\r\n/g, '\n')
-                      // Fix spacing before list items - remove extra blank lines before list items
+                      // Replace multiple consecutive blank lines with a single line
+                      .replace(/\n{3,}/g, '\n\n')
+                      // Fix spacing before list items
                       .replace(/\n\n([ \t]*[*\-+]|[ \t]*\d+\.)[ \t]/g, '\n$1 ')
                       // Fix spacing before numbered lists
                       .replace(/\n\n([ \t]*\d+\.)[ \t]+/g, '\n$1 ')
-                      // Now handle other paragraph spacing
-                      .replace(/\n\n/g, '\n&nbsp;\n')
+                      // Use a smaller spacer for paragraph breaks
+                      .replace(/\n\n/g, '\n\u200B\n')  // Use zero-width space for smaller breaks
+                      // Make sure single line breaks don't create new paragraphs unless they're list items
                       .replace(/(?<!\n)\n(?!\n)(?![ \t]*[*\-+]|[ \t]*\d+\.)/g, '\n\n')
                     }
                   </Markdown>
