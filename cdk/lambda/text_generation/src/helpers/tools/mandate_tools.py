@@ -136,7 +136,7 @@ class MandateTools:
                     "top_related_documents": documents,
                 },
                 "metadata": {
-                    "description": f"LLM‑categorized documents that relate to mandate: {mandate_name}",
+                    "description": f"LLM categorized documents that relate to mandate: {mandate_name}",
                     "sources": sources,
                 },
             })
@@ -148,7 +148,7 @@ class MandateTools:
                     "error": str(e)
                 },
                 "metadata": {
-                    "description": f"LLM‑categorized documents that relate to mandate: {mandate_name}",
+                    "description": f"LLM categorized documents that relate to mandate: {mandate_name}",
                     "sources": []
                 }
             })
