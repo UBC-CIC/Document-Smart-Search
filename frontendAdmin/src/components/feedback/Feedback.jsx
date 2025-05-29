@@ -8,7 +8,6 @@ import {
   Landmark,
   ChevronDown,
   ChevronUp,
-  MessageSquare,
 } from "lucide-react";
 import {
   Collapsible,
@@ -57,23 +56,24 @@ const getRoleLabel = (role) => {
 const formatDate = (dateString) => {
   const date = new Date(dateString);
   if (isNaN(date)) return "Invalid Date";
-
   const day = String(date.getDate()).padStart(2, "0");
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const year = String(date.getFullYear()).slice(-2);
-
   let hours = date.getHours();
   const minutes = String(date.getMinutes()).padStart(2, "0");
   const ampm = hours >= 12 ? "PM" : "AM";
   hours = hours % 12 || 12;
-
   return `${day}/${month}/${year}, ${hours}:${minutes} ${ampm}`;
 };
 
 const FeedbackView = ({ role, feedbackData, onFeedbackClick }) => {
   const [isOpen, setIsOpen] = useState(true);
 
-  if (!feedbackData || !Array.isArray(feedbackData.feedback_details) || feedbackData.feedback_details.length === 0) {
+  if (
+    !feedbackData ||
+    !Array.isArray(feedbackData.feedback_details) ||
+    feedbackData.feedback_details.length === 0
+  ) {
     return (
       <div className="w-full">
         <div className="flex items-center space-x-4 px-4 py-3 bg-gray-50 rounded-t-lg">
@@ -86,7 +86,9 @@ const FeedbackView = ({ role, feedbackData, onFeedbackClick }) => {
           </div>
         </div>
         <div className="p-8 text-center border-b border-x rounded-b-lg bg-white">
-          <p className="text-gray-500">No feedback available for this role yet</p>
+          <p className="text-gray-500">
+            No feedback available for this role yet
+          </p>
         </div>
       </div>
     );
@@ -102,11 +104,16 @@ const FeedbackView = ({ role, feedbackData, onFeedbackClick }) => {
               {getRoleLabel(role)} Feedback
             </h2>
             <span className="ml-2 text-gray-500">
-              (Avg Rating: {Number(feedbackData.average_rating).toFixed(1)}, Total: {feedbackData.feedback_count})
+              (Avg Rating: {Number(feedbackData.average_rating).toFixed(1)},
+              Total: {feedbackData.feedback_count})
             </span>
           </div>
           <Button variant="ghost" size="sm" className="w-9 p-0">
-            {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            {isOpen ? (
+              <ChevronUp className="h-4 w-4" />
+            ) : (
+              <ChevronDown className="h-4 w-4" />
+            )}
           </Button>
         </div>
       </CollapsibleTrigger>
@@ -122,7 +129,9 @@ const FeedbackView = ({ role, feedbackData, onFeedbackClick }) => {
               <div className="flex flex-col space-y-3">
                 <div className="flex items-center space-x-2">
                   <span className="text-gray-500">Session ID:</span>
-                  <code className="bg-gray-50 px-2 py-1 rounded text-sm">{feedback.session_id}</code>
+                  <code className="bg-gray-50 px-2 py-1 rounded text-sm">
+                    {feedback.session_id}
+                  </code>
                   <div
                     className={`ml-2 px-2 py-1 rounded text-xs font-semibold ${
                       feedback.feedback_rating >= 4
@@ -137,11 +146,15 @@ const FeedbackView = ({ role, feedbackData, onFeedbackClick }) => {
                 </div>
                 <div className="flex items-center space-x-2">
                   <span className="text-gray-500">Feedback:</span>
-                  <span className="text-sm">{feedback.feedback_description || "None"}</span>
+                  <span className="text-sm">
+                    {feedback.feedback_description || "None"}
+                  </span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <span className="text-gray-500">Submitted:</span>
-                  <span className="text-sm">{formatDate(feedback.feedback_time)}</span>
+                  <span className="text-sm">
+                    {formatDate(feedback.feedback_time)}
+                  </span>
                 </div>
               </div>
             </div>
@@ -153,6 +166,7 @@ const FeedbackView = ({ role, feedbackData, onFeedbackClick }) => {
 };
 
 const Feedback = () => {
+  const [tabsValue, setTabsValue] = useState("public");
   const [feedbackDataByRole, setFeedbackDataByRole] = useState({});
   const [paginationState, setPaginationState] = useState({
     public: 1,
@@ -173,12 +187,13 @@ const Feedback = () => {
       const session = await fetchAuthSession();
       const token = session.tokens.idToken;
       const page = paginationState[role];
-
       const startDateStr = startDate ? startDate.toISOString() : "";
       const endDateStr = endDate ? endDate.toISOString() : "";
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_ENDPOINT}admin/feedback_by_role?user_role=${encodeURIComponent(role)}&start_date=${startDateStr}&end_date=${endDateStr}&page=${page}&limit=10`,
+        `${process.env.NEXT_PUBLIC_API_ENDPOINT}admin/feedback_by_role?user_role=${encodeURIComponent(
+          role
+        )}&start_date=${startDateStr}&end_date=${endDateStr}&page=${page}&limit=10`,
         {
           method: "GET",
           headers: {
@@ -201,6 +216,11 @@ const Feedback = () => {
   };
 
   useEffect(() => {
+    // Reset pagination to page 1 on tab change
+    setPaginationState((prev) => ({ ...prev, [tabsValue]: 1 }));
+  }, [tabsValue]);
+
+  useEffect(() => {
     setLoading(true);
     roles.forEach((role) => fetchFeedbackData(role));
   }, [paginationState, startDate, endDate]);
@@ -221,22 +241,15 @@ const Feedback = () => {
   };
 
   if (loading) return <LoadingScreen />;
-
   if (selectedSession) {
     return (
-      <Session
-        session={selectedSession}
-        onBack={() => setSelectedSession(null)}
-        from={"Feedback"}
-      />
+      <Session session={selectedSession} onBack={() => setSelectedSession(null)} from="Feedback" />
     );
   }
 
   return (
     <div className="w-full mx-auto p-4 space-y-4">
-
-
-      <Tabs defaultValue="public" className="w-full">
+      <Tabs value={tabsValue} onValueChange={setTabsValue} className="w-full">
         <TabsList className="mb-4 flex flex-wrap gap-2 rounded-md bg-gray-50">
           {roles.map((role) => (
             <TabsTrigger key={role} value={role} className="flex items-center gap-1">
@@ -245,30 +258,32 @@ const Feedback = () => {
             </TabsTrigger>
           ))}
         </TabsList>
-      <div className="flex flex-col background-white p-4 rounded-lg shadow-sm border mb-4">
-        <div className="flex justify-start gap-8">
-          <div className="flex flex-col">
-            <label className="block text-sm mb-1">Start Date</label>
-            <DatePicker
-              selected={startDate}
-              onChange={(date) => setStartDate(date)}
-              placeholderText="dd/mm/yyyy"
-              className="p-2 border rounded"
-              dateFormat="dd/MM/yyyy"
-            />
-          </div>
-          <div className="flex flex-col">
-            <label className="block text-sm mb-1">End Date</label>
-            <DatePicker
-              selected={endDate}
-              onChange={(date) => setEndDate(date)}
-              placeholderText="dd/mm/yyyy"
-              className="p-2 border rounded"
-              dateFormat="dd/MM/yyyy"
-            />
+
+        <div className="flex flex-col background-white p-4 rounded-lg shadow-sm border mb-4">
+          <div className="flex justify-start gap-8">
+            <div className="flex flex-col">
+              <label className="block text-sm mb-1">Start Date</label>
+              <DatePicker
+                selected={startDate}
+                onChange={(date) => setStartDate(date)}
+                placeholderText="dd/mm/yyyy"
+                className="p-2 border rounded"
+                dateFormat="dd/MM/yyyy"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label className="block text-sm mb-1">End Date</label>
+              <DatePicker
+                selected={endDate}
+                onChange={(date) => setEndDate(date)}
+                placeholderText="dd/mm/yyyy"
+                className="p-2 border rounded"
+                dateFormat="dd/MM/yyyy"
+              />
+            </div>
           </div>
         </div>
-      </div>
+
         {roles.map((role) => (
           <TabsContent key={role} value={role}>
             <FeedbackView

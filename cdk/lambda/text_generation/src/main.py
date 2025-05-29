@@ -8,6 +8,7 @@ import datetime
 from opensearchpy import OpenSearch
 import psycopg
 from langchain_aws import BedrockEmbeddings
+import time
 
 # Import helpers
 # from helpers.db import get_rds_connection
@@ -78,6 +79,54 @@ def get_parameter(param_name: str):
     except Exception as e:
         logger.error(f"Error fetching parameter {param_name}: {e}")
         raise
+
+def setup_guardrail(guardrail_name):
+    bedrock_client = boto3.client("bedrock-runtime", region_name=REGION)
+    paginator = bedrock_client.get_paginator("list_guardrails")
+    guardrail_id = guardrail_version = None
+
+    for page in paginator.paginate():
+        for guardrail in page["guardrails"]:
+            if guardrail["name"] == guardrail_name:
+                guardrail_id = guardrail["id"]
+                guardrail_version = guardrail.get("version", None)
+                break
+        if guardrail_id:
+            break
+    if not guardrail_id:
+        resp = bedrock_client.create_guardrail(
+            name=guardrail_name,
+            contentFilterConfig={
+                "inputFilterType": "ALLOW",
+                "outputFilterType": "ALLOW",
+                "contentFilterType": "OBSERVE",
+            },
+            wordFilterConfig={
+                "inputFilterType": "ALLOW",
+                "outputFilterType": "ALLOW",
+                "contentFilterType": "OBSERVE",
+            },
+            # sensitiveInformationPolicyConfig={
+            #     "inputFilterType": "ALLOW",
+            #     "outputFilterType": "ALLOW",
+            #     "contentFilterType": "OBSERVE",
+            # },
+            blockedInputMessaging='Sorry, I cannot process that request.',
+            blockedOutputMessaging='Sorry, I cannot process that content.',
+        )
+        guardrail_id = resp["guardrailId"]
+        time.sleep(5)
+        ver_resp = bedrock_client.create_guardrail_version(
+            guardrailIdentifier=guardrail_id,
+            description="Initial version",
+            clientRequestToken=str(uuid.uuid4())
+        )
+        guardrail_version = ver_resp["version"]
+
+        return guardrail_id, guardrail_version
+    
+
+
 
 def get_secret(secret_name: str) -> Dict:
     try:
@@ -203,6 +252,8 @@ def handler(event, context):
             'body': json.dumps('Missing required parameter: user_role')
         }
     
+    guardrail_id, guardrail_version = setup_guardrail('comprehensive-guardrails')
+    
     # Check if this is the first message for this session
     if no_existing_messages(dynamodb_table_name, session_id):
         logger.info(f"First message detected with user_role: {user_role}")
@@ -212,6 +263,26 @@ def handler(event, context):
         
         # Create the role message
         set_role_message(role_display_name, dynamodb_table_name, session_id)
+
+    # Apply guardrail to the question
+    guard_resp = bedrock_runtime.apply_guardrail(
+        guardrailIdentifier=guardrail_id,
+        guardrailVersion=guardrail_version,
+        source="INPUT",
+        content=[{"text": {"text": question, "qualifiers": ["guard_content"]}}]
+    )
+
+    if guard_resp.get("action") == "GUARDRAIL_INTERVENED":
+        return {
+            "statusCode": 400,
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Headers": "*",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "*",
+            },
+            "body": json.dumps({"error": "Content blocked by moderation guardrails."})
+        }
 
     try:
         # Initialize OpenSearch, DB, and get configuration values
@@ -319,8 +390,32 @@ def handler(event, context):
         response_data = get_llm_output(response['output'])
         llm_output = response_data.get("llm_output")
         options = response_data.get("options", [])
+
+        
         
         logger.info(f"Request processed in {duration:.2f} seconds")
+
+                # Optional: Apply guardrail to LLM output
+        guard_resp = bedrock_runtime.apply_guardrail(
+            guardrailIdentifier=guardrail_id,
+            guardrailVersion=guardrail_version,
+            source="OUTPUT",
+            content=[{"text": {"text": llm_output, "qualifiers": ["guard_content"]}}]
+        )
+
+        if guard_resp.get("action") == "GUARDRAIL_INTERVENED":
+            return {
+                "statusCode": 400,
+                "headers": {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Headers": "*",
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "*",
+                },
+                "body": json.dumps({"error": "Response blocked by moderation guardrails."})
+            }
+
+        
         
         # Return the response
         return {

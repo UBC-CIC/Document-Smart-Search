@@ -136,6 +136,7 @@ const RoleView = ({ role, sessions, onSessionClick, startDate, endDate, currentP
 };
 
 export default function History() {
+  const [tabValue, setTabValue] = useState("public");
   const [publicSessions, setPublicSessions] = useState([]);
   const [internalResearcherSessions, setInternalResearcherSessions] = useState([]);
   const [externalResearcherSessions, setExternalResearcherSessions] = useState([]);
@@ -196,6 +197,25 @@ export default function History() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    switch (tabValue) {
+      case "public":
+        setPublicPage(1);
+        break;
+      case "internal_researcher":
+        setInternalResearcherPage(1);
+        break;
+      case "external_researcher":
+        setExternalResearcherPage(1);
+        break;
+      case "policy_maker":
+        setPolicyMakerPage(1);
+        break;
+      default:
+        break;
+    }
+  }, [tabValue]);
 
   useEffect(() => {
     const loadSessions = async () => {
@@ -295,7 +315,7 @@ export default function History() {
 
   return (
     <div className="w-full mx-auto p-4 mb-8">
-      <Tabs defaultValue="public" className="w-full">
+      <Tabs value={tabValue} onValueChange={setTabValue} className="w-full">
         <TabsList className="mb-4 flex flex-wrap gap-2 rounded-md bg-gray-50">
           {roles.map((role) => (
             <TabsTrigger key={role.key} value={role.key} className="flex items-center gap-1">
