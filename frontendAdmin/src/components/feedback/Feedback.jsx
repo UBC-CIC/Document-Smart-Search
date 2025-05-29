@@ -234,6 +234,17 @@ const Feedback = () => {
 
   return (
     <div className="w-full mx-auto p-4 space-y-4">
+
+
+      <Tabs defaultValue="public" className="w-full">
+        <TabsList className="mb-4 flex flex-wrap gap-2 rounded-md bg-gray-50">
+          {roles.map((role) => (
+            <TabsTrigger key={role} value={role} className="flex items-center gap-1">
+              {getRoleIcon(role)}
+              {getRoleLabel(role)}
+            </TabsTrigger>
+          ))}
+        </TabsList>
       <div className="flex flex-col background-white p-4 rounded-lg shadow-sm border mb-4">
         <div className="flex justify-start gap-8">
           <div className="flex flex-col">
@@ -258,17 +269,6 @@ const Feedback = () => {
           </div>
         </div>
       </div>
-
-      <Tabs defaultValue="public" className="w-full">
-        <TabsList className="mb-4 flex flex-wrap gap-2 rounded-md bg-gray-50">
-          {roles.map((role) => (
-            <TabsTrigger key={role} value={role} className="flex items-center gap-1">
-              {getRoleIcon(role)}
-              {getRoleLabel(role)}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-
         {roles.map((role) => (
           <TabsContent key={role} value={role}>
             <FeedbackView
