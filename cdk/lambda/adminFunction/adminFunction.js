@@ -716,87 +716,95 @@ exports.handler = async (event) => {
           response.body = JSON.stringify({ error: "Internal server error" })
         }
         break
-      case "GET /admin/feedback_by_role":
-        if (event.queryStringParameters && event.queryStringParameters.user_role) {
-          const userRole = event.queryStringParameters.user_role;
-          const page = parseInt(event.queryStringParameters.page) || 1;
-          const limit = parseInt(event.queryStringParameters.limit) || 10;
-          const offset = (page - 1) * limit;
+        case "GET /admin/feedback_by_role":
+          if (event.queryStringParameters && event.queryStringParameters.user_role) {
+            const userRole = event.queryStringParameters.user_role;
+            const page = parseInt(event.queryStringParameters.page) || 1;
+            const limit = parseInt(event.queryStringParameters.limit) || 10;
+            const offset = (page - 1) * limit;
+            const startDate = event.queryStringParameters.start_date || null;
+            const endDate = event.queryStringParameters.end_date || null;
 
-          console.log(`Fetching feedback for user_role=${userRole}, page=${page}, limit=${limit}`);
+            console.log(`Fetching feedback for user_role=${userRole}, page=${page}, limit=${limit}, start_date=${startDate}, end_date=${endDate}`);
 
-          try {
-            // Fetch paginated feedback for the specified role
-            const feedbackDetails = await sqlConnectionTableCreator`
-              WITH feedback_with_roles AS (
-                SELECT DISTINCT
-                  f.feedback_id,
-                  f.session_id,
-                  f.feedback_rating,
-                  f.feedback_description,
-                  f.timestamp AS feedback_time,
-                  uel.user_role
+            try {
+              // Fetch paginated feedback for the specified role
+              const feedbackDetails = await sqlConnectionTableCreator`
+                WITH feedback_with_roles AS (
+                  SELECT DISTINCT
+                    f.feedback_id,
+                    f.session_id,
+                    f.feedback_rating,
+                    f.feedback_description,
+                    f.timestamp AS feedback_time,
+                    uel.user_role
+                  FROM feedback f
+                  INNER JOIN user_engagement_log uel
+                  ON f.session_id = uel.session_id
+                  WHERE uel.user_role = ${userRole}
+                  ${startDate ? sql`AND f.timestamp >= ${startDate}` : sql``}
+                  ${endDate ? sql`AND f.timestamp <= ${endDate}` : sql``}
+                )
+                SELECT 
+                  feedback_id,
+                  session_id,
+                  feedback_rating,
+                  feedback_description,
+                  feedback_time
+                FROM feedback_with_roles
+                ORDER BY feedback_time DESC
+                LIMIT ${limit} OFFSET ${offset};
+              `;
+
+              const totalCountResult = await sqlConnectionTableCreator`
+                SELECT COUNT(*) AS total_count
+                FROM (
+                  SELECT DISTINCT f.feedback_id
+                  FROM feedback f
+                  INNER JOIN user_engagement_log uel
+                  ON f.session_id = uel.session_id
+                  WHERE uel.user_role = ${userRole}
+                  ${startDate ? sql`AND f.timestamp >= ${startDate}` : sql``}
+                  ${endDate ? sql`AND f.timestamp <= ${endDate}` : sql``}
+                ) AS count_table;
+              `;
+
+              const averageRatingResult = await sqlConnectionTableCreator`
+                SELECT 
+                  AVG(f.feedback_rating) AS average_rating
                 FROM feedback f
                 INNER JOIN user_engagement_log uel
                 ON f.session_id = uel.session_id
                 WHERE uel.user_role = ${userRole}
-              )
-              SELECT 
-                feedback_id,
-                session_id,
-                feedback_rating,
-                feedback_description,
-                feedback_time
-              FROM feedback_with_roles
-              ORDER BY feedback_time DESC
-              LIMIT ${limit} OFFSET ${offset};
-            `;
+                ${startDate ? sql`AND f.timestamp >= ${startDate}` : sql``}
+                ${endDate ? sql`AND f.timestamp <= ${endDate}` : sql``};
+              `;
 
-            const totalCountResult = await sqlConnectionTableCreator`
-              SELECT COUNT(*) AS total_count
-              FROM (
-                SELECT DISTINCT f.feedback_id
-                FROM feedback f
-                INNER JOIN user_engagement_log uel
-                ON f.session_id = uel.session_id
-                WHERE uel.user_role = ${userRole}
-              ) AS count_table;
-            `;
+              const totalCount = parseInt(totalCountResult[0].total_count, 10);
+              const totalPages = Math.ceil(totalCount / limit);
+              const averageRating = parseFloat(averageRatingResult[0].average_rating || 0).toFixed(1);
 
-            const averageRatingResult = await sqlConnectionTableCreator`
-              SELECT 
-                AVG(f.feedback_rating) AS average_rating
-              FROM feedback f
-              INNER JOIN user_engagement_log uel
-              ON f.session_id = uel.session_id
-              WHERE uel.user_role = ${userRole};
-            `;
+              response.body = JSON.stringify({
+                user_role: userRole,
+                feedback_count: totalCount,
+                average_rating: averageRating,
+                feedback_details: feedbackDetails,
+                totalPages,
+                currentPage: page,
+              });
 
-            const totalCount = parseInt(totalCountResult[0].total_count, 10);
-            const totalPages = Math.ceil(totalCount / limit);
-            const averageRating = parseFloat(averageRatingResult[0].average_rating || 0).toFixed(1);
-
-            response.body = JSON.stringify({
-              user_role: userRole,
-              feedback_count: totalCount,
-              average_rating: averageRating,
-              feedback_details: feedbackDetails,
-              totalPages,
-              currentPage: page,
-            });
-            
-            response.statusCode = 200;
-          } catch (err) {
-            console.error("Error fetching feedback:", err);
-            response.statusCode = 500;
-            response.body = JSON.stringify({ error: "Internal server error" });
+              response.statusCode = 200;
+            } catch (err) {
+              console.error("Error fetching feedback:", err);
+              response.statusCode = 500;
+              response.body = JSON.stringify({ error: "Internal server error" });
+            }
+          } else {
+            console.error("Missing required parameter: user_role");
+            response.statusCode = 400;
+            response.body = JSON.stringify({ error: "Missing required parameter: user_role" });
           }
-        } else {
-          console.error("Missing required parameter: user_role");
-          response.statusCode = 400;
-          response.body = JSON.stringify({ error: "Missing required parameter: user_role" });
-        }
-        break;
+          break;
       default:
         throw new Error(`Unsupported route: "${pathData}"`)
     }

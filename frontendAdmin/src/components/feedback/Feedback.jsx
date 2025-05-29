@@ -6,7 +6,6 @@ import {
   BookOpen,
   GraduationCap,
   Landmark,
-  ShieldCheck,
   ChevronDown,
   ChevronUp,
   MessageSquare,
@@ -22,6 +21,8 @@ import { fetchAuthSession } from "aws-amplify/auth";
 import Session from "../history/Session";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import Pagination from "@mui/material/Pagination";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 
 const getRoleIcon = (role) => {
   switch (role) {
@@ -53,9 +54,6 @@ const getRoleLabel = (role) => {
   }
 };
 
-const FeedbackView = ({ role, feedbackData, onFeedbackClick }) => {
-  const [isOpen, setIsOpen] = useState(true);
-
 const formatDate = (dateString) => {
   const date = new Date(dateString);
   if (isNaN(date)) return "Invalid Date";
@@ -72,6 +70,8 @@ const formatDate = (dateString) => {
   return `${day}/${month}/${year}, ${hours}:${minutes} ${ampm}`;
 };
 
+const FeedbackView = ({ role, feedbackData, onFeedbackClick }) => {
+  const [isOpen, setIsOpen] = useState(true);
 
   if (!feedbackData || !Array.isArray(feedbackData.feedback_details) || feedbackData.feedback_details.length === 0) {
     return (
@@ -163,6 +163,9 @@ const Feedback = () => {
   const [totalPagesByRole, setTotalPagesByRole] = useState({});
   const [loading, setLoading] = useState(true);
   const [selectedSession, setSelectedSession] = useState(null);
+  const [startDate, setStartDate] = useState(null);
+  const [endDate, setEndDate] = useState(null);
+
   const roles = ["public", "internal_researcher", "external_researcher", "policy_maker"];
 
   const fetchFeedbackData = async (role) => {
@@ -171,8 +174,11 @@ const Feedback = () => {
       const token = session.tokens.idToken;
       const page = paginationState[role];
 
+      const startDateStr = startDate ? startDate.toISOString() : "";
+      const endDateStr = endDate ? endDate.toISOString() : "";
+
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_ENDPOINT}admin/feedback_by_role?user_role=${encodeURIComponent(role)}&page=${page}&limit=10`,
+        `${process.env.NEXT_PUBLIC_API_ENDPOINT}admin/feedback_by_role?user_role=${encodeURIComponent(role)}&start_date=${startDateStr}&end_date=${endDateStr}&page=${page}&limit=10`,
         {
           method: "GET",
           headers: {
@@ -185,7 +191,6 @@ const Feedback = () => {
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
       const data = await response.json();
-      
       setFeedbackDataByRole((prev) => ({ ...prev, [role]: data }));
       setTotalPagesByRole((prev) => ({ ...prev, [role]: data.totalPages || 1 }));
     } catch (error) {
@@ -198,7 +203,7 @@ const Feedback = () => {
   useEffect(() => {
     setLoading(true);
     roles.forEach((role) => fetchFeedbackData(role));
-  }, [paginationState]);
+  }, [paginationState, startDate, endDate]);
 
   const handleSessionClick = (sessionId) => {
     for (const role of roles) {
@@ -229,6 +234,31 @@ const Feedback = () => {
 
   return (
     <div className="w-full mx-auto p-4 space-y-4">
+      <div className="flex flex-col background-white p-4 rounded-lg shadow-sm border mb-4">
+        <div className="flex justify-start gap-8">
+          <div className="flex flex-col">
+            <label className="block text-sm mb-1">Start Date</label>
+            <DatePicker
+              selected={startDate}
+              onChange={(date) => setStartDate(date)}
+              placeholderText="dd/mm/yyyy"
+              className="p-2 border rounded"
+              dateFormat="dd/MM/yyyy"
+            />
+          </div>
+          <div className="flex flex-col">
+            <label className="block text-sm mb-1">End Date</label>
+            <DatePicker
+              selected={endDate}
+              onChange={(date) => setEndDate(date)}
+              placeholderText="dd/mm/yyyy"
+              className="p-2 border rounded"
+              dateFormat="dd/MM/yyyy"
+            />
+          </div>
+        </div>
+      </div>
+
       <Tabs defaultValue="public" className="w-full">
         <TabsList className="mb-4 flex flex-wrap gap-2 rounded-md bg-gray-50">
           {roles.map((role) => (

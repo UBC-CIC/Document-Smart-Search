@@ -9,7 +9,6 @@ import { VpcStack }         from "../lib/vpc-stack";
 import { OpenSearchStack }  from "../lib/opensearch-stack";
 import { DBFlowStack }      from "../lib/dbFlow-stack";
 import { DataPipelineStack } from "../lib/data-pipeline-stack";
-import { WafShieldStack }   from "../lib/waf-shield-stack";
 
 const app = new cdk.App();
 
@@ -53,14 +52,5 @@ const amplifyStack = new AmplifyStack(app, `${StackPrefix}-Amplify`, apiStack, {
 
 // 7) Data Pipeline
 const dataPipelineStack = new DataPipelineStack(app, `${StackPrefix}-DataPipeline`, vpcStack, dbStack, osStack, { env });
-
-// 8) WAF and Shield Protection
-const wafShieldStack = new WafShieldStack(app, `${StackPrefix}-WafShield`, {
-  env,
-  apiGateway: apiStack.api,
-});
-
-// Add dependencies
-wafShieldStack.addDependency(apiStack);
 
 Tags.of(app).add("app", "DFO-Smart-Search");
