@@ -42,6 +42,12 @@ export default function GraphPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const cyRef = useRef(null);
 
+    if (typeof window === "undefined") {
+    // Avoid SSR entirely
+    return null;
+  }
+
+
   const {
     yearFilters = [],
     setYearFilters = () => {},
@@ -55,6 +61,7 @@ export default function GraphPage() {
     setDocumentTypeFilters = () => {},
     resetFilters = () => {},
   } = useDocumentSearch() || {};
+
 
 
   const elements = useMemo(() => {
