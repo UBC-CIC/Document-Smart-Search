@@ -98,11 +98,11 @@ const PublicHome = () => {
       text: "Emerging Trends",
       description: "Discover trending topics and new research insights.",
     },
-    {
-      icon: <RiEditBoxLine className="w-6 h-6 md:w-7 md:h-7 text-amber-600 dark:text-amber-400" />,
-      text: "Manage Content",
-      description: "Update and contribute to official DFO documents.",
-    },
+    // {
+    //   icon: <RiEditBoxLine className="w-6 h-6 md:w-7 md:h-7 text-amber-600 dark:text-amber-400" />,
+    //   text: "Manage Content",
+    //   description: "Update and contribute to official DFO documents.",
+    // },
   ];
 
   if (!mounted) {
@@ -110,15 +110,16 @@ const PublicHome = () => {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-white dark:bg-gray-900 transition-colors duration-300">
+<div className="min-h-screen flex flex-col justify-between bg-white dark:bg-gray-900 transition-colors duration-300">
       <Header />
 
-      <motion.main
-        className="flex-1 flex flex-col justify-between py-6 sm:py-8 md:py-12 px-3 sm:px-4 max-w-7xl mx-auto w-full"
-        initial="hidden"
-        animate="visible"
-        variants={containerVariants}
-      >
+<motion.main
+  className="flex flex-col items-center py-10 px-4 gap-12 max-w-7xl mx-auto w-full"
+  initial="hidden"
+  animate="visible"
+  variants={containerVariants}
+>
+
         {/* Top Section: Logo and Welcome Text */}
         <motion.div className="space-y-4 sm:space-y-6 md:space-y-8" variants={itemVariants}>
           {/* Logo with shine effect */}
@@ -150,7 +151,7 @@ const PublicHome = () => {
 
         {/* Middle Section: Feature Cards */}
         <div className="flex-1 flex flex-col justify-center my-6 sm:my-8 md:my-12">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 md:gap-6 max-w-4xl mx-auto w-full">
+<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 max-w-5xl mx-auto">
             {featureCards.map((item, index) => (
               <motion.div
                 key={index}
