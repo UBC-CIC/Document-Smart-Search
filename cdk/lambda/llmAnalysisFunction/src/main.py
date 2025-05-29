@@ -46,20 +46,25 @@ def extract_key_insights(analysis_text: str) -> List[str]:
     """Extract key insights from the LLM analysis text."""
     insights = []
     
-    # Look for key findings section
-    key_findings_match = re.search(r'Key Findings[:\n]+(.*?)(?:Relevance to User Query|\Z)', 
-                                 analysis_text, re.DOTALL | re.IGNORECASE)
+    # Look for key findings section using the exact expected format
+    key_findings_match = re.search(r'# Key Findings\s+(.*?)(?:# Summary|\Z)', 
+                                   analysis_text, re.DOTALL)
     
     if key_findings_match:
         findings_text = key_findings_match.group(1).strip()
-        # Extract bullet points or numbered insights
-        bullet_points = re.findall(r'(?:^|\n)[•\-\*\d+\.]\s*([^\n]+)', findings_text)
+        # Extract bullet points with hyphen format as specified in prompt
+        bullet_points = re.findall(r'- ([^\n]+)', findings_text)
         
         if bullet_points:
-            insights = [point.strip() for point in bullet_points if point.strip()]
-        else:
-            # If no bullet points found, split by newlines and filter empty lines
-            insights = [line.strip() for line in findings_text.split('\n') if line.strip()]
+            # Remove duplicates while preserving order
+            seen = set()
+            unique_insights = []
+            for point in bullet_points:
+                point_stripped = point.strip()
+                if point_stripped and point_stripped not in seen:
+                    seen.add(point_stripped)
+                    unique_insights.append(point_stripped)
+            insights = unique_insights
     
     # If no insights found, provide a generic one to avoid empty list
     if not insights:
@@ -149,34 +154,40 @@ def handler(event, context):
                     "Access-Control-Allow-Origin": "*"
                 }
             }
-        
-        # Create the prompt for Bedrock
+
+        cleaned_text = doc['text'].replace("\n", " ").strip()
         llm_prompt = f"""
-        Please analyze this document in relation to the user's query.
-        
-        Format your response with clear sections:
-        
+        You are an expert summarizer. Analyze the document in relation to the user's query, 
+        and respond only in the following exact format in plain text, no other formatting or text:
+
         # Key Findings
-        - List 3-5 bullet points of the most important insights from the document
+        - 3 to 5 bullet points: each a single, self-contained insight
         
         # Summary
-        Provide a concise summary of the document's content and its relevance to the query
-        
-        User Query:
-        {user_query}
+        A concise paragraph that (1) summarizes the document's main content, 
+        (2) explains its relevance to the user's question, and (3) gives a rating of 1 to 10 
+        on how well the document answers the user's question, with 10 being a perfect match.
 
-        Document:
-        Title: {doc['title']}
-        Alternative Title: {doc['document_subject']}
-        Document type: {doc['document_type']}
-        
-        Canadian Science Advisory Secretariat (CSAS) Event Name: {doc['csas_event']}
-        CSAS Event Year: {doc['csas_event_year']}
-        
-        Text:
-        {doc['text']}
+        Constraints:
+        - Use exactly these two sections and no other headings.
+        - Bullet lists must use a hyphen (`- `).
+        - Do not ask any follow-up questions or add any commentary.
+        - Do not include any additional text outside the specified sections.
+        ---
+
+        **Document Metadata:**  
+        Title: {doc['title']}  
+        Alt Title: {doc['document_subject']}  
+        Type: {doc['document_type']}  
+        CSAS Event: {doc['csas_event']} ({doc['csas_event_year']})
+
+        **Full Text:**  
+        {cleaned_text}
+
+        **User Query:**  
+        {user_query}
         """
-        
+
         # Call Bedrock for LLM analysis
         bedrock_client = boto3.client("bedrock-runtime", region_name=REGION_NAME)
         
@@ -186,26 +197,26 @@ def handler(event, context):
             accept="application/json",
             body=json.dumps({
                 "prompt": llm_prompt,
-                "temperature": 0.7
+                "temperature": 0.1,
             })
         )
         
         response_body = json.loads(response.get("body").read())
-        analysis = response_body.get("generation", "")
-        
+        analysis: str = response_body.get("generation", "").replace("`", "")
+
         # Extract summary - assume everything after the Summary header and before any other header
         summary_match = re.search(r'# Summary\s+(.*?)(?:#|\Z)', analysis, re.DOTALL)
-        summary = summary_match.group(1).strip() if summary_match else analysis
-        
+        summary = summary_match.group(1).strip() if summary_match else analysis.strip()
+
         # Extract key insights as a list
         key_insights = extract_key_insights(analysis)
-        
+
         # Return only what the frontend expects
         return {
             "statusCode": 200,
             "body": json.dumps({
                 "title": doc["title"],
-                "summary": summary.strip(),
+                "summary": summary,
                 "keyInsights": key_insights
             }),
             "headers": {
