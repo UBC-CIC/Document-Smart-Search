@@ -10,25 +10,18 @@ export default function RelatedDocumentsPopup({
   topicType,
   documentId
 }) {
-  const [showTooltip, setShowTooltip] = useState(null);
-  
   // Topic-specific relevance explanations
   const derivedTopicExplanation = "The semantic similarity of this document to the topic.";
   const mandateExplanation = "Relevance of this document to the mandate as rated by a LLM.";
   const dfoTopicExplanation = "Relevance of this document to the topic as rated by a LLM.";
   
-  // Get the appropriate explanation based on topic type
-  const getRelevanceExplanation = () => {
-    if (topicType === 'derived') return derivedTopicExplanation;
-    if (topicType === 'mandate') return mandateExplanation;
-    return dfoTopicExplanation;
-  };
+  const [showTooltip, setShowTooltip] = useState(null);
   
   // Use the hook to manage all state and data fetching
   const {
     popupState,
     documents,
-    totalCount, // Use the totalCount from the API response
+    totalCount,
     isLoading,
     currentPage,
     totalPages,
@@ -65,6 +58,13 @@ export default function RelatedDocumentsPopup({
     return count > 1000 ? `${(count / 1000).toFixed(1)}K` : count;
   };
   
+  // Get the appropriate explanation based on topic type
+  const getRelevanceExplanation = () => {
+    if (topicType === 'derived') return derivedTopicExplanation;
+    if (topicType === 'mandate') return mandateExplanation;
+    return dfoTopicExplanation;
+  };
+  
   // Don't render anything if the popup is closed
   if (!isOpen) return null;
 
@@ -76,6 +76,7 @@ export default function RelatedDocumentsPopup({
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-4xl max-h-[90vh] flex flex-col">
+        {/* Header */}
         <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
           <h3 className="text-lg font-medium dark:text-white flex-1">
             {topicType === 'mandate' ? 'Mandate: ' : topicType === 'dfo' ? 'DFO Topic: ' : 'Derived Topic: '}
@@ -160,7 +161,7 @@ export default function RelatedDocumentsPopup({
               <div>
                 <h4 className="text-sm font-medium mb-3 dark:text-gray-300">Sort By</h4>
                 <div className="space-y-2">
-                  {/* Combined Score renamed to Relevancy for non-derived topics */}
+                  {/* Sort options */}
                   {topicType !== 'derived' && (
                     <button 
                       onClick={() => handleSortChange('combined')}
@@ -175,7 +176,6 @@ export default function RelatedDocumentsPopup({
                     </button>
                   )}
                   
-                  {/* For derived topics, keep the semantic score option */}
                   {topicType === 'derived' && (
                     <button 
                       onClick={() => handleSortChange('semanticScore')}
@@ -190,6 +190,7 @@ export default function RelatedDocumentsPopup({
                     </button>
                   )}
                   
+                  {/* Year sort options */}
                   <button 
                     onClick={() => handleSortChange('yearDesc')}
                     className={`flex items-center space-x-2 px-3 py-2 rounded-md w-full text-left ${
@@ -219,6 +220,7 @@ export default function RelatedDocumentsPopup({
           </div>
         )}
         
+        {/* Main content */}
         <div className="p-4 flex-1 overflow-y-auto">
           <div className="flex justify-between items-center mb-4">
             <div className="text-sm text-gray-600 dark:text-gray-400">
@@ -266,10 +268,7 @@ export default function RelatedDocumentsPopup({
                     <div>
                       <span className="bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded text-xs flex items-center">
                         <span className="font-medium">Relevance Score:</span>
-                        <span className="ml-1">
-                          {/* Show semantic score for derived topics, LLM score for others */}
-                          {((topicType === 'derived' ? doc.semanticScore : doc.llmScore) * 100).toFixed(0)}%
-                        </span>
+                        <span className="ml-1">{((topicType === 'derived' ? doc.semanticScore : doc.llmScore) * 100).toFixed(0)}%</span>
                         <div 
                           className="ml-1 relative cursor-help"
                           onMouseEnter={() => setShowTooltip(`doc-${index}`)}
@@ -277,7 +276,7 @@ export default function RelatedDocumentsPopup({
                         >
                           <Info className="h-3 w-3 text-gray-400" />
                           {showTooltip === `doc-${index}` && (
-                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg z-50">
+                            <div className="absolute bottom-full right-0 mb-1 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg z-50">
                               {getRelevanceExplanation()}
                             </div>
                           )}
