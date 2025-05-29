@@ -43,18 +43,19 @@ export default function GraphPage() {
   const cyRef = useRef(null);
 
   const {
-    yearFilters,
-    setYearFilters,
-    topicFilters,
-    setTopicFilters,
-    mandateFilters,
-    setMandateFilters,
-    authorFilters,
-    setAuthorFilters,
-    documentTypeFilters,
-    setDocumentTypeFilters,
-    resetFilters,
-  } = useDocumentSearch();
+    yearFilters = [],
+    setYearFilters = () => {},
+    topicFilters = [],
+    setTopicFilters = () => {},
+    mandateFilters = [],
+    setMandateFilters = () => {},
+    authorFilters = [],
+    setAuthorFilters = () => {},
+    documentTypeFilters = [],
+    setDocumentTypeFilters = () => {},
+    resetFilters = () => {},
+  } = useDocumentSearch() || {};
+
 
   const elements = useMemo(() => {
     const selectedMandateIds = new Set(Array.isArray(mandateFilters) ? mandateFilters : []);
