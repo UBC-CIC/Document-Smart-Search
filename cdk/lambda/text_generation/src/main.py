@@ -93,6 +93,7 @@ def setup_guardrail(guardrail_name):
                 break
         if guardrail_id:
             break
+
     if not guardrail_id:
         resp = bedrock_client.create_guardrail(
             name=guardrail_name,
@@ -106,24 +107,41 @@ def setup_guardrail(guardrail_name):
                 "outputFilterType": "ALLOW",
                 "contentFilterType": "OBSERVE",
             },
-            # sensitiveInformationPolicyConfig={
-            #     "inputFilterType": "ALLOW",
-            #     "outputFilterType": "ALLOW",
-            #     "contentFilterType": "OBSERVE",
-            # },
-            blockedInputMessaging='Sorry, I cannot process that request.',
-            blockedOutputMessaging='Sorry, I cannot process that content.',
+            sensitiveInformationPolicyConfig={
+                "inputFilterType": "ALLOW",
+                "outputFilterType": "ALLOW",
+                "contentFilterType": "OBSERVE",
+            },
+            topicPolicyConfig={
+                "topicsConfig": [
+                    {
+                        "name": "OffTopic",
+                        "definition": "Any question not related to fisheries science, ocean policy, or Canadian government research programs.",
+                        "examples": [
+                            "What’s your favorite video game?",
+                            "Tell me about Taylor Swift’s album.",
+                            "How do I cook pasta?",
+                            "What's the weather in Paris?"
+                        ],
+                        "type": "DENY"
+                    }
+                ]
+            },
+            blockedInputMessaging="Please stay on topic. This assistant focuses on DFO-related questions.",
+            blockedOutputMessaging="This response is not relevant to the topic. Please ask something related to the Department of Fisheries and Oceans."
         )
+
         guardrail_id = resp["guardrailId"]
         time.sleep(5)
+
         ver_resp = bedrock_client.create_guardrail_version(
             guardrailIdentifier=guardrail_id,
-            description="Initial version",
+            description="Initial version with topic enforcement",
             clientRequestToken=str(uuid.uuid4())
         )
         guardrail_version = ver_resp["version"]
 
-        return guardrail_id, guardrail_version
+    return guardrail_id, guardrail_version
     
 
 
