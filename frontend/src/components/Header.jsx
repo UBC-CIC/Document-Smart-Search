@@ -19,8 +19,7 @@ const Header = ({ setPage }) => {
           </div>
           {/* Government of Canada Wordmark */}
           <div className="leading-tight">
-            <p className="text-black font-bold text-sm sm:text-base">Government of Canada</p>
-            <p className="text-black font-bold text-sm sm:text-base">Gouvernement du Canada</p>
+            <p className="text-black font-bold text-sm sm:text-base">Fisheries and Oceans Canada</p>
           </div>
         </div>
       </div>

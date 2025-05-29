@@ -83,7 +83,7 @@ export default function NavigationHeader() {
             >
               Analytics
             </button>
-            <button
+            {/* <button
               onClick={() => handleNavigation("/graph")}
               className={
                 isActive("/graph")
@@ -92,7 +92,7 @@ export default function NavigationHeader() {
               }
             >
               Graph
-            </button>
+            </button> */}
           </nav>
 
           {/* Mobile Navigation Toggle */}
