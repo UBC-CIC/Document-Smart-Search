@@ -1,7 +1,13 @@
 import Link from "next/link"
-import { ChevronRight } from "lucide-react"
+import { ChevronRight, Info } from "lucide-react"
+import { useState } from "react"
 
 export default function ResultItem({ result, openQuerySummary }) {
+  const [showTooltip, setShowTooltip] = useState(false);
+  
+  // Relevancy explanation tooltip
+  const relevancyExplanation = "Relevance score represents a hybrid score combining semantic similarity (70%) and keyword matching (30%) based on a given query. Since semantic scoring is relative to all documents in the database, a high percentage doesn't always guarantee relevance to your specific question."
+
   // Function to determine the background color based on score
   const getScoreColor = (score) => {
     if (!score) return "bg-gray-300";
@@ -94,11 +100,23 @@ export default function ResultItem({ result, openQuerySummary }) {
         </div>
 
         <div className="flex justify-between items-center mt-2">
-          <div className="text-xs md:text-sm">
-            <span className="text-gray-500 dark:text-gray-400 mr-2">Similarity Score:</span>
+          <div className="text-xs md:text-sm flex items-center">
+            <span className="text-gray-500 dark:text-gray-400 mr-2">Relevance Score:</span>
             <span className={`score-badge ${getScoreColor(result.semanticScore)}`}>
               {scorePercentage !== null ? `${scorePercentage}%` : 'N/A'}
             </span>
+            <div 
+              className="ml-1 relative cursor-help"
+              onMouseEnter={() => setShowTooltip(true)}
+              onMouseLeave={() => setShowTooltip(false)}
+            >
+              <Info className="h-3 w-3 text-gray-400" />
+              {showTooltip && (
+                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg z-50">
+                  {relevancyExplanation}
+                </div>
+              )}
+            </div>
           </div>
           <a
             href={result.html_url || ""}

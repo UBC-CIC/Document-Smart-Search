@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { X, Filter, ArrowUp, ArrowDown } from "lucide-react";
+import { X, Filter, ArrowUp, ArrowDown, Info } from "lucide-react";
 import { fetchSimilarDocuments, fetchSimilarDocumentFilterOptions } from "../services/similarDocumentsService";
 import Link from "next/link";
 
@@ -8,6 +8,10 @@ export default function SimilarDocumentsPopup({
   onClose, 
   documentId 
 }) {
+  const [showTooltip, setShowTooltip] = useState(null);
+  // Relevancy explanation tooltip
+  const relevancyExplanation = "Relevance score is a hybrid score (70% semantic similarity, 30% keyword matching) relative to all documents in the database. A high score doesn't guarantee direct relevance to the document; it signifies strong semantic similarity";
+
   // State for all fetched documents and filter options
   const [allDocuments, setAllDocuments] = useState([]);
   const [filterOptions, setFilterOptions] = useState({
@@ -247,7 +251,7 @@ export default function SimilarDocumentsPopup({
                         : 'hover:bg-gray-100 dark:hover:bg-gray-700'
                     }`}
                   >
-                    <span className="dark:text-gray-300">Semantic Relevance</span>
+                    <span className="dark:text-gray-300">Relevance Score</span>
                     {sortBy === 'semanticScore' && <ArrowDown className="h-4 w-4" />}
                   </button>
                   
@@ -314,7 +318,7 @@ export default function SimilarDocumentsPopup({
             </div>
           ) : (
             <div className="space-y-4">
-              {displayedDocuments.map((doc) => (
+              {displayedDocuments.map((doc, index) => (
                 <div key={doc.id} className="border dark:border-gray-700 rounded-lg p-4">
                   <Link href={`/documents/${doc.id}`} className="block">
                     <h4 className="text-blue-600 dark:text-blue-400 font-medium hover:underline">{doc.title}</h4>
@@ -331,8 +335,21 @@ export default function SimilarDocumentsPopup({
                       {doc.documentType} • {doc.year || (doc.csasYear ? `${doc.csasYear}*` : "N/A")}
                     </div>
                     <div>
-                      <span className="bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded text-xs">
-                        <span className="font-medium">Semantic Score:</span> {(doc.semanticScore * 100).toFixed(0)}%
+                      <span className="bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded text-xs flex items-center">
+                        <span className="font-medium">Relevance Score:</span>
+                        <span className="ml-1">{(doc.semanticScore * 100).toFixed(0)}%</span>
+                        <div 
+                          className="ml-1 relative cursor-help"
+                          onMouseEnter={() => setShowTooltip(`doc-${index}`)}
+                          onMouseLeave={() => setShowTooltip(null)}
+                        >
+                          <Info className="h-3 w-3 text-gray-400" />
+                          {showTooltip === `doc-${index}` && (
+                            <div className="absolute bottom-full right-0 mb-1 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg z-50">
+                              {relevancyExplanation}
+                            </div>
+                          )}
+                        </div>
                       </span>
                     </div>
                   </div>

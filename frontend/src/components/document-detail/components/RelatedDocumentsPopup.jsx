@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, Filter, ArrowUp, ArrowDown } from "lucide-react";
+import { X, Filter, ArrowUp, ArrowDown, Info } from "lucide-react";
 import Link from "next/link";
 import { useTopicPopup } from "../hooks/useTopicPopup";
 
@@ -10,6 +10,20 @@ export default function RelatedDocumentsPopup({
   topicType,
   documentId
 }) {
+  const [showTooltip, setShowTooltip] = useState(null);
+  
+  // Topic-specific relevance explanations
+  const derivedTopicExplanation = "The semantic similarity of this document to the topic.";
+  const mandateExplanation = "Relevance of this document to the mandate as rated by a LLM.";
+  const dfoTopicExplanation = "Relevance of this document to the topic as rated by a LLM.";
+  
+  // Get the appropriate explanation based on topic type
+  const getRelevanceExplanation = () => {
+    if (topicType === 'derived') return derivedTopicExplanation;
+    if (topicType === 'mandate') return mandateExplanation;
+    return dfoTopicExplanation;
+  };
+  
   // Use the hook to manage all state and data fetching
   const {
     popupState,
@@ -146,7 +160,7 @@ export default function RelatedDocumentsPopup({
               <div>
                 <h4 className="text-sm font-medium mb-3 dark:text-gray-300">Sort By</h4>
                 <div className="space-y-2">
-                  {/* Combined Score - only show for non-derived topics */}
+                  {/* Combined Score renamed to Relevancy for non-derived topics */}
                   {topicType !== 'derived' && (
                     <button 
                       onClick={() => handleSortChange('combined')}
@@ -156,35 +170,23 @@ export default function RelatedDocumentsPopup({
                           : 'hover:bg-gray-100 dark:hover:bg-gray-700'
                       }`}
                     >
-                      <span className="dark:text-gray-300">Combined Score</span>
+                      <span className="dark:text-gray-300">Relevance Score</span>
                       {sortBy === 'combined' && <ArrowDown className="h-4 w-4" />}
                     </button>
                   )}
                   
-                  <button 
-                    onClick={() => handleSortChange('semanticScore')}
-                    className={`flex items-center space-x-2 px-3 py-2 rounded-md w-full text-left ${
-                      sortBy === 'semanticScore' 
-                        ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' 
-                        : 'hover:bg-gray-100 dark:hover:bg-gray-700'
-                    }`}
-                  >
-                    <span className="dark:text-gray-300">Semantic Score</span>
-                    {sortBy === 'semanticScore' && <ArrowDown className="h-4 w-4" />}
-                  </button>
-                  
-                  {/* LLM Score option only for non-derived topics */}
-                  {topicType !== 'derived' && (
+                  {/* For derived topics, keep the semantic score option */}
+                  {topicType === 'derived' && (
                     <button 
-                      onClick={() => handleSortChange('llmScore')}
+                      onClick={() => handleSortChange('semanticScore')}
                       className={`flex items-center space-x-2 px-3 py-2 rounded-md w-full text-left ${
-                        sortBy === 'llmScore' 
+                        sortBy === 'semanticScore' 
                           ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' 
                           : 'hover:bg-gray-100 dark:hover:bg-gray-700'
                       }`}
                     >
-                      <span className="dark:text-gray-300">LLM Score</span>
-                      {sortBy === 'llmScore' && <ArrowDown className="h-4 w-4" />}
+                      <span className="dark:text-gray-300">Relevance Score</span>
+                      {sortBy === 'semanticScore' && <ArrowDown className="h-4 w-4" />}
                     </button>
                   )}
                   
@@ -245,7 +247,7 @@ export default function RelatedDocumentsPopup({
             </div>
           ) : (
             <div className="space-y-4">
-              {documents.map((doc) => (
+              {documents.map((doc, index) => (
                 <div key={doc.id} className="border dark:border-gray-700 rounded-lg p-4">
                   <Link href={`/documents/${doc.id}`} className="block">
                     <h4 className="text-blue-600 dark:text-blue-400 font-medium hover:underline">{doc.title}</h4>
@@ -262,20 +264,25 @@ export default function RelatedDocumentsPopup({
                       {doc.documentType} • {doc.year || (doc.csasYear ? `${doc.csasYear}*` : "N/A")}
                     </div>
                     <div>
-                      {topicType === 'derived' ? (
-                        <span className="bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded text-xs">
-                          <span className="font-medium">Semantic Score:</span> {(doc.semanticScore * 100).toFixed(0)}%
+                      <span className="bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded text-xs flex items-center">
+                        <span className="font-medium">Relevance Score:</span>
+                        <span className="ml-1">
+                          {/* Show semantic score for derived topics, LLM score for others */}
+                          {((topicType === 'derived' ? doc.semanticScore : doc.llmScore) * 100).toFixed(0)}%
                         </span>
-                      ) : (
-                        <div className="flex space-x-2">
-                          <span className="bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded text-xs">
-                            <span className="font-medium">Semantic:</span> {(doc.semanticScore * 100).toFixed(0)}%
-                          </span>
-                          <span className="bg-green-50 dark:bg-green-900/30 px-2 py-1 rounded text-xs">
-                            <span className="font-medium">LLM:</span> {(doc.llmScore * 100).toFixed(0)}%
-                          </span>
+                        <div 
+                          className="ml-1 relative cursor-help"
+                          onMouseEnter={() => setShowTooltip(`doc-${index}`)}
+                          onMouseLeave={() => setShowTooltip(null)}
+                        >
+                          <Info className="h-3 w-3 text-gray-400" />
+                          {showTooltip === `doc-${index}` && (
+                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg z-50">
+                              {getRelevanceExplanation()}
+                            </div>
+                          )}
                         </div>
-                      )}
+                      </span>
                     </div>
                   </div>
                 </div>
