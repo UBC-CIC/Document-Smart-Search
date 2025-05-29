@@ -142,6 +142,19 @@ def setup_guardrail(guardrail_name):
         guardrail_version = ver_resp["version"]
 
     return guardrail_id, guardrail_version
+
+
+def classify_guardrail_violation(assessments):
+    for item in assessments:
+        if item.get("topicPolicy") and item["topicPolicy"].get("topic") == "OffTopic":
+            return "Please stay on topic. This assistant focuses on DFO-related questions."
+        if item.get("contentFilter"):
+            category = item["contentFilter"].get("category", "").lower()
+            if category in ["sexual", "violence", "self-harm", "hate", "toxic"]:
+                return f"Your message was blocked due to {category} content."
+        if item.get("sensitiveInformationPolicy"):
+            return "Please avoid sharing personal information (like names, emails, or phone numbers)."
+    return "Your message was blocked by moderation filters."
     
 
 
@@ -291,6 +304,7 @@ def handler(event, context):
     )
 
     if guard_resp.get("action") == "GUARDRAIL_INTERVENED":
+        msg = classify_guardrail_violation(guard_resp.get("assessments", []))
         return {
             "statusCode": 400,
             "headers": {
@@ -299,7 +313,7 @@ def handler(event, context):
                 "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Methods": "*",
             },
-            "body": json.dumps({"error": "Content blocked by moderation guardrails."})
+            "body": json.dumps({"error": msg})
         }
 
     try:
