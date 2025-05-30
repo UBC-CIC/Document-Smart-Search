@@ -111,7 +111,6 @@ def setup_guardrail(guardrail_name):
             # },
             sensitiveInformationPolicyConfig={
                 "piiEntitiesConfig": [
-                    {"type": "NAME", "action": "ANONYMIZE"},
                     {"type": "EMAIL", "action": "ANONYMIZE"},
                     {"type": "PHONE", "action": "ANONYMIZE"}
                 ]
