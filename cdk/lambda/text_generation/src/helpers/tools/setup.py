@@ -7,7 +7,6 @@ from langchain.tools import Tool
 from helpers.tools.none_tool import NoneTool
 from helpers.tools.mandate_tools import MandateTools
 from helpers.tools.topic_tools import TopicTools
-from helpers.tools.document_tools import DocumentTools
 from helpers.tools.search_tools import SearchTools
 from helpers.tools.tool_wrapper import ToolWrapper
 
@@ -58,23 +57,19 @@ def initialize_tools(
     mandate_tools = MandateTools(
         opensearch_client=opensearch_client,
         mandate_index_name=mandate_index_name,
+        html_index_name=html_index_name, 
         region=region,
-        conn=conn  # Only pass the connection
+        conn=conn
     )
     
     topic_tools = TopicTools(
         opensearch_client=opensearch_client,
         topic_index_name=topic_index_name,
+        html_index_name=html_index_name,  # Added html_index_name parameter
         region=region,
-        conn=conn  # Only pass the connection
+        conn=conn
     )
-    
-    document_tools = DocumentTools(
-        opensearch_client=opensearch_client,
-        html_index_name=html_index_name,
-        conn=conn  # Only pass the connection
-    )
-    
+
     search_tools = SearchTools(
         opensearch_client=opensearch_client,
         embedder=embedder,
@@ -92,32 +87,22 @@ def initialize_tools(
         Tool(
             name="Get All DFO Mandates And Descriptions",
             func=mandate_tools.get_all_dfo_mandates_and_descriptions,
-            description="Returns all DFO mandates with their descriptions as JSON."
+            description="Returns all DFO mandates with their descriptions and the number of related documents for each."
         ),
         Tool(
             name="Get All DFO Topics And Descriptions",
             func=topic_tools.get_all_dfo_topics_and_descriptions,
-            description="Returns all DFO topics with their descriptions as JSON."
+            description="Returns all DFO topics with their descriptions and the number of related documents for each."
         ),
         Tool(
             name="Mandate Related Documents",
             func=mandate_tools.mandate_related_documents_tool,
-            description="Returns related documents for a given DFO mandate."
+            description="Returns top related documents for a given DFO mandate, including total counts by year."
         ),
         Tool(
             name="Topic Related Documents",
             func=topic_tools.topic_related_documents_tool,
-            description="Returns related documents for a given DFO topic."
-        ),
-        Tool(
-            name="Document Categorization Results",
-            func=document_tools.document_categorization_results_tool,
-            description="Returns document categorization and metadata for a given document URL. Input must be a document URL."
-        ),
-        Tool(
-            name="Document HTML Raw Text",
-            func=document_tools.document_html_raw_text_tool,
-            description="Returns the cleaned HTML text content for a given document URL. Input must be a document URL."
+            description="Returns top related documents for a given DFO topic, including total counts by year."
         ),
         Tool(
             name="Semantic HTML Page Search",
