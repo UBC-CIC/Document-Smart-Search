@@ -133,7 +133,7 @@ class DerivedTopicTools:
             return json.dumps({
                 "output": f"Derived topic '{topic_name}' not found. Please check the topic name and try again.",
                 "metadata": {
-                    "description": f"Error: Derived topic not found",
+                    "description": f"Documents related to derived topic: {topic_name} (Error: Topic Not Found)",
                     "sources": []
                 }
             })

@@ -152,7 +152,7 @@ class TopicTools:
             return json.dumps({
                 "output": f"Topic '{topic_name}' not found. Please check the topic name and try again.",
                 "metadata": {
-                    "description": f"Error: Topic not found",
+                    "description": f"LLM categorized documents that relate to topic: {topic_name} (Error: Topic not found)",
                     "sources": []
                 }
             })

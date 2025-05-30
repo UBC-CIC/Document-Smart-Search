@@ -152,7 +152,7 @@ class MandateTools:
             return json.dumps({
                 "output": f"Mandate '{mandate_name}' not found. Please check the mandate name and try again.",
                 "metadata": {
-                    "description": f"Error: Mandate not found",
+                    "description": f"LLM categorized documents that relate to mandate: {mandate_name} (Error: Mandate not found)",
                     "sources": []
                 }
             })
