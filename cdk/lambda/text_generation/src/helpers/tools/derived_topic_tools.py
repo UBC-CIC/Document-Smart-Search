@@ -1,7 +1,5 @@
 import json
-from typing import Dict, List, Any
-from collections import defaultdict
-from langchain_core.documents import Document
+from typing import Dict, List, Any, Tuple
 from opensearchpy import OpenSearch
 
 # Import this at the module level
@@ -11,99 +9,82 @@ from helpers.db import execute_query
 TERMS_OF_REFERENCE_LIMIT = 10  # Number of "Terms of Reference" documents to return
 OTHER_DOCS_LIMIT = 10  # Number of other document types to return
 
-class MandateTools:
-    """Tools for working with DFO mandate information."""
+class DerivedTopicTools:
+    """Tools for working with DFO derived topic information (stored in SQL database)."""
     
     def __init__(
         self, 
         opensearch_client: OpenSearch,
-        mandate_index_name: str,
         html_index_name: str,
         region: str,
         conn 
     ):
         self.opensearch_client = opensearch_client
-        self.mandate_index_name = mandate_index_name
         self.html_index_name = html_index_name
         self.region = region
-        self.conn = conn 
+        self.conn = conn
     
-    def get_all_items(self) -> Dict[str, List[Document]]:
+    def _get_all_derived_topic_names(self) -> List[Tuple[str, int]]:
         """
-        Retrieve mandate items from OpenSearch and group them by name.
-        Returns a dict grouping items by name.
+        Get all derived topic names and their document counts from the database.
+        Returns a list of tuples (topic_name, document_count).
         """
-        response = self.opensearch_client.search(
-            index=self.mandate_index_name, 
-            body={"size": 1000, "query": {"match_all": {}}}
-        )
-        matches = response["hits"]["hits"]
-
-        items_by_name = defaultdict(list)
-        for hit in matches:
-            source = hit["_source"]
-            name = source.get("name", "N/A")
-
-            # Create document object with necessary metadata
-            metadata = {
-                'description': source.get('description', 'No description')
+        query = """
+        SELECT DISTINCT topic_name, COUNT(html_url) as doc_count
+        FROM documents_derived_topic
+        GROUP BY topic_name
+        ORDER BY topic_name;
+        """
+        
+        try:
+            results = execute_query(query, self.conn)
+            return [(topic_name, doc_count) for topic_name, doc_count in results]
+        except Exception as e:
+            print(f"Error retrieving derived topics: {e}")
+            return []
+    
+    def get_combined_derived_topics(self) -> str:
+        """
+        Combine derived topics into a single text string with document counts.
+        """
+        topics_with_counts = self._get_all_derived_topic_names()
+        
+        combined_items = ""
+        for topic_name, doc_count in topics_with_counts:
+            combined_items += f"- {topic_name}: Total Related Documents: {doc_count}\n"
+        
+        return combined_items
+    
+    def get_all_dfo_derived_topics_and_counts(self, _: Any) -> str:
+        """
+        Returns all DFO derived topics with their document counts.
+        This is a tool function for the agent.
+        """
+        combined_topics = self.get_combined_derived_topics()
+        return json.dumps({
+            "output": combined_topics,
+            "metadata": {
+                "description": "DFO Derived Topics with Document Counts"
             }
-            text = source.get('name_and_description', '')
-            document = Document(page_content=text, metadata=metadata)
+        })
 
-            items_by_name[name].append(document)
-
-        return items_by_name
-    
-    def _count_mandate_documents(self, mandate_name: str) -> int:
-        """Count total number of documents related to a mandate."""
+    def _count_derived_topic_documents(self, topic_name: str) -> int:
+        """Count total number of documents related to a derived topic."""
         count_query = f"""
         SELECT COUNT(*)
         FROM documents d
-        INNER JOIN documents_mandates dm
-          ON d.html_url = dm.html_url
-        WHERE dm.mandate_name = '{mandate_name}'
-          AND dm.llm_belongs = 'Yes';
+        INNER JOIN documents_derived_topic ddt
+          ON d.html_url = ddt.html_url
+        WHERE ddt.topic_name = '{topic_name}';
         """
         result = execute_query(count_query, self.conn)
         return result[0][0] if result else 0
     
-    def get_combined_mandates(self) -> str:
-        """
-        Combine mandates into a single text string with document counts.
-        """
-        items_by_name = self.get_all_items()
-        combined_items = ""
-        for item_name, docs in items_by_name.items():
-            # Get document count for this mandate
-            doc_count = self._count_mandate_documents(item_name)
-            
-            combined_items += f"- {item_name}:"
-            for doc in docs:
-                description = doc.metadata.get('description', 'No description').replace(":", " -")
-                combined_items += f" {description} (Number of related documents: {doc_count})"
-                break  # Only include one description per item
-            combined_items += "\n"
-        return combined_items
-    
-    def get_all_dfo_mandates_and_descriptions(self, _: Any) -> str:
-        """
-        Returns all DFO mandates with their descriptions.
-        This is a tool function for the agent.
-        """
-        combined_mandates = self.get_combined_mandates()
-        return json.dumps({
-            "output": combined_mandates,
-            "metadata": {
-                "description": "Official DFO Mandates and Descriptions"
-            }
-        })
-
     def _get_document_content(self, doc_id: str) -> Dict[str, Any]:
         """Get document content by ID from OpenSearch."""
         try:
             resp = self.opensearch_client.get(
-                index=self.html_index_name,  # Use the instance variable
+                index=self.html_index_name,
                 id=doc_id,
                 _source=[
                     "html_subject",
@@ -130,29 +111,29 @@ class MandateTools:
         except Exception as e:
             return {"title": "Document not found", "text": ""}
 
-    def _mandate_exists(self, mandate_name: str) -> bool:
-        """Check if a mandate exists in the database."""
+    def _derived_topic_exists(self, topic_name: str) -> bool:
+        """Check if a derived topic exists in the database."""
         query = f"""
         SELECT COUNT(*) 
-        FROM mandates 
-        WHERE mandate_name = '{mandate_name}';
+        FROM derived_topics
+        WHERE topic_name = '{topic_name}';
         """
         result = execute_query(query, self.conn)
         return result[0][0] > 0 if result else False
 
-    def mandate_related_documents_tool(self, mandate_name: str) -> str:
+    def derived_topic_related_documents_tool(self, topic_name: str) -> str:
         """
-        Return documents linked to a mandate as a formatted string.
+        Return documents linked to a derived topic as a formatted string.
         Include document counts by year and full document content.
         Returns Terms of Reference documents and other document types separately.
-        Returns error message if mandate not found.
+        Returns error message if topic not found.
         """
-        # First check if mandate exists
-        if not self._mandate_exists(mandate_name):
+        # First check if derived topic exists
+        if not self._derived_topic_exists(topic_name):
             return json.dumps({
-                "output": f"Mandate '{mandate_name}' not found. Please check the mandate name and try again.",
+                "output": f"Derived topic '{topic_name}' not found. Please check the topic name and try again.",
                 "metadata": {
-                    "description": f"LLM categorized documents that relate to mandate: {mandate_name} (Error: Mandate not found)",
+                    "description": f"Documents related to derived topic: {topic_name} (Error: Topic Not Found)",
                     "sources": []
                 }
             })
@@ -166,16 +147,13 @@ class MandateTools:
                d.year,
                d.event_year,
                d.event_subject,
-               dm.semantic_score,
-               dm.llm_score,
-               dm.llm_explanation
+               ddt.confidence_score AS semantic_score
         FROM documents d
-        INNER JOIN documents_mandates dm
-          ON d.html_url = dm.html_url
-        WHERE dm.mandate_name = '{mandate_name}'
-          AND dm.llm_belongs = 'Yes'
+        INNER JOIN documents_derived_topic ddt
+          ON d.html_url = ddt.html_url
+        WHERE ddt.topic_name = '{topic_name}'
           AND d.doc_type = 'Terms of Reference'
-        ORDER BY dm.llm_score DESC
+        ORDER BY ddt.confidence_score DESC
         LIMIT {TERMS_OF_REFERENCE_LIMIT};
         """
         
@@ -188,35 +166,30 @@ class MandateTools:
                d.year,
                d.event_year,
                d.event_subject,
-               dm.semantic_score,
-               dm.llm_score,
-               dm.llm_explanation
+               ddt.confidence_score AS semantic_score
         FROM documents d
-        INNER JOIN documents_mandates dm
-          ON d.html_url = dm.html_url
-        WHERE dm.mandate_name = '{mandate_name}'
-          AND dm.llm_belongs = 'Yes'
+        INNER JOIN documents_derived_topic ddt
+          ON d.html_url = ddt.html_url
+        WHERE ddt.topic_name = '{topic_name}'
           AND d.doc_type != 'Terms of Reference'
-        ORDER BY dm.llm_score DESC
+        ORDER BY ddt.confidence_score DESC
         LIMIT {OTHER_DOCS_LIMIT};
         """
         
-        # Query to count total documents for this mandate
+        # Query to count total documents for this derived topic
         count_query = f"""
         SELECT COUNT(*) 
-        FROM documents_mandates 
-        WHERE mandate_name = '{mandate_name}' 
-        AND llm_belongs = 'Yes';
+        FROM documents_derived_topic
+        WHERE topic_name = '{topic_name}';
         """
         
         # Query to get document counts by year
         year_query = f"""
         SELECT d.event_year, COUNT(*) 
         FROM documents d
-        INNER JOIN documents_mandates dm
-          ON d.html_url = dm.html_url
-        WHERE dm.mandate_name = '{mandate_name}'
-          AND dm.llm_belongs = 'Yes'
+        INNER JOIN documents_derived_topic ddt
+          ON d.html_url = ddt.html_url
+        WHERE ddt.topic_name = '{topic_name}'
         GROUP BY d.event_year
         ORDER BY d.event_year DESC;
         """
@@ -247,8 +220,8 @@ class MandateTools:
             sources = []
             
             # Process Terms of Reference documents
-            output += f"\nTop {TERMS_OF_REFERENCE_LIMIT} Terms of Reference documents by LLM score:\n"
-            for doc_id, url, title, doc_type, year, event_year, event_subject, semantic_score, llm_score, _ in terms_rows:
+            output += f"\nTop {TERMS_OF_REFERENCE_LIMIT} Terms of Reference documents by confidence score:\n"
+            for doc_id, url, title, doc_type, year, event_year, event_subject, confidence_score in terms_rows:
                 # Get full document content
                 doc_content = self._get_document_content(doc_id)
                 
@@ -256,7 +229,7 @@ class MandateTools:
                 html_subject = doc_content.get('document_subject', '')
                 output += f"\nDocument: {title}, Subject: {html_subject}\n"
                 output += f"Document Type: {doc_type}\n"
-                output += f"LLM Rated Similarity Score: {llm_score}\n"
+                output += f"Confidence Score: {confidence_score}\n"
                 output += f"CSAS Event: {event_subject}, Year: {event_year or year or 'Unknown'}\n"
                 text_content = doc_content.get('text', '').replace('\n', ' ')
                 output += f"Content: {text_content}\n"
@@ -266,12 +239,12 @@ class MandateTools:
                     "name": title,
                     "url": url,
                     "document_id": doc_id,
-                    "relevancy_score": llm_score / 10,
+                    "relevancy_score": float(confidence_score) if confidence_score is not None else 0,
                 })
             
             # Process other document types
-            output += f"\n\nTop {OTHER_DOCS_LIMIT} other document types by LLM score:\n"
-            for doc_id, url, title, doc_type, year, event_year, event_subject, semantic_score, llm_score, _ in other_rows:
+            output += f"\n\nTop {OTHER_DOCS_LIMIT} other document types by confidence score:\n"
+            for doc_id, url, title, doc_type, year, event_year, event_subject, confidence_score in other_rows:
                 # Get full document content
                 doc_content = self._get_document_content(doc_id)
                 
@@ -279,7 +252,7 @@ class MandateTools:
                 html_subject = doc_content.get('document_subject', '')
                 output += f"\nDocument: {title}, Subject: {html_subject}\n"
                 output += f"Document Type: {doc_type}\n"
-                output += f"LLM Rated Similarity Score: {llm_score}\n"
+                output += f"Confidence Score: {confidence_score}\n"
                 output += f"CSAS Event: {event_subject}, Year: {event_year or year or 'Unknown'}\n"
                 text_content = doc_content.get('text', '').replace('\n', ' ')
                 output += f"Content: {text_content}\n"
@@ -289,25 +262,25 @@ class MandateTools:
                     "name": title,
                     "url": url,
                     "document_id": doc_id,
-                    "relevancy_score": llm_score / 10,
+                    "relevancy_score": float(confidence_score) if confidence_score is not None else 0,
                 })
                 
             # Return the formatted string, but still embed source metadata as JSON
             result = {
                 "output": output,
                 "metadata": {
-                    "description": f"LLM categorized documents that relate to mandate: {mandate_name}",
+                    "description": f"Documents related to derived topic: {topic_name}",
                     "sources": sources,
                 },
             }
             
             return json.dumps(result)
         except Exception as e:
-            error_output = f"Error retrieving documents for mandate '{mandate_name}': {str(e)}"
+            error_output = f"Error retrieving documents for derived topic '{topic_name}': {str(e)}"
             return json.dumps({
                 "output": error_output,
                 "metadata": {
-                    "description": f"LLM categorized documents that relate to mandate: {mandate_name}",
+                    "description": f"Documents related to derived topic: {topic_name}",
                     "sources": []
                 }
             })

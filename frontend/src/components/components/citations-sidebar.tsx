@@ -267,8 +267,10 @@ export function CitationsSidebar({ isOpen, onClose, toolsUsed, currentMessageId 
                     <h3 className="font-medium text-sm dark:text-white">
                       {source.name || source.title || "Source"}
                     </h3>
-                    <div className="flex items-center mt-1 gap-2">
-                      {source.url && (
+                    
+                    {/* URL in its own flex container */}
+                    {source.url && (
+                      <div className="mt-1">
                         <button
                           onClick={() => openSourceUrl(source.url)}
                           className="text-blue-600 dark:text-blue-400 hover:underline text-xs flex items-center"
@@ -276,17 +278,24 @@ export function CitationsSidebar({ isOpen, onClose, toolsUsed, currentMessageId 
                           <span className="truncate max-w-[250px]">{source.url}</span>
                           <ExternalLink className="h-3 w-3 ml-1 flex-shrink-0" />
                         </button>
-                      )}
-                      {source.document_id && (
+                      </div>
+                    )}
+                    
+                    {/* Document details on a separate line */}
+                    {source.document_id && (
+                      <div className="mt-1">
                         <Link 
                           href={`/documents/${source.document_id}`}
                           className="text-blue-600 dark:text-blue-400 hover:underline text-xs flex items-center"
+                          target="_blank"
+                          rel="noopener noreferrer"
                         >
                           <span>View Document Details</span>
                           <FileText className="h-3 w-3 ml-1 flex-shrink-0" />
                         </Link>
-                      )}
-                    </div>
+                      </div>
+                    )}
+                    
                     {source.relevancy_score !== undefined && (
                       <div className="mt-1 flex items-center">
                         <span className="text-xs text-gray-500 dark:text-gray-400">
@@ -398,14 +407,18 @@ export function CitationsSidebar({ isOpen, onClose, toolsUsed, currentMessageId 
                                     </button>
                                   )}
                                   {source.document_id && (
-                                    <Link 
-                                      href={`/documents/${source.document_id}`}
-                                      className="text-blue-600 dark:text-blue-400 hover:underline text-xs flex items-center"
-                                      onClick={(e) => e.stopPropagation()} // Prevent toggle from firing
-                                    >
-                                      <span>View Document Details</span>
-                                      <FileText className="h-3 w-3 ml-1 flex-shrink-0" />
-                                    </Link>
+                                    <div className="mt-1">
+                                      <Link 
+                                        href={`/documents/${source.document_id}`}
+                                        className="text-blue-600 dark:text-blue-400 hover:underline text-xs flex items-center"
+                                        onClick={(e) => e.stopPropagation()} // Prevent toggle from firing
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                      >
+                                        <span>View Document Details</span>
+                                        <FileText className="h-3 w-3 ml-1 flex-shrink-0" />
+                                      </Link>
+                                    </div>
                                   )}
                                 </div>
                                 
