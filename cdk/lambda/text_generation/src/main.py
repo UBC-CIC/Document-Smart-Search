@@ -306,15 +306,22 @@ def handler(event, context):
     if guard_resp.get("action") == "GUARDRAIL_INTERVENED":
         msg = classify_guardrail_violation(guard_resp.get("assessments", []))
         return {
-            "statusCode": 400,
+            "statusCode": 200,
             "headers": {
                 "Content-Type": "application/json",
                 "Access-Control-Allow-Headers": "*",
                 "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Methods": "*",
             },
-            "body": json.dumps({"error": msg})
+            "body": json.dumps({
+                "type": "guardrail",
+                "content": msg,
+                "options": [],
+                "user_role": user_role,
+                "tools_used": []
+            })
         }
+
 
     try:
         # Initialize OpenSearch, DB, and get configuration values
@@ -436,15 +443,22 @@ def handler(event, context):
         )
 
         if guard_resp.get("action") == "GUARDRAIL_INTERVENED":
+            msg = classify_guardrail_violation(guard_resp.get("assessments", []))
             return {
-                "statusCode": 400,
+                "statusCode": 200,
                 "headers": {
                     "Content-Type": "application/json",
                     "Access-Control-Allow-Headers": "*",
                     "Access-Control-Allow-Origin": "*",
                     "Access-Control-Allow-Methods": "*",
                 },
-                "body": json.dumps({"error": "Response blocked by moderation guardrails."})
+                "body": json.dumps({
+                    "type": "guardrail",
+                    "content": msg,
+                    "options": [],
+                    "user_role": user_role,
+                    "tools_used": []
+                })
             }
 
         
