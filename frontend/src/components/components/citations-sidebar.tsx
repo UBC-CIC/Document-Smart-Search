@@ -268,7 +268,7 @@ export function CitationsSidebar({ isOpen, onClose, toolsUsed, currentMessageId 
                       {source.name || source.title || "Source"}
                     </h3>
                     
-                    {/* URL in its own flex container */}
+                    {/* URL on its own line */}
                     {source.url && (
                       <div className="mt-1">
                         <button
@@ -278,21 +278,6 @@ export function CitationsSidebar({ isOpen, onClose, toolsUsed, currentMessageId 
                           <span className="truncate max-w-[250px]">{source.url}</span>
                           <ExternalLink className="h-3 w-3 ml-1 flex-shrink-0" />
                         </button>
-                      </div>
-                    )}
-                    
-                    {/* Document details on a separate line */}
-                    {source.document_id && (
-                      <div className="mt-1">
-                        <Link 
-                          href={`/documents/${source.document_id}`}
-                          className="text-blue-600 dark:text-blue-400 hover:underline text-xs flex items-center"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <span>View Document Details</span>
-                          <FileText className="h-3 w-3 ml-1 flex-shrink-0" />
-                        </Link>
                       </div>
                     )}
                     
@@ -324,6 +309,22 @@ export function CitationsSidebar({ isOpen, onClose, toolsUsed, currentMessageId 
                         </span>
                       </div>
                     )}
+                    
+                    {/* Document details moved below relevancy score */}
+                    {source.document_id && (
+                      <div className="mt-3">
+                        <Link 
+                          href={`/documents/${source.document_id}`}
+                          className="text-blue-600 dark:text-blue-400 hover:underline text-xs flex items-center"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <span>Document Categorization</span>
+                          <FileText className="h-3 w-3 ml-1 flex-shrink-0" />
+                        </Link>
+                      </div>
+                    )}
+
                     {source.text && (
                       <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 line-clamp-3">
                         {source.text}
@@ -393,8 +394,9 @@ export function CitationsSidebar({ isOpen, onClose, toolsUsed, currentMessageId 
                                   {source.name || source.title || "Source"}
                                 </h4>
                                 
-                                <div className="flex items-center mt-1 gap-2">
-                                  {source.url && (
+                                {/* URL on its own line */}
+                                {source.url && (
+                                  <div className="mt-1">
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation(); // Prevent toggle from firing
@@ -405,22 +407,8 @@ export function CitationsSidebar({ isOpen, onClose, toolsUsed, currentMessageId 
                                       <span className="truncate max-w-[220px]">{source.url}</span>
                                       <ExternalLink className="h-3 w-3 ml-1 flex-shrink-0" />
                                     </button>
-                                  )}
-                                  {source.document_id && (
-                                    <div className="mt-1">
-                                      <Link 
-                                        href={`/documents/${source.document_id}`}
-                                        className="text-blue-600 dark:text-blue-400 hover:underline text-xs flex items-center"
-                                        onClick={(e) => e.stopPropagation()} // Prevent toggle from firing
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                      >
-                                        <span>View Document Details</span>
-                                        <FileText className="h-3 w-3 ml-1 flex-shrink-0" />
-                                      </Link>
-                                    </div>
-                                  )}
-                                </div>
+                                  </div>
+                                )}
                                 
                                 {source.relevancy_score !== undefined && (
                                   <div className="mt-1 flex items-center">
@@ -448,6 +436,22 @@ export function CitationsSidebar({ isOpen, onClose, toolsUsed, currentMessageId 
                                         )}
                                       </div>
                                     </span>
+                                  </div>
+                                )}
+                                
+                                {/* Document details moved below relevancy score */}
+                                {source.document_id && (
+                                  <div className="mt-3">
+                                    <Link 
+                                      href={`/documents/${source.document_id}`}
+                                      className="text-blue-600 dark:text-blue-400 hover:underline text-xs flex items-center"
+                                      onClick={(e) => e.stopPropagation()} // Prevent toggle from firing
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                    >
+                                      <span>Document Categorization</span>
+                                      <FileText className="h-3 w-3 ml-1 flex-shrink-0" />
+                                    </Link>
                                   </div>
                                 )}
                                 
