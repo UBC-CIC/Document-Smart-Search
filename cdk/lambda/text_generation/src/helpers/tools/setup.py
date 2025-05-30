@@ -95,37 +95,37 @@ def initialize_tools(
         Tool(
             name="Get All DFO Mandates And Descriptions",
             func=mandate_tools.get_all_dfo_mandates_and_descriptions,
-            description="Returns all DFO mandates with their descriptions and the number of related documents for each."
+            description="Returns the names of DFO mandates with their descriptions and the number of related documents for each."
         ),
         Tool(
             name="Get All DFO Topics And Descriptions",
             func=topic_tools.get_all_dfo_topics_and_descriptions,
-            description="Returns all DFO topics with their descriptions and the number of related documents for each."
+            description="Returns the names of DFO topics with their descriptions and the number of related documents for each."
         ),
         Tool(
             name="Get All DFO Derived Topics And Counts",
             func=derived_topic_tools.get_all_dfo_derived_topics_and_counts,
-            description="Returns all DFO derived topics with their document counts."
+            description="Returns the names of all DFO derived topics and the number of related documents for each."
         ),
         Tool(
             name="Mandate Related Documents",
             func=mandate_tools.mandate_related_documents_tool,
-            description="Returns top related documents for a given DFO mandate, including total counts by year."
+            description="Returns top related documents for a given DFO mandate. The mandate MUST match exactly one of the DFO mandates."
         ),
         Tool(
             name="Topic Related Documents",
             func=topic_tools.topic_related_documents_tool,
-            description="Returns top related documents for a given DFO topic, including total counts by year."
+            description="Returns top related documents for a given DFO topic. The topic MUST match exactly one of the DFO topics."
         ),
         Tool(
             name="Derived Topic Related Documents",
             func=derived_topic_tools.derived_topic_related_documents_tool,
-            description="Returns top related documents for a given DFO derived topic, including total counts by year."
+            description="Returns top related documents for a given DFO derived topic. The derived topic MUST match exactly one of the DFO derived topics."
         ),
         Tool(
             name="Semantic HTML Page Search",
             func=search_tools.semantic_html_search_tool,
-            description="Performs semantic search for html documents based on an input query."
+            description="Returns top related HTML documents to a user query."
         )
     ]
     
