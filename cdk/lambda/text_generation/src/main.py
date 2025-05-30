@@ -96,19 +96,42 @@ def setup_guardrail(guardrail_name):
 
     if not guardrail_id:
         resp = bedrock_mgmt_client.create_guardrail(
-            name="comprehensive-guardrails",
+            name=guardrail_name,
             description="Blocks harmful and off-topic content",
-            # Commenting out filtersConfig to test simpler config
-            # contentPolicyConfig={
-            #     "filtersConfig": [
-            #         {"type": "SEXUAL", "inputStrength": "MEDIUM", "outputStrength": "MEDIUM"},
-            #         {"type": "HATE", "inputStrength": "MEDIUM", "outputStrength": "MEDIUM"},
-            #         {"type": "VIOLENCE", "inputStrength": "MEDIUM", "outputStrength": "MEDIUM"},
-            #         {"type": "INSULTS", "inputStrength": "MEDIUM", "outputStrength": "MEDIUM"},
-            #         {"type": "MISCONDUCT", "inputStrength": "MEDIUM", "outputStrength": "MEDIUM"},
-            #         {"type": "PROMPT_ATTACK", "inputStrength": "MEDIUM"}  # No outputStrength!
-            #     ]
-            # },
+            contentPolicyConfig={
+                "filtersConfig": [
+                    {
+                        "type": "HATE",
+                        "inputStrength": "MEDIUM",
+                        "outputStrength": "MEDIUM"
+                    },
+                    {
+                        "type": "SEXUAL",
+                        "inputStrength": "MEDIUM",
+                        "outputStrength": "MEDIUM"
+                    },
+                    {
+                        "type": "VIOLENCE",
+                        "inputStrength": "MEDIUM",
+                        "outputStrength": "MEDIUM"
+                    },
+                    {
+                        "type": "INSULTS",
+                        "inputStrength": "HIGH",
+                        "outputStrength": "HIGH"
+                    },
+                    {
+                        "type": "PROMPT_ATTACK",
+                        "inputStrength": "HIGH",
+                        "outputStrength": "NONE"
+                    },
+                    {
+                        "type": "MISCONDUCT",
+                        "inputStrength": "HIGH",
+                        "outputStrength": "HIGH"
+                    }
+                ]
+            },
             sensitiveInformationPolicyConfig={
                 "piiEntitiesConfig": [
                     {"type": "EMAIL", "action": "ANONYMIZE"},
@@ -131,20 +154,39 @@ def setup_guardrail(guardrail_name):
 
     return guardrail_id, guardrail_version
 
-
-
-
 def classify_guardrail_violation(assessments):
+    filter_reason_map = {
+        "sexual": "Sexual content isn't appropriate for this assistant. Please keep it professional.",
+        "violence": "Content involving violence is not permitted. Please rephrase respectfully.",
+        "hate": "Hateful language is against our guidelines. Please use respectful language.",
+        "self-harm": "References to self-harm are not appropriate. If you're struggling, please seek professional help.",
+        "toxic": "Toxic or inflammatory language is not allowed. Please rephrase.",
+        "insults": "Insulting language is blocked. Please be respectful.",
+        "prompt_attack": "This prompt appears to manipulate the system inappropriately and is not allowed.",
+        "misconduct": "This request involves misconduct or inappropriate behavior. Please revise."
+    }
+
     for item in assessments:
+        # Topic policy check
         if item.get("topicPolicy") and item["topicPolicy"].get("topic") == "OffTopic":
-            return "Please stay on topic. This assistant focuses on DFO-related questions."
+            return "Please stay on topic. This assistant is designed for DFO-related inquiries only."
+
+        # Content filter check
         if item.get("contentFilter"):
             category = item["contentFilter"].get("category", "").lower()
-            if category in ["sexual", "violence", "self-harm", "hate", "toxic"]:
-                return f"Your message was blocked due to {category} content."
+            if category in filter_reason_map:
+                return filter_reason_map[category]
+
+        # Sensitive info policy check
         if item.get("sensitiveInformationPolicy"):
-            return "Please avoid sharing personal information (like names, emails, or phone numbers)."
-    return "Your message was blocked by moderation filters."
+            entity_types = [e.get("type") for e in item["sensitiveInformationPolicy"].get("entities", [])]
+            if "EMAIL" in entity_types:
+                return "Please avoid sharing your email address."
+            if "PHONE" in entity_types:
+                return "Phone numbers are not allowed in the conversation."
+
+    return "Your message was blocked by moderation filters. Please revise your input."
+
     
 
 
