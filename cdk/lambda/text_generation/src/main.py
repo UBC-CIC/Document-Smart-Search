@@ -138,6 +138,25 @@ def setup_guardrail(guardrail_name):
                     {"type": "PHONE", "action": "ANONYMIZE"}
                 ]
             },
+            topicPolicyConfig={
+                "topicsConfig": [
+                    {
+                        "name": "OffTopic",
+                        "type": "DENY",
+                        "definition": "This topic includes content not relevant to the Department of Fisheries and Oceans (DFO).",
+                        "examples": [
+                            "Tell me a joke",
+                            "How do I bake a cake?",
+                            "What is the capital of France?",
+                            "Explain the Big Bang theory"
+                        ],
+                        "inputEnabled": True,
+                        "inputAction": "BLOCK",
+                        "outputEnabled": False,   # Don't block output just in case
+                        "outputAction": "NONE"
+                    }
+                ]
+            },
             blockedInputMessaging="This content is not allowed by our guidelines.",
             blockedOutputsMessaging="The assistant cannot respond to this request."
         )
@@ -186,7 +205,6 @@ def classify_guardrail_violation(assessments):
                 return "Phone numbers are not allowed in the conversation."
 
     return "Your message was blocked by moderation filters. Please revise your input."
-
     
 
 
