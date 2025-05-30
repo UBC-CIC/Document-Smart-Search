@@ -81,8 +81,8 @@ def get_parameter(param_name: str):
         raise
 
 def setup_guardrail(guardrail_name):
-    bedrock_client = boto3.client("bedrock-runtime", region_name=REGION)
-    paginator = bedrock_client.get_paginator("list_guardrails")
+    bedrock_mgmt_client = boto3.client("bedrock", region_name=REGION)
+    paginator = bedrock_mgmt_client.get_paginator("list_guardrails")
     guardrail_id = guardrail_version = None
 
     for page in paginator.paginate():
@@ -95,53 +95,44 @@ def setup_guardrail(guardrail_name):
             break
 
     if not guardrail_id:
-        resp = bedrock_client.create_guardrail(
-            name=guardrail_name,
-            contentFilterConfig={
-                "inputFilterType": "ALLOW",
-                "outputFilterType": "ALLOW",
-                "contentFilterType": "OBSERVE",
-            },
-            wordFilterConfig={
-                "inputFilterType": "ALLOW",
-                "outputFilterType": "ALLOW",
-                "contentFilterType": "OBSERVE",
-            },
+        resp = bedrock_mgmt_client.create_guardrail(
+            name="comprehensive-guardrails",
+            description="Blocks harmful and off-topic content",
+            # Commenting out filtersConfig to test simpler config
+            # contentPolicyConfig={
+            #     "filtersConfig": [
+            #         {"type": "SEXUAL", "inputStrength": "MEDIUM", "outputStrength": "MEDIUM"},
+            #         {"type": "HATE", "inputStrength": "MEDIUM", "outputStrength": "MEDIUM"},
+            #         {"type": "VIOLENCE", "inputStrength": "MEDIUM", "outputStrength": "MEDIUM"},
+            #         {"type": "INSULTS", "inputStrength": "MEDIUM", "outputStrength": "MEDIUM"},
+            #         {"type": "MISCONDUCT", "inputStrength": "MEDIUM", "outputStrength": "MEDIUM"},
+            #         {"type": "PROMPT_ATTACK", "inputStrength": "MEDIUM"}  # No outputStrength!
+            #     ]
+            # },
             sensitiveInformationPolicyConfig={
-                "inputFilterType": "ALLOW",
-                "outputFilterType": "ALLOW",
-                "contentFilterType": "OBSERVE",
-            },
-            topicPolicyConfig={
-                "topicsConfig": [
-                    {
-                        "name": "OffTopic",
-                        "definition": "Any question not related to fisheries science, ocean policy, or Canadian government research programs.",
-                        "examples": [
-                            "What’s your favorite video game?",
-                            "Tell me about Taylor Swift’s album.",
-                            "How do I cook pasta?",
-                            "What's the weather in Paris?"
-                        ],
-                        "type": "DENY"
-                    }
+                "piiEntitiesConfig": [
+                    {"type": "NAME", "action": "ANONYMIZE"},
+                    {"type": "EMAIL", "action": "ANONYMIZE"},
+                    {"type": "PHONE", "action": "ANONYMIZE"}
                 ]
             },
-            blockedInputMessaging="Please stay on topic. This assistant focuses on DFO-related questions.",
-            blockedOutputMessaging="This response is not relevant to the topic. Please ask something related to the Department of Fisheries and Oceans."
+            blockedInputMessaging="This content is not allowed by our guidelines.",
+            blockedOutputsMessaging="The assistant cannot respond to this request."
         )
 
         guardrail_id = resp["guardrailId"]
         time.sleep(5)
 
-        ver_resp = bedrock_client.create_guardrail_version(
+        ver_resp = bedrock_mgmt_client.create_guardrail_version(
             guardrailIdentifier=guardrail_id,
-            description="Initial version with topic enforcement",
+            description="Initial version with sensitive info policy only",
             clientRequestToken=str(uuid.uuid4())
         )
         guardrail_version = ver_resp["version"]
 
     return guardrail_id, guardrail_version
+
+
 
 
 def classify_guardrail_violation(assessments):
