@@ -130,12 +130,33 @@ class TopicTools:
         except Exception as e:
             return {"title": "Document not found", "text": ""}
 
+    def _topic_exists(self, topic_name: str) -> bool:
+        """Check if a topic exists in the database."""
+        query = f"""
+        SELECT COUNT(*) 
+        FROM topics 
+        WHERE topic_name = '{topic_name}';
+        """
+        result = execute_query(query, self.conn)
+        return result[0][0] > 0 if result else False
+
     def topic_related_documents_tool(self, topic_name: str) -> str:
         """
         Return documents linked to a topic as a formatted string.
         Include document counts by year and full document content.
         Returns Terms of Reference documents and other document types separately.
+        Returns error message if topic not found.
         """
+        # First check if topic exists
+        if not self._topic_exists(topic_name):
+            return json.dumps({
+                "output": f"Topic '{topic_name}' not found. Please check the topic name and try again.",
+                "metadata": {
+                    "description": f"Error: Topic not found",
+                    "sources": []
+                }
+            })
+        
         # Query to get Terms of Reference documents
         terms_query = f"""
         SELECT d.doc_id,

@@ -7,6 +7,7 @@ from langchain.tools import Tool
 from helpers.tools.none_tool import NoneTool
 from helpers.tools.mandate_tools import MandateTools
 from helpers.tools.topic_tools import TopicTools
+from helpers.tools.derived_topic_tools import DerivedTopicTools
 from helpers.tools.search_tools import SearchTools
 from helpers.tools.tool_wrapper import ToolWrapper
 
@@ -65,7 +66,14 @@ def initialize_tools(
     topic_tools = TopicTools(
         opensearch_client=opensearch_client,
         topic_index_name=topic_index_name,
-        html_index_name=html_index_name,  # Added html_index_name parameter
+        html_index_name=html_index_name,
+        region=region,
+        conn=conn
+    )
+    
+    derived_topic_tools = DerivedTopicTools(
+        opensearch_client=opensearch_client,
+        html_index_name=html_index_name,
         region=region,
         conn=conn
     )
@@ -95,6 +103,11 @@ def initialize_tools(
             description="Returns all DFO topics with their descriptions and the number of related documents for each."
         ),
         Tool(
+            name="Get All DFO Derived Topics And Counts",
+            func=derived_topic_tools.get_all_dfo_derived_topics_and_counts,
+            description="Returns all DFO derived topics with their document counts."
+        ),
+        Tool(
             name="Mandate Related Documents",
             func=mandate_tools.mandate_related_documents_tool,
             description="Returns top related documents for a given DFO mandate, including total counts by year."
@@ -103,6 +116,11 @@ def initialize_tools(
             name="Topic Related Documents",
             func=topic_tools.topic_related_documents_tool,
             description="Returns top related documents for a given DFO topic, including total counts by year."
+        ),
+        Tool(
+            name="Derived Topic Related Documents",
+            func=derived_topic_tools.derived_topic_related_documents_tool,
+            description="Returns top related documents for a given DFO derived topic, including total counts by year."
         ),
         Tool(
             name="Semantic HTML Page Search",
