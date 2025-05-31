@@ -46,7 +46,9 @@ export function CitationsSidebar({ isOpen, onClose, toolsUsed, currentMessageId 
   
   // Update the message tools map when new tools come in
   useEffect(() => {
-    if (currentMessageId && toolsUsed && toolsUsed.tools_and_sources && toolsUsed.tools_and_sources.length > 0) {
+    if (currentMessageId && toolsUsed) {
+      // Always update the map with the current message ID, even if there are no tools
+      // This ensures we track all messages, including ones without tools
       setMessageToolsMap(prev => ({
         ...prev,
         [currentMessageId]: toolsUsed
