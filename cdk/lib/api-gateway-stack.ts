@@ -549,6 +549,73 @@ export class ApiGatewayStack extends cdk.Stack {
       .defaultChild as lambda.CfnFunction;
     apiGW_authorizationFunction.overrideLogicalId("adminLambdaAuthorizer");
 
+    const jwtSecret = new secretsmanager.Secret(this, `${id}-JwtSecret`, {
+      secretName: 'DFO-JWTSecret',
+      generateSecretString: {
+        secretStringTemplate: JSON.stringify({}),
+        generateStringKey: 'jwtSecret',
+        excludePunctuation: true,
+        passwordLength: 64,
+      },
+    });
+
+
+    const userAuthFunction = new lambda.Function(
+      this,
+      `${id}-user-authorization-api-gateway`,
+      {
+        runtime: lambda.Runtime.NODEJS_20_X,
+        code: lambda.Code.fromAsset("lambda/userAuthorizerFunction"),
+        handler: "userAuthorizerFunction.handler",
+        timeout: Duration.seconds(300),
+        memorySize: 256,
+        layers: [jwt],
+        role: lambdaRole,
+        environment: {
+          JWT_SECRET: jwtSecret.secretArn,
+        },
+        functionName: `${id}-userLambdaAuthorizer`,
+      }
+    );
+
+      jwtSecret.grantRead(userAuthFunction);
+
+        const publicTokenLambda = new lambda.Function(this, `${id}-PublicTokenFunction`, {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: "publicTokenFunction.handler",
+      layers: [jwt],
+      code: lambda.Code.fromAsset("lambda/publicTokenFunction"),
+      environment: {
+        JWT_SECRET: jwtSecret.secretArn,
+      },
+      timeout: Duration.seconds(30),
+      memorySize: 128,
+      role: lambdaRole,
+    });
+
+    jwtSecret.grantRead(publicTokenLambda);
+
+    // Add the permission to the Lambda function's policy to allow API Gateway access
+    publicTokenLambda.grantInvoke(
+      new iam.ServicePrincipal("apigateway.amazonaws.com")
+    );
+
+    // Change Logical ID to match the one decleared in YAML file of Open API
+    const apiGW_publicTokenFunction = publicTokenLambda.node
+      .defaultChild as lambda.CfnFunction;
+    apiGW_publicTokenFunction.overrideLogicalId("PublicTokenFunction");
+
+    // Add the permission to the Lambda function's policy to allow API Gateway access
+    userAuthFunction.grantInvoke(
+      new iam.ServicePrincipal("apigateway.amazonaws.com")
+    );
+
+    // Change Logical ID to match the one decleared in YAML file of Open API
+    const apiGW_userauthorizationFunction = userAuthFunction.node
+      .defaultChild as lambda.CfnFunction;
+    apiGW_userauthorizationFunction.overrideLogicalId("userLambdaAuthorizer");
+
+
     // Create parameters for Bedrock LLM ID, Embedding Model ID, and Table Name in Parameter Store
     const bedrockLLMParameter = new ssm.StringParameter(
       this,

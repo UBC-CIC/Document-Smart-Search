@@ -2,9 +2,13 @@
  * Services for handling chat API interactions
  */
 
+import { getUserToken } from "@/lib/getUserToken";
+
 // Create a new chat session
 export async function createChatSession(fingerprint) {
   try {
+  // Fetch user auth token
+  const token = await getUserToken();
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_API_ENDPOINT}user/create_session?user_info=${encodeURIComponent(
         fingerprint
@@ -13,6 +17,7 @@ export async function createChatSession(fingerprint) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
       }
     );
@@ -33,12 +38,15 @@ export async function createChatSession(fingerprint) {
 // Fetch chat history for a session
 export async function fetchChatMessages(sessionId) {
   try {
+    // Fetch user auth token
+    const token = await getUserToken();
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_API_ENDPOINT}user/get_messages?session_id=${encodeURIComponent(sessionId)}`,
       {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
       }
     );
@@ -56,6 +64,8 @@ export async function fetchChatMessages(sessionId) {
 
 // Send a message to the chat API
 export async function sendChatMessage(session, fingerprint, content, userRole) {
+  const token = await getUserToken();
+  console.log("Token:", token);
   try {
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_API_ENDPOINT}user/text_generation?session_id=${encodeURIComponent(
@@ -65,6 +75,7 @@ export async function sendChatMessage(session, fingerprint, content, userRole) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           message_content: content,
@@ -88,6 +99,7 @@ export async function sendChatMessage(session, fingerprint, content, userRole) {
 // Send feedback about the chat
 export async function submitFeedback(fingerprint, session, userRole, rating, description) {
   try {
+    const token = await getUserToken();
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_API_ENDPOINT}user/create_feedback?user_info=${encodeURIComponent(
         fingerprint
@@ -100,6 +112,7 @@ export async function submitFeedback(fingerprint, session, userRole, rating, des
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         }, 
       }
     );
