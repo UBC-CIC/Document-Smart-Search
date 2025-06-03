@@ -4,7 +4,9 @@ import React from "react"
 import { useState, useEffect } from "react"
 
 // Relevancy explanation tooltip
-const relevancyExplanation = "Relevancy represents a hybrid score combining semantic similarity (70%) and keyword matching (30%) based on a given query. Since semantic scoring is relative to all documents in the database, a high percentage doesn't always guarantee relevance to your specific question."
+const relevancyExplanationHybridSearch = "Relevancy here represents a hybrid score combining semantic similarity (70%) and keyword matching (30%) based on a given query. Since semantic scoring is relative to all documents in the database, a high percentage doesn't always guarantee relevance to your specific question."
+const relevancyExplanationTopicsOrMandates= "Relevancy here represents the LLM's confidence in the categorization of the document based on the topics or mandates. A high percentage indicates a strong match to the expected categories, but does not guarantee relevance to your specific question."
+const relevancyExplanationDerivedTopics = "Relevancy here represents how semantically relevant the derived topics are to the original document. A high percentage does not guarantee relevance to your specific question."
 
 interface Source {
   title?: string
@@ -44,7 +46,9 @@ export function CitationsSidebar({ isOpen, onClose, toolsUsed, currentMessageId 
   
   // Update the message tools map when new tools come in
   useEffect(() => {
-    if (currentMessageId && toolsUsed && toolsUsed.tools_and_sources && toolsUsed.tools_and_sources.length > 0) {
+    if (currentMessageId && toolsUsed) {
+      // Always update the map with the current message ID, even if there are no tools
+      // This ensures we track all messages, including ones without tools
       setMessageToolsMap(prev => ({
         ...prev,
         [currentMessageId]: toolsUsed
@@ -185,6 +189,35 @@ export function CitationsSidebar({ isOpen, onClose, toolsUsed, currentMessageId 
   const availableMessageIds = Object.keys(messageToolsMap);
   const hasMultipleMessages = availableMessageIds.length > 1;
 
+  // Get the appropriate relevancy explanation based on tool name
+  const getRelevancyExplanation = (toolName: string): string => {
+    if (toolName.includes("Mandate Related Documents") || toolName.includes("Topic Related Documents")) {
+      return relevancyExplanationTopicsOrMandates;
+    } else if (toolName.includes("Derived Topic Related Documents")) {
+      return relevancyExplanationDerivedTopics;
+    } else if (toolName.includes("Semantic HTML Page Search")) {
+      return relevancyExplanationHybridSearch;
+    }
+    // Default to hybrid search explanation
+    return relevancyExplanationHybridSearch;
+  };
+
+  // Find which tool a source belongs to
+  const findToolForSource = (source: Source): string | null => {
+    if (!activeToolsUsed || !activeToolsUsed.tools_and_sources) {
+      return null;
+    }
+    
+    for (const tool of activeToolsUsed.tools_and_sources) {
+      if (tool.sources && tool.sources.some(s => 
+        s.document_id === source.document_id && s.url === source.url)) {
+        return tool.tool_name;
+      }
+    }
+    
+    return null;
+  };
+
   return (
     <div
       className={`fixed inset-0 z-50 ${isOpen ? 'block md:flex' : 'hidden'}`}
@@ -262,76 +295,81 @@ export function CitationsSidebar({ isOpen, onClose, toolsUsed, currentMessageId 
           {currentTab === "sources" && hasAnySources() && (
             <div className="space-y-4">
               {sources.length > 0 ? (
-                sources.map((source, index) => (
-                  <div key={index} className="bg-white dark:bg-gray-700 rounded-lg p-3">
-                    <h3 className="font-medium text-sm dark:text-white">
-                      {source.name || source.title || "Source"}
-                    </h3>
-                    
-                    {/* URL on its own line */}
-                    {source.url && (
-                      <div className="mt-1">
-                        <button
-                          onClick={() => openSourceUrl(source.url)}
-                          className="text-blue-600 dark:text-blue-400 hover:underline text-xs flex items-center"
-                        >
-                          <span className="truncate max-w-[250px]">{source.url}</span>
-                          <ExternalLink className="h-3 w-3 ml-1 flex-shrink-0" />
-                        </button>
-                      </div>
-                    )}
-                    
-                    {source.relevancy_score !== undefined && (
-                      <div className="mt-1 flex items-center">
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          Relevancy: 
-                        </span>
-                        <div className="ml-1 bg-gray-200 dark:bg-gray-600 rounded-full h-2 w-24">
-                          <div 
-                            className="bg-blue-500 h-2 rounded-full" 
-                            style={{ width: `${Math.min(source.relevancy_score * 100, 100)}%` }}
-                          ></div>
-                        </div>
-                        <span className="ml-1 text-xs text-gray-500 dark:text-gray-400 flex items-center">
-                          {(source.relevancy_score * 100).toFixed(0)}%
-                          <div 
-                            className="ml-1 relative cursor-help"
-                            onMouseEnter={() => setShowTooltip(`sources-${index}`)}
-                            onMouseLeave={() => setShowTooltip(null)}
+                sources.map((source, index) => {
+                  const toolName = findToolForSource(source) || "";
+                  const explanation = getRelevancyExplanation(toolName);
+                  
+                  return (
+                    <div key={index} className="bg-white dark:bg-gray-700 rounded-lg p-3">
+                      <h3 className="font-medium text-sm dark:text-white">
+                        {source.name || source.title || "Source"}
+                      </h3>
+                      
+                      {/* URL on its own line */}
+                      {source.url && (
+                        <div className="mt-1">
+                          <button
+                            onClick={() => openSourceUrl(source.url)}
+                            className="text-blue-600 dark:text-blue-400 hover:underline text-xs flex items-center"
                           >
-                            <Info className="h-3 w-3 text-gray-400" />
-                            {showTooltip === `sources-${index}` && (
-                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg z-50">
-                                {relevancyExplanation}
-                              </div>
-                            )}
+                            <span className="truncate max-w-[250px]">{source.url}</span>
+                            <ExternalLink className="h-3 w-3 ml-1 flex-shrink-0" />
+                          </button>
+                        </div>
+                      )}
+                      
+                      {source.relevancy_score !== undefined && (
+                        <div className="mt-1 flex items-center">
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            Relevancy: 
+                          </span>
+                          <div className="ml-1 bg-gray-200 dark:bg-gray-600 rounded-full h-2 w-24">
+                            <div 
+                              className="bg-blue-500 h-2 rounded-full" 
+                              style={{ width: `${Math.min(source.relevancy_score * 100, 100)}%` }}
+                            ></div>
                           </div>
-                        </span>
-                      </div>
-                    )}
-                    
-                    {/* Document details moved below relevancy score */}
-                    {source.document_id && (
-                      <div className="mt-3">
-                        <Link 
-                          href={`/documents/${source.document_id}`}
-                          className="text-blue-600 dark:text-blue-400 hover:underline text-xs flex items-center"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <span>Document Categorization</span>
-                          <FileText className="h-3 w-3 ml-1 flex-shrink-0" />
-                        </Link>
-                      </div>
-                    )}
+                          <span className="ml-1 text-xs text-gray-500 dark:text-gray-400 flex items-center">
+                            {(source.relevancy_score * 100).toFixed(0)}%
+                            <div 
+                              className="ml-1 relative cursor-help"
+                              onMouseEnter={() => setShowTooltip(`sources-${index}`)}
+                              onMouseLeave={() => setShowTooltip(null)}
+                            >
+                              <Info className="h-3 w-3 text-gray-400" />
+                              {showTooltip === `sources-${index}` && (
+                                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg z-50">
+                                  {explanation}
+                                </div>
+                              )}
+                            </div>
+                          </span>
+                        </div>
+                      )}
+                      
+                      {/* Document details moved below relevancy score */}
+                      {source.document_id && (
+                        <div className="mt-3">
+                          <Link 
+                            href={`/documents/${source.document_id}`}
+                            className="text-blue-600 dark:text-blue-400 hover:underline text-xs flex items-center"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <span>Document Categorization</span>
+                            <FileText className="h-3 w-3 ml-1 flex-shrink-0" />
+                          </Link>
+                        </div>
+                      )}
 
-                    {source.text && (
-                      <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 line-clamp-3">
-                        {source.text}
-                      </p>
-                    )}
-                  </div>
-                ))
+                      {source.text && (
+                        <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 line-clamp-3">
+                          {source.text}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })
               ) : (
                 <p className="text-gray-500 dark:text-gray-400">No sources available.</p>
               )}
@@ -388,80 +426,84 @@ export function CitationsSidebar({ isOpen, onClose, toolsUsed, currentMessageId 
                               const scoreB = b.relevancy_score || 0;
                               return scoreB - scoreA;
                             })
-                            .map((source, sourceIndex) => (
-                              <div key={sourceIndex} className="bg-white dark:bg-gray-700 rounded p-2 text-sm">
-                                <h4 className="font-medium text-sm dark:text-white">
-                                  {source.name || source.title || "Source"}
-                                </h4>
-                                
-                                {/* URL on its own line */}
-                                {source.url && (
-                                  <div className="mt-1">
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation(); // Prevent toggle from firing
-                                        openSourceUrl(source.url);
-                                      }}
-                                      className="text-blue-600 dark:text-blue-400 hover:underline text-xs flex items-center"
-                                    >
-                                      <span className="truncate max-w-[220px]">{source.url}</span>
-                                      <ExternalLink className="h-3 w-3 ml-1 flex-shrink-0" />
-                                    </button>
-                                  </div>
-                                )}
-                                
-                                {source.relevancy_score !== undefined && (
-                                  <div className="mt-1 flex items-center">
-                                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                                      Relevancy:
-                                    </span>
-                                    <div className="ml-1 bg-gray-200 dark:bg-gray-600 rounded-full h-2 w-16">
-                                      <div 
-                                        className="bg-blue-500 h-2 rounded-full" 
-                                        style={{ width: `${Math.min(source.relevancy_score * 100, 100)}%` }}
-                                      ></div>
-                                    </div>
-                                    <span className="ml-1 text-xs text-gray-500 dark:text-gray-400 flex items-center">
-                                      {(source.relevancy_score * 100).toFixed(0)}%
-                                      <div 
-                                        className="ml-1 relative cursor-help"
-                                        onMouseEnter={() => setShowTooltip(`tool-${index}-source-${sourceIndex}`)}
-                                        onMouseLeave={() => setShowTooltip(null)}
+                            .map((source, sourceIndex) => {
+                              const explanation = getRelevancyExplanation(tool.tool_name);
+                              
+                              return (
+                                <div key={sourceIndex} className="bg-white dark:bg-gray-700 rounded p-2 text-sm">
+                                  <h4 className="font-medium text-sm dark:text-white">
+                                    {source.name || source.title || "Source"}
+                                  </h4>
+                                  
+                                  {/* URL on its own line */}
+                                  {source.url && (
+                                    <div className="mt-1">
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation(); // Prevent toggle from firing
+                                          openSourceUrl(source.url);
+                                        }}
+                                        className="text-blue-600 dark:text-blue-400 hover:underline text-xs flex items-center"
                                       >
-                                        <Info className="h-3 w-3 text-gray-400" />
-                                        {showTooltip === `tool-${index}-source-${sourceIndex}` && (
-                                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg z-50">
-                                            {relevancyExplanation}
-                                          </div>
-                                        )}
+                                        <span className="truncate max-w-[220px]">{source.url}</span>
+                                        <ExternalLink className="h-3 w-3 ml-1 flex-shrink-0" />
+                                      </button>
+                                    </div>
+                                  )}
+                                  
+                                  {source.relevancy_score !== undefined && (
+                                    <div className="mt-1 flex items-center">
+                                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                                        Relevancy:
+                                      </span>
+                                      <div className="ml-1 bg-gray-200 dark:bg-gray-600 rounded-full h-2 w-16">
+                                        <div 
+                                          className="bg-blue-500 h-2 rounded-full" 
+                                          style={{ width: `${Math.min(source.relevancy_score * 100, 100)}%` }}
+                                        ></div>
                                       </div>
-                                    </span>
-                                  </div>
-                                )}
-                                
-                                {/* Document details moved below relevancy score */}
-                                {source.document_id && (
-                                  <div className="mt-3">
-                                    <Link 
-                                      href={`/documents/${source.document_id}`}
-                                      className="text-blue-600 dark:text-blue-400 hover:underline text-xs flex items-center"
-                                      onClick={(e) => e.stopPropagation()} // Prevent toggle from firing
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                    >
-                                      <span>Document Categorization</span>
-                                      <FileText className="h-3 w-3 ml-1 flex-shrink-0" />
-                                    </Link>
-                                  </div>
-                                )}
-                                
-                                {source.text && (
-                                  <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 line-clamp-2">
-                                    {source.text}
-                                  </p>
-                                )}
-                              </div>
-                            ))}
+                                      <span className="ml-1 text-xs text-gray-500 dark:text-gray-400 flex items-center">
+                                        {(source.relevancy_score * 100).toFixed(0)}%
+                                        <div 
+                                          className="ml-1 relative cursor-help"
+                                          onMouseEnter={() => setShowTooltip(`tool-${index}-source-${sourceIndex}`)}
+                                          onMouseLeave={() => setShowTooltip(null)}
+                                        >
+                                          <Info className="h-3 w-3 text-gray-400" />
+                                          {showTooltip === `tool-${index}-source-${sourceIndex}` && (
+                                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg z-50">
+                                              {explanation}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </span>
+                                    </div>
+                                  )}
+                                  
+                                  {/* Document details moved below relevancy score */}
+                                  {source.document_id && (
+                                    <div className="mt-3">
+                                      <Link 
+                                        href={`/documents/${source.document_id}`}
+                                        className="text-blue-600 dark:text-blue-400 hover:underline text-xs flex items-center"
+                                        onClick={(e) => e.stopPropagation()} // Prevent toggle from firing
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                      >
+                                        <span>Document Categorization</span>
+                                        <FileText className="h-3 w-3 ml-1 flex-shrink-0" />
+                                      </Link>
+                                    </div>
+                                  )}
+                                  
+                                  {source.text && (
+                                    <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 line-clamp-2">
+                                      {source.text}
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            })}
                         </div>
                       </div>
                     )}

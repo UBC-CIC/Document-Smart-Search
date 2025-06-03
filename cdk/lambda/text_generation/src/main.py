@@ -474,13 +474,17 @@ def handler(event, context):
             llm=llm,
             verbose=False 
         )
+        # print(response)
         
         # Process the response
         response_data = get_llm_output(response['output'])
+
+        # print(response_data)
         llm_output = response_data.get("llm_output")
         options = response_data.get("options", [])
 
-        
+        # print("LLM Output:\n", llm_output)
+        # print("Options:\n", options)
         
         logger.info(f"Request processed in {duration:.2f} seconds")
 
@@ -511,7 +515,10 @@ def handler(event, context):
                 })
             }
 
-        
+        # print("Guardrail check passed for LLM output.")
+        # print("Tools Summary:\n", tools_summary)
+        # print("User Role:", user_role)
+        # print("Options:\n", options)
         
         # Return the response
         return {
