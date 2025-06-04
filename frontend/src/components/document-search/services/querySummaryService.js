@@ -34,10 +34,12 @@ export async function getQuerySummary(userQuery, documentId) {
 
   try {
     // Single API call to get document summary from backend
+    const token = await getUserToken();
     const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/expert-analysis`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
       },
       body: JSON.stringify({
         documentId: documentId,

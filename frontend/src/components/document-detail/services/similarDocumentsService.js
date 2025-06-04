@@ -23,10 +23,12 @@ export async function fetchSimilarDocumentFilterOptions() {
     const url = new URL(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/filters`);
     url.searchParams.append("filters", filtersToRequest.join(","));
 
+    const token = await getUserToken();
     const response = await fetch(url, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
       }
     });
 
@@ -90,10 +92,12 @@ export async function fetchSimilarDocuments(documentId, filters = { years: {}, d
         .map(([type]) => type)
     };
     
+    const token = await getUserToken();
     const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/similarity-search`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
       },
       body: JSON.stringify({
         documentId: documentId,

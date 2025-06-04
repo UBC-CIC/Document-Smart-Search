@@ -26,10 +26,12 @@ export async function fetchTopicFilterOptions() {
     const url = new URL(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/filters`);
     url.searchParams.append("filters", filtersToRequest.join(","));
 
+    const token = await getUserToken();
     const response = await fetch(url, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
       }
     });
 
@@ -99,10 +101,12 @@ export async function fetchRelatedDocumentsByTopic(
   // Real API implementation
   try {
     // Simplified API call - just request filtered results (up to 50)
+    const token = await getUserToken();
     const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/topics?type=${encodeURIComponent(topicType)}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
       },
       body: JSON.stringify({
         name: topicName,

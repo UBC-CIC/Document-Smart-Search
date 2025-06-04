@@ -25,7 +25,14 @@ export async function fetchDocumentDetail(documentId) {
 
   try {
     // In the real API implementation, we expect related documents to be included in the response
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/document-details?document_id=${encodeURIComponent(documentId)}`);
+    const token = await getUserToken();
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/document-details?document_id=${encodeURIComponent(documentId)}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+    });
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);

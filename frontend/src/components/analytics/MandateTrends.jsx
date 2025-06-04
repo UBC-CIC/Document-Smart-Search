@@ -23,10 +23,12 @@ const fetchFilterOptions = async () => {
     const url = new URL(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/filters`);
     url.searchParams.append("filters", filtersToRequest.join(","));
 
+    const token = getUserToken();
     const response = await fetch(url, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
       }
     });
 
@@ -114,10 +116,12 @@ export default function MandateTrends() {
         url.searchParams.append("document_types", selectedDocTypes.join(","));
       }
 
+      const token = await getUserToken();
       const response = await fetch(url, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
         },
       });
 
