@@ -24,7 +24,7 @@ const fetchFilterOptions = async () => {
     const url = new URL(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/filters`);
     url.searchParams.append("filters", filtersToRequest.join(","));
 
-    const token = getUserToken();
+    const token = await getUserToken();
     const response = await fetch(url, {
       method: "GET",
       headers: {
