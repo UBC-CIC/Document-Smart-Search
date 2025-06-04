@@ -1,15 +1,13 @@
-// getUserToken.js
-
 let cachedToken = null;
 let tokenExpiry = null;
 
 export async function getUserToken() {
   const now = Date.now();
 
-  // Return cached token if still valid
-  if (cachedToken && tokenExpiry && now < tokenExpiry) {
-    return cachedToken;
-  }
+  // if (cachedToken && tokenExpiry && now < tokenExpiry - 60000) { // 1 minute buffer
+  //   console.log("Using cached public token:", cachedToken);
+  //   return cachedToken;
+  // }
 
   try {
     console.log("Fetching new public token...");
@@ -19,12 +17,12 @@ export async function getUserToken() {
     const data = await res.json();
     const token = data.token;
 
-    // Decode the token to extract expiry
+    // extract expiry
     const [, payload] = token.split(".");
     const decoded = JSON.parse(atob(payload));
     const exp = decoded.exp * 1000; // convert to ms
 
-    // Cache it
+    // cache it
     cachedToken = token;
     tokenExpiry = exp;
 
