@@ -550,7 +550,7 @@ export class ApiGatewayStack extends cdk.Stack {
     apiGW_authorizationFunction.overrideLogicalId("adminLambdaAuthorizer");
 
     const jwtSecret = new secretsmanager.Secret(this, `${id}-JwtSecret`, {
-      secretName: 'DFO-JWTSecret',
+      secretName: `${id}-DFO-JWTSecret`,
       generateSecretString: {
         secretStringTemplate: JSON.stringify({}),
         generateStringKey: 'jwtSecret',

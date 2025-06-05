@@ -4,13 +4,7 @@ let tokenExpiry = null;
 export async function getUserToken() {
   const now = Date.now();
 
-  // if (cachedToken && tokenExpiry && now < tokenExpiry - 60000) { // 1 minute buffer
-  //   console.log("Using cached public token:", cachedToken);
-  //   return cachedToken;
-  // }
-
   try {
-    console.log("Fetching new public token...");
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/publicToken`);
     if (!res.ok) throw new Error("Failed to fetch token");
 
@@ -26,7 +20,6 @@ export async function getUserToken() {
     cachedToken = token;
     tokenExpiry = exp;
 
-    console.log("Fetched and cached new token:", token);
     return token;
   } catch (err) {
     console.error("Error fetching public token:", err);
