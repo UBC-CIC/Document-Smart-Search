@@ -65,7 +65,6 @@ export async function fetchChatMessages(sessionId) {
 // Send a message to the chat API
 export async function sendChatMessage(session, fingerprint, content, userRole) {
   const token = await getUserToken();
-  console.log("Token:", token);
   try {
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_API_ENDPOINT}user/text_generation?session_id=${encodeURIComponent(

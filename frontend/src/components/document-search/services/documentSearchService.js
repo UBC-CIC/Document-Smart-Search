@@ -21,7 +21,6 @@ export async function fetchFilterOptions() {
 
     // Fetch user auth token
     const token = await getUserToken();
-    console.log("Token:", token)
     const response = await fetch(url, {
       method: "GET",
       headers: {
