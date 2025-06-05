@@ -684,6 +684,55 @@ exports.handler = async (event) => {
           response.body = JSON.stringify({ error: "Internal server error" })
         }
         break
+      case "GET /admin/latest_prompt":
+        try {
+          const latestPrompts = await sqlConnectionTableCreator`
+            SELECT DISTINCT ON (role) role, prompt, time_created
+            FROM (
+              SELECT 'public' AS role, public AS prompt, time_created FROM prompts WHERE public IS NOT NULL
+              UNION ALL
+              SELECT 'internal_researcher' AS role, internal_researcher AS prompt, time_created FROM prompts WHERE internal_researcher IS NOT NULL
+              UNION ALL
+              SELECT 'policy_maker' AS role, policy_maker AS prompt, time_created FROM prompts WHERE policy_maker IS NOT NULL
+              UNION ALL
+              SELECT 'external_researcher' AS role, external_researcher AS prompt, time_created FROM prompts WHERE external_researcher IS NOT NULL
+            ) AS combined
+            ORDER BY role, time_created DESC;
+          `;
+
+          if (latestPrompts.length === 0) {
+            response.statusCode = 404;
+            response.body = JSON.stringify({ error: "No prompts found" });
+            break;
+          }
+
+          const result = {
+            public: null,
+            internal_researcher: null,
+            policy_maker: null,
+            external_researcher: null,
+            time_created: null,
+          };
+
+          for (const entry of latestPrompts) {
+            result[entry.role] = entry.prompt;
+          }
+
+          // Use the latest overall time_created
+          result.time_created = latestPrompts
+            .map((p) => new Date(p.time_created))
+            .sort((a, b) => b.getTime() - a.getTime())[0]
+            .toISOString();
+
+          response.statusCode = 200;
+          response.body = JSON.stringify(result);
+        } catch (err) {
+          console.error(err);
+          response.statusCode = 500;
+          response.body = JSON.stringify({ error: "Internal server error" });
+        }
+        break;
+
       case "GET /admin/get_feedback":
         try {
           if (!event.queryStringParameters || !event.queryStringParameters.session_id) {

@@ -36,10 +36,15 @@ export default function Component() {
 
         console.log("Response status:", response.status);
         const data = await response.json();
-        console.log("Response data:", data);
 
         if (response.ok) {
-          setPrompts(data);
+          setPrompts({
+            public: (data.public || "").trim(),
+            internal_researcher: (data.internal_researcher  || "" ).trim(),
+            policy_maker: (data.policy_maker  || "" ).trim(),
+            external_researcher: (data.external_researcher  || "" ).trim() });
+
+            console.log("Latest prompts fetched successfully:", data);
         } else if (response.status === 404) {
           console.log("No prompts found, initializing empty state");
           // Initialize empty prompts if none found

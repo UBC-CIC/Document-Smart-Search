@@ -21,7 +21,7 @@ const PromptSettings = ({
   setPreviousPrompts,
   setPrompts,
 }) => {
-  const [promptText, setPromptText] = useState(currentPrompt?.prompt || "");
+  const [promptText, setPromptText] = useState(currentPrompt || "");
 
   const formatRoleName = (role) => {
     const roleMap = {
@@ -74,7 +74,7 @@ const PromptSettings = ({
       // Fetch current prompts
       const currentPrompts = await fetchPrompts(token, "admin/latest_prompt");
       if (currentPrompts) {
-        setPrompts(currentPrompts);
+        setPrompts();
       }
 
       // Fetch previous prompts
