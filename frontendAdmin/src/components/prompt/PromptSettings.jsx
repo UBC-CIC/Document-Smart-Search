@@ -74,7 +74,12 @@ const PromptSettings = ({
       // Fetch current prompts
       const currentPrompts = await fetchPrompts(token, "admin/latest_prompt");
       if (currentPrompts) {
-        setPrompts();
+        setPrompts({
+          public: currentPrompts.public,
+          internal_researcher: currentPrompts.internal_researcher,
+          external_researcher: currentPrompts.external_researcher,
+          policy_maker: currentPrompts.policy_maker
+        });
       }
 
       // Fetch previous prompts
