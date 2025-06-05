@@ -20,7 +20,8 @@ export async function fetchFilterOptions() {
     // url.searchParams.append("filters", filtersToRequest.join(","));
 
     // Fetch user auth token
-    const token = getUserToken();
+    const token = await getUserToken();
+    console.log("Token:", token)
     const response = await fetch(url, {
       method: "GET",
       headers: {
@@ -76,7 +77,7 @@ export async function performDocumentSearch(query, filters) {
     // console.log("JSON SENDING:", JSON.stringify({ query, filters: transformedFilters }, null, 2))
 
     // Fetch user auth token
-    const token = getUserToken();
+    const token = await getUserToken();
     const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/hybrid-search`, {
       method: "POST",
       headers: {
