@@ -28,35 +28,23 @@ from helpers.tools.setup import initialize_tools
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
 
-# Environment variables
-# DB_SECRET_NAME = os.environ["SM_DB_CREDENTIALS"]
-# REGION = os.environ["REGION"]
-# RDS_PROXY_ENDPOINT = os.environ["RDS_PROXY_ENDPOINT"]
-# BEDROCK_LLM_PARAM = os.environ["BEDROCK_LLM_PARAM"]
-# EMBEDDING_MODEL_PARAM = os.environ["EMBEDDING_MODEL_PARAM"]
-# DYNAMODB_TABLE_NAME = os.environ["TABLE_NAME_PARAM"]
-
 # Constants
 SEARCH_PIPELINE_NAME = "html_hybrid_search"
 KEYWORD_RATIO_OS_P = 0.3
 SEMANTIC_RATIO_OS_P = 0.7
 
 # Hardcoded constants (for now)
-OPENSEARCH_SEC = "opensearch-masteruser-test-glue"
-OPENSEARCH_HOST = "opensearch-host-test-glue"
-INDEX_NAME = "dfo-html-full-index"
-RDS_SEC = "rds/dfo-db-glue-test"
+OPENSEARCH_SEC = os.environ["OPENSEARCH_SEC"]
+OPENSEARCH_HOST = os.environ["OPENSEARCH_HOST"]
+INDEX_NAME = os.environ["INDEX_NAME"]
+RDS_SEC = os.environ["RDS_SEC"]
 
-DFO_HTML_FULL_INDEX_NAME = "dfo-html-full-index"
-DFO_MANDATE_FULL_INDEX_NAME = "dfo-mandate-full-index"
-DFO_TOPIC_FULL_INDEX_NAME = "dfo-topic-full-index"
+DFO_HTML_FULL_INDEX_NAME = os.environ["DFO_HTML_FULL_INDEX_NAME"]
+DFO_MANDATE_FULL_INDEX_NAME = os.environ["DFO_MANDATE_FULL_INDEX_NAME"]
+DFO_TOPIC_FULL_INDEX_NAME = os.environ["DFO_TOPIC_FULL_INDEX_NAME"]
 
-# REGION_NAME = "us-west-2"
-# EMBEDDING_MODEL_PARAM = "amazon.titan-embed-text-v2:0"
 # Other parameters - these should be passed in as environment variables
-BEDROCK_INFERENCE_PROFILE = "us.meta.llama3-3-70b-instruct-v1:0"
-# EMBEDDING_MODEL_ID = "amazon.titan-embed-text-v2:0"
-# DYNAMODB_TABLE_NAME = "DynamoDB-Conversation-Table"
+BEDROCK_INFERENCE_PROFILE = os.environ["BEDROCK_INFERENCE_PROFILE"]
 
 # Constants from the original stack
 RDS_PROXY_ENDPOINT = os.environ["RDS_PROXY_ENDPOINT"]
@@ -375,7 +363,6 @@ def handler(event, context):
 
     try:
         # Initialize OpenSearch, DB, and get configuration values
-        # Set up OpenSearch client - This is hard coded to a test database for now
         secrets = get_secret(OPENSEARCH_SEC)
         opensearch_host = get_parameter(OPENSEARCH_HOST)
         opensearch_client = OpenSearch(

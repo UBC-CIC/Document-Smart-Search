@@ -698,6 +698,43 @@ export class ApiGatewayStack extends cdk.Stack {
       }
     );
 
+
+    const opensearchSecParameter = new ssm.StringParameter(this, "OpensearchSecParameter", {
+      parameterName: `/${id}/DFO/OpensearchSec`,
+      description: "Opensearch security credentials",
+      stringValue: "opensearch-masteruser-test-glue",
+    });
+
+    const opensearchHostParameter = new ssm.StringParameter(this, "OpensearchHostParameter", {
+      parameterName: `/${id}/DFO/OpensearchHost`,
+      description: "Opensearch host",
+      stringValue: "opensearch-host-test-glue",
+    });
+
+    const indexNameParameter = new ssm.StringParameter(this, "IndexNameParameter", {
+      parameterName: `/${id}/DFO/IndexName`,
+      description: "Opensearch index name",
+      stringValue: "dfo-html-full-index",
+    });
+
+    const rdsSecParameter = new ssm.StringParameter(this, "RdsSecParameter", {
+      parameterName: `/${id}/DFO/RdsSec`,
+      description: "RDS security credentials",
+      stringValue: "rds/dfo-db-glue-test",
+    });
+
+    const dfoHtmlFullIndexNameParameter = new ssm.StringParameter(this, "DfoHtmlFullIndexNameParameter", {
+      parameterName: `/${id}/DFO/DfoHtmlFullIndexName`,
+      description: "DFO HTML full index name",
+      stringValue: "dfo-html-full-index",
+    });
+
+    const bedrockInferenceProfileParameter = new ssm.StringParameter(this, "BedrockInferenceProfileParameter", {
+      parameterName: `/${id}/DFO/BedrockInferenceProfile`,
+      description: "Bedrock inference profile for text generation",
+      stringValue: "us.meta.llama3-3-70b-instruct-v1:0",
+    });
+
     /**
      * Create Lambda with container image for text generation workflow in RAG pipeline
      */
@@ -719,6 +756,12 @@ export class ApiGatewayStack extends cdk.Stack {
           BEDROCK_LLM_PARAM: bedrockLLMParameter.parameterName,
           EMBEDDING_MODEL_PARAM: embeddingModelParameter.parameterName,
           TABLE_NAME_PARAM: tableNameParameter.parameterName,
+          OPENSEARCH_HOST: opensearchHostParameter.parameterName,
+          OPENSEARCH_SEC: opensearchSecParameter.parameterName,
+          OPENSEARCH_INDEX_NAME: indexNameParameter.parameterName,
+          RDS_SEC: rdsSecParameter.parameterName,
+          DFO_HTML_FULL_INDEX_NAME: dfoHtmlFullIndexNameParameter.parameterName,
+          BEDROCK_INFERENCE_PROFILE: bedrockInferenceProfileParameter.parameterName
         },
       }
     );
@@ -752,12 +795,22 @@ export class ApiGatewayStack extends cdk.Stack {
     // Attach the custom Bedrock policy to Lambda function
     textGenFunc.addToRolePolicy(bedrockPolicyStatement);
     
-    // TODO: Restrict this later!
     textGenFunc.addToRolePolicy(
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
-        actions: ["ssm:*"],
-        resources: ["arn:aws:ssm:*:*:parameter/*"],
+        actions: ["ssm:GetParameter"],
+        resources: 
+      [
+        bedrockLLMParameter.parameterArn,
+        embeddingModelParameter.parameterArn,
+        tableNameParameter.parameterArn,
+        opensearchHostParameter.parameterArn,
+        opensearchSecParameter.parameterArn,
+        indexNameParameter.parameterArn,
+        rdsSecParameter.parameterArn,
+        dfoHtmlFullIndexNameParameter.parameterArn,
+        bedrockInferenceProfileParameter.parameterArn
+      ],
       })
     );
     
@@ -770,16 +823,12 @@ export class ApiGatewayStack extends cdk.Stack {
       })
     );
     
-    // Grant access to Secret Manager
     textGenFunc.addToRolePolicy(
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
-        actions: [
-          //Secrets Manager
-          "secretsmanager:GetSecretValue",
-        ],
+        actions: ["secretsmanager:GetSecretValue"],
         resources: [
-          `arn:aws:secretsmanager:${this.region}:${this.account}:secret:*`,
+          `arn:aws:secretsmanager:${this.region}:${this.account}:secret:*`
         ],
       })
     );
