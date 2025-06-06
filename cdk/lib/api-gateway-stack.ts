@@ -84,10 +84,6 @@ export class ApiGatewayStack extends cdk.Stack {
       `arn:aws:lambda:${this.region}:017000801446:layer:AWSLambdaPowertoolsPythonV2:78`
     );
 
-    this.layerList["psycopg2"] = psycopgLayer;
-    this.layerList["postgres"] = postgres;
-    this.layerList["jwt"] = jwt;
-
     const { userPool, appClient, identityPool, secret } =
       createCognitoResources(this, id);
 
@@ -139,7 +135,7 @@ export class ApiGatewayStack extends cdk.Stack {
     this.stageARN_APIGW = this.api.deploymentStage.stageArn;
     this.apiGW_basedURL = this.api.urlForPath();
 
-            // Waf Firewall
+    // Waf Firewall
     const waf = new wafv2.CfnWebACL(this, `${id}-waf`, {
       description: "waf for DFO",
       scope: "REGIONAL",
