@@ -795,24 +795,24 @@ export class ApiGatewayStack extends cdk.Stack {
     // Attach the custom Bedrock policy to Lambda function
     textGenFunc.addToRolePolicy(bedrockPolicyStatement);
     
-    textGenFunc.addToRolePolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: ["ssm:GetParameter"],
-        resources: 
-      [
-        bedrockLLMParameter.parameterArn,
-        embeddingModelParameter.parameterArn,
-        tableNameParameter.parameterArn,
-        opensearchHostParameter.parameterArn,
-        opensearchSecParameter.parameterArn,
-        indexNameParameter.parameterArn,
-        rdsSecParameter.parameterArn,
-        dfoHtmlFullIndexNameParameter.parameterArn,
-        bedrockInferenceProfileParameter.parameterArn
-      ],
-      })
-    );
+    // textGenFunc.addToRolePolicy(
+    //   new iam.PolicyStatement({
+    //     effect: iam.Effect.ALLOW,
+    //     actions: ["ssm:GetParameter"],
+    //     resources: 
+    //   [
+    //     bedrockLLMParameter.parameterArn,
+    //     embeddingModelParameter.parameterArn,
+    //     tableNameParameter.parameterArn,
+    //     opensearchHostParameter.parameterArn,
+    //     opensearchSecParameter.parameterArn,
+    //     indexNameParameter.parameterArn,
+    //     rdsSecParameter.parameterArn,
+    //     dfoHtmlFullIndexNameParameter.parameterArn,
+    //     bedrockInferenceProfileParameter.parameterArn
+    //   ],
+    //   })
+    // );
     
     // TODO: Restrict this later!
     textGenFunc.addToRolePolicy(
