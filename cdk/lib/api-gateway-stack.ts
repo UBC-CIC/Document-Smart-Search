@@ -28,6 +28,7 @@ import { createLayers } from "./api-gateway-helpers/layers";
 import { createRolesAndPolicies } from "./api-gateway-helpers/roles";
 import { DockerImageAsset, Platform } from 'aws-cdk-lib/aws-ecr-assets';
 import * as wafv2 from "aws-cdk-lib/aws-wafv2";
+import { table } from "console";
 
 export class ApiGatewayStack extends cdk.Stack {
   private readonly api: apigateway.SpecRestApi;
@@ -795,34 +796,6 @@ export class ApiGatewayStack extends cdk.Stack {
     // Attach the custom Bedrock policy to Lambda function
     textGenFunc.addToRolePolicy(bedrockPolicyStatement);
     
-    // textGenFunc.addToRolePolicy(
-    //   new iam.PolicyStatement({
-    //     effect: iam.Effect.ALLOW,
-    //     actions: ["ssm:GetParameter"],
-    //     resources: 
-    //   [
-    //     bedrockLLMParameter.parameterArn,
-    //     embeddingModelParameter.parameterArn,
-    //     tableNameParameter.parameterArn,
-    //     opensearchHostParameter.parameterArn,
-    //     opensearchSecParameter.parameterArn,
-    //     indexNameParameter.parameterArn,
-    //     rdsSecParameter.parameterArn,
-    //     dfoHtmlFullIndexNameParameter.parameterArn,
-    //     bedrockInferenceProfileParameter.parameterArn
-    //   ],
-    //   })
-    // );
-    
-    // TODO: Restrict this later!
-    textGenFunc.addToRolePolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: ["bedrock:*"],
-        resources: ["*"],
-      })
-    );
-    
     textGenFunc.addToRolePolicy(
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
@@ -845,7 +818,7 @@ export class ApiGatewayStack extends cdk.Stack {
           "dynamodb:GetItem",
           "dynamodb:UpdateItem",
         ],
-        resources: [`arn:aws:dynamodb:${this.region}:${this.account}:table/*`],
+        resources: [`arn:aws:dynamodb:${this.region}:${this.account}:table/${tableNameParameter.stringValue}}`],
       })
     );
     // Grant access to SSM Parameter Store for specific parameters
