@@ -718,6 +718,12 @@ export class ApiGatewayStack extends cdk.Stack {
       stringValue: "dfo-html-full-index",
     });
 
+    const dfoMandateFullIndexNameParameter = new ssm.StringParameter(this, "DfoMandateFullIndexNameParameter", {
+      parameterName: `/${id}/DFO/DfoMandateFullIndexName`,
+      description: "DFO Mandate full index name",
+      stringValue: "dfo-mandate-full-index",
+    });
+
     const rdsSecParameter = new ssm.StringParameter(this, "RdsSecParameter", {
       parameterName: `/${id}/DFO/RdsSec`,
       description: "RDS security credentials",
@@ -734,6 +740,12 @@ export class ApiGatewayStack extends cdk.Stack {
       parameterName: `/${id}/DFO/BedrockInferenceProfile`,
       description: "Bedrock inference profile for text generation",
       stringValue: "us.meta.llama3-3-70b-instruct-v1:0",
+    });
+
+    const dfoTopicFullIndexNameParameter = new ssm.StringParameter(this, "DfoTopicFullIndexNameParameter", {
+      parameterName: `/${id}/DFO/DfoTopicFullIndexName`,
+      description: "DFO Topic full index name",
+      stringValue: "dfo-topic-full-index",
     });
 
     /**
@@ -762,7 +774,10 @@ export class ApiGatewayStack extends cdk.Stack {
           OPENSEARCH_INDEX_NAME: indexNameParameter.parameterName,
           RDS_SEC: rdsSecParameter.parameterName,
           DFO_HTML_FULL_INDEX_NAME: dfoHtmlFullIndexNameParameter.parameterName,
-          BEDROCK_INFERENCE_PROFILE: bedrockInferenceProfileParameter.parameterName
+          DFO_MANDATE_FULL_INDEX_NAME: dfoMandateFullIndexNameParameter.stringValue,
+          BEDROCK_INFERENCE_PROFILE: bedrockInferenceProfileParameter.parameterName,
+          INDEX_NAME: indexNameParameter.stringValue,
+          DFO_TOPIC_FULL_INDEX_NAME: dfoTopicFullIndexNameParameter.stringValue,
         },
       }
     );
@@ -793,8 +808,27 @@ export class ApiGatewayStack extends cdk.Stack {
       ],
     });
 
+    const bedrockGuardrailPolicyStatement = new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: [
+        "bedrock:ApplyGuardrail",
+        "bedrock:InvokeModel",
+        "bedrock:InvokeEndpoint",
+        "bedrock:ListGuardrails",
+        "bedrock:CreateGuardrail",
+        "bedrock:CreateGuardrailVersion",
+        "bedrock:DescribeGuardrail",
+        "bedrock:GetGuardrail",
+      ],
+      resources: ["*"],
+    });
+
+
+
     // Attach the custom Bedrock policy to Lambda function
     textGenFunc.addToRolePolicy(bedrockPolicyStatement);
+
+    textGenFunc.addToRolePolicy(bedrockGuardrailPolicyStatement); 
     
     textGenFunc.addToRolePolicy(
       new iam.PolicyStatement({
@@ -818,7 +852,7 @@ export class ApiGatewayStack extends cdk.Stack {
           "dynamodb:GetItem",
           "dynamodb:UpdateItem",
         ],
-        resources: [`arn:aws:dynamodb:${this.region}:${this.account}:table/${tableNameParameter.stringValue}}`],
+        resources: [`arn:aws:dynamodb:${this.region}:${this.account}:table/*`],
       })
     );
     // Grant access to SSM Parameter Store for specific parameters
