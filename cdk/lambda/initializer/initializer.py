@@ -85,12 +85,6 @@ def handler(event, context):
                 "time_created" timestamp
             );
 
-            CREATE TABLE IF NOT EXISTS "categories" (
-                "category_id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-                "category_name" varchar,
-                "category_number" integer
-            );
-
             CREATE TABLE IF NOT EXISTS "sessions" (
                 "session_id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
                 "time_created" timestamp
@@ -296,13 +290,6 @@ def handler(event, context):
         """
         cursor.execute(sql)
         print(cursor.fetchall())
-        
-        sql = """
-            SELECT * FROM categories;
-        """
-        cursor.execute(sql)
-        print(cursor.fetchall())
-
 
         # Close cursor and connection
         cursor.close()
