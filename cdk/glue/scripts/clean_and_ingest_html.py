@@ -32,43 +32,44 @@ session = aws.session
 # Constants
 
 # Get job parameters
-# from awsglue.utils import getResolvedOptions
+from awsglue.utils import getResolvedOptions
 
-# args = getResolvedOptions(sys.argv, [
-#     'html_urls_path',
-#     'bucket_name',
-#     'batch_id',
-#     'region_name',
-#     'embedding_model',
-#     'opensearch_secret',
-#     'opensearch_host',
-#     'rds_secret',
-#     'dfo_html_full_index_name',
-#     'dfo_topic_full_index_name',
-#     'dfo_mandate_full_index_name',
-#     'pipeline_mode',
-#     'sm_method',
-#     'topic_modelling_mode',
-#     'llm_model'
-# ])
+args = getResolvedOptions(sys.argv, [
+    'NEXT_JOB_NAME',
+    'html_urls_path',
+    'bucket_name',
+    'batch_id',
+    'region_name',
+    'embedding_model',
+    'opensearch_secret',
+    'opensearch_host',
+    'rds_secret',
+    'dfo_html_full_index_name',
+    'dfo_topic_full_index_name',
+    'dfo_mandate_full_index_name',
+    'pipeline_mode',
+    'sm_method',
+    'topic_modelling_mode',
+    'llm_model'
+])
 
-args = {
-    'html_urls_path': 's3://dfo-test-datapipeline/batches/2025-05-07/html_data/CSASDocuments.xlsx',
-    'bucket_name': 'dfo-test-datapipeline',
-    'batch_id': '2025-05-07',
-    'region_name': 'us-west-2',
-    'embedding_model': 'amazon.titan-embed-text-v2:0',
-    'opensearch_secret': 'opensearch-masteruser-test-glue',
-    'opensearch_host': 'opensearch-host-test-glue',
-    'rds_secret': 'rds/dfo-db-glue-test',
-    'dfo_html_full_index_name': 'dfo-html-full-index',
-    'dfo_topic_full_index_name': 'dfo-topic-full-index',
-    'dfo_mandate_full_index_name': 'dfo-mandate-full-index',
-    'pipeline_mode': 'full_update', # or 'topics_only', 'html_only'
-    'sm_method': 'numpy', # 'numpy', 'opensearch'
-    'topic_modelling_mode': 'retrain', # or 'predict'
-    'llm_model': 'us.meta.llama3-3-70b-instruct-v1:0'
-}
+# args = {
+#     'html_urls_path': 's3://dfo-test-datapipeline/batches/2025-05-07/html_data/CSASDocuments.xlsx',
+#     'bucket_name': 'dfo-test-datapipeline',
+#     'batch_id': '2025-05-07',
+#     'region_name': 'us-west-2',
+#     'embedding_model': 'amazon.titan-embed-text-v2:0',
+#     'opensearch_secret': 'opensearch-masteruser-test-glue',
+#     'opensearch_host': 'opensearch-host-test-glue',
+#     'rds_secret': 'rds/dfo-db-glue-test',
+#     'dfo_html_full_index_name': 'dfo-html-full-index',
+#     'dfo_topic_full_index_name': 'dfo-topic-full-index',
+#     'dfo_mandate_full_index_name': 'dfo-mandate-full-index',
+#     'pipeline_mode': 'full_update', # or 'topics_only', 'html_only'
+#     'sm_method': 'numpy', # 'numpy', 'opensearch'
+#     'topic_modelling_mode': 'retrain', # or 'predict'
+#     'llm_model': 'us.meta.llama3-3-70b-instruct-v1:0'
+# }
 
 # Index Names
 DFO_HTML_FULL_INDEX_NAME = args['dfo_html_full_index_name']
@@ -940,6 +941,29 @@ def upload_to_s3(bucket: str, key: str, df: pd.DataFrame, debug: bool = False):
             f.write(csv_buffer.getvalue().decode('utf-8'))
 
 html_url_to_content = {} # not sure why this is needed
+
+def trigger_next_job(job_name: str, job_args: dict) -> None:
+    """
+    Trigger the next Glue job in the pipeline.
+    
+    Parameters
+    ----------
+    job_name : str
+        Name of the Glue job to trigger
+    job_args : dict
+        Arguments to pass to the Glue job
+    """
+    glue_client = session.client('glue')
+    try:
+        response = glue_client.start_job_run(
+            JobName=job_name,
+            Arguments=job_args
+        )
+        print(f"Successfully triggered job {job_name} with run ID: {response['JobRunId']}")
+    except Exception as e:
+        print(f"Error triggering job {job_name}: {str(e)}")
+        raise
+
 async def main(dryrun=False, debug=False):
     """
     Main function to process and ingest HTML documents.
@@ -1020,6 +1044,10 @@ async def main(dryrun=False, debug=False):
     }])
     print(stats_df.squeeze())
     upload_to_s3(BUCKET_NAME, f"{folder}/overall_stats.csv", stats_df, debug)
+
+    # After successful completion, trigger the next job
+    if not dryrun:
+        trigger_next_job(args['NEXT_JOB_NAME'], args)
 
 if __name__ == "__main__":
     asyncio.run(main(dryrun=False, debug=True))

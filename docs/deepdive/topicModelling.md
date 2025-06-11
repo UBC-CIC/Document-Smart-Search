@@ -25,6 +25,7 @@
   - [1. Zero-Shot Topic Modeling with Pre-Computed Embeddings](#1-zero-shot-topic-modeling-with-pre-computed-embeddings)
   - [2. Zero-Shot Topic Modeling with Pretrained Embedding Model (sentence-transformers/all-MiniLM-L6-v2)](#2-zero-shot-topic-modeling-with-pretrained-embedding-model-sentence-transformersall-minilm-l6-v2)
 - [Strategic Advantages for Our System](#strategic-advantages-for-our-system)
+- [Further Reading](#further-reading)
 
 ## Topic Modeling Architecture: A Deep Dive
 
@@ -233,3 +234,9 @@ Integrating this zero-shot methodology offers significant advantages over purely
   The final topic set is immediately more useful, as it is anchored to familiar, mission-critical concepts. New topics can be contextualized against this stable background of known subjects.
 
 With **Zero-Shot Topic Modeling**, we can evolve our system into a more dynamic and responsive intelligence tool that effectively balances our need to monitor known responsibilities with the necessity of discovering unknown challenges.
+
+## Further Reading
+
+- [BERTopic Zero-Shot Topic Modeling](https://maartengr.github.io/BERTopic/getting_started/zeroshot/zeroshot.html)
+- [BERTopic Documentation](https://maartengr.github.io/BERTopic/)
+- [BERTopic GitHub Repository](https://github.com/MaartenGr/BERTopic)
