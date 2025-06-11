@@ -1,50 +1,147 @@
-# DFO Smart Search Security Guide
+# Security Guide
 
-This document outlines the security measures implemented in the DFO Smart Search application to protect against common web vulnerabilities and attacks.
+## Table of Contents
 
-## Security Features
+- [Security Guide](#security-guide)
+  - [Table of Contents](#table-of-contents)
+  - [Overview](#overview)
+  - [Authentication and Authorization](#authentication-and-authorization)
+    - [AWS Cognito](#aws-cognito)
+    - [IAM Roles and Policies](#iam-roles-and-policies)
+  - [Network Security](#network-security)
+    - [VPC Configuration](#vpc-configuration)
+    - [API Gateway Security](#api-gateway-security)
+  - [Web Application Firewall (WAF)](#web-application-firewall-waf)
+    - [WAF Configuration](#waf-configuration)
+    - [WAF Monitoring](#waf-monitoring)
+  - [Data Security](#data-security)
+    - [Encryption](#encryption)
+    - [Database Security](#database-security)
+    - [S3 Security](#s3-security)
+  - [Monitoring and Logging](#monitoring-and-logging)
+    - [CloudWatch](#cloudwatch)
+    - [AWS Config](#aws-config)
+  - [Compliance and Best Practices](#compliance-and-best-practices)
+  - [Security Incident Response](#security-incident-response)
+  - [Additional Resources](#additional-resources)
 
-### AWS WAF (Web Application Firewall)
+## Overview
 
-The application is protected by AWS WAF, which helps protect your web applications from common web exploits that could affect application availability, compromise security, or consume excessive resources.
+This document outlines the security measures implemented in the DFO Smart Search application to protect data, users, and infrastructure.
 
-#### WAF Rules Implemented
+## Authentication and Authorization
 
-1. **Rate Limiting Rule**
-   - Limits requests to 100 per 5 minutes per IP address
-   - Prevents brute force attacks and denial of service attempts
+### AWS Cognito
 
-2. **AWS Managed Rules - Core Rule Set**
-   - Provides protection against exploitation of a wide range of vulnerabilities
-   - Includes protection against OWASP Top 10 security risks
+- User authentication is handled through AWS Cognito
+- Supports multi-factor authentication (MFA)
+- Implements secure password policies
+- Manages user sessions and tokens
+- Handles user registration and sign-in flows
 
-3. **AWS Managed Rules - SQL Injection Rule Set**
-   - Blocks request patterns associated with exploitation of SQL databases
-   - Prevents attackers from modifying or extracting data from your database
+### IAM Roles and Policies
 
-4. **AWS Managed Rules - Known Bad Inputs Rule Set**
-   - Blocks request patterns known to be invalid and associated with exploitation
-   - Prevents common attack patterns and known malicious inputs
+- Least privilege principle applied to all IAM roles
+- Separate roles for authenticated and unauthenticated users
+- Role-based access control (RBAC) for different user types
+- Regular audit of IAM permissions
 
-### AWS Shield Advanced
+## Network Security
 
-AWS Shield Advanced provides enhanced protections for your applications against more sophisticated and larger DDoS attacks.
+### VPC Configuration
 
-#### Shield Features Enabled
+- All resources deployed within a private VPC
+- Network ACLs and Security Groups for traffic control
+- RDS Proxy for database connection management
+- Private subnets for sensitive resources
 
-1. **DDoS Protection**
-   - Protects against layer 3/4 DDoS attacks (volumetric attacks)
-   - Protects against layer 7 DDoS attacks (application layer attacks)
+### API Gateway Security
 
-2. **24/7 DDoS Response Team (DRT)**
-   - Access to AWS DDoS experts for assistance during attacks
-   - Proactive engagement during large-scale events
+- Regional API Gateway with private endpoints
+- IAM authorization for API endpoints
+- Request validation and throttling
+- HTTPS/TLS encryption for all API communications
 
-3. **Real-time Visibility and Notifications**
-   - Detailed metrics and reporting on DDoS events
-   - Automated notifications when attacks are detected
+## Web Application Firewall (WAF)
 
-## Best Practices for Developers
+### WAF Configuration
+
+The application is protected by AWS WAF with the following rules:
+
+1. **Common Attack Protection** (Priority: 1)
+   - Protects against common web exploits
+   - Implements AWS managed rules for:
+     - Cross-site scripting (XSS)
+     - HTTP flooding
+     - IP reputation
+     - Bad bots
+     - Size restrictions
+
+2. **Rate Limiting** (Priority: 2)
+   - Limits requests to 2000 per IP address
+   - Helps prevent DDoS attacks
+   - Configurable thresholds
+   - IP-based rate limiting
+
+3. **SQL Injection Protection** (Priority: 3)
+   - AWS managed rules for SQL injection detection
+   - Blocks common SQL injection patterns
+   - Protects database operations
+   - Regular rule updates
+
+4. **Known Bad Inputs** (Priority: 4)
+   - Blocks requests with known malicious patterns
+   - AWS managed rules for known bad inputs
+   - Protects against automated attacks
+   - Regular updates to threat intelligence
+
+### WAF Monitoring
+
+- CloudWatch metrics for all WAF rules
+- Sampled request logging
+- Real-time monitoring of blocked requests
+- Alert configuration for security events
+
+## Data Security
+
+### Encryption
+
+- Data at rest encryption for all storage
+- Data in transit encryption using TLS
+- Key management through AWS KMS
+- Regular key rotation
+
+### Database Security
+
+- RDS encryption enabled
+- Network isolation through VPC
+- Regular security patches
+- Automated backups with encryption
+
+### S3 Security
+
+- Server-side encryption for all buckets
+- Bucket policies for access control
+- Versioning enabled
+- Lifecycle policies for data management
+
+## Monitoring and Logging
+
+### CloudWatch
+
+- Comprehensive logging of all services
+- Metric monitoring and alerting
+- Log retention policies
+- Performance monitoring
+
+### AWS Config
+
+- Continuous monitoring of resource configurations
+- Compliance checking
+- Change tracking
+- Security best practices enforcement
+
+## Compliance and Best Practices
 
 1. **Input Validation**
    - Always validate and sanitize user inputs on both client and server sides

@@ -4,6 +4,7 @@ import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as lambdaEventSources from "aws-cdk-lib/aws-lambda-event-sources";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as ssm from "aws-cdk-lib/aws-ssm";
+import * as wafv2 from "aws-cdk-lib/aws-wafv2";
 import { Construct } from "constructs";
 import { Duration } from "aws-cdk-lib";
 import {
@@ -67,10 +68,6 @@ export class ApiGatewayStack extends cdk.Stack {
 
 
     this.layerList = {};
-    const { embeddingStorageBucket, dataIngestionBucket } = createS3Buckets(
-      this,
-      id
-    );
 
     const { jwt, postgres, psycopgLayer, opensearchLayer } = createLayers(this, id);
     this.layerList["psycopg2"] = psycopgLayer;
@@ -236,36 +233,6 @@ export class ApiGatewayStack extends cdk.Stack {
         unauthenticated: unauthenticatedRole.roleArn,
       },
     });
-
-    const lambdaUserFunction = new lambda.Function(this, `${id}-userFunction`, {
-      runtime: lambda.Runtime.NODEJS_20_X,
-      code: lambda.Code.fromAsset("lambda/lib"),
-      handler: "userFunction.handler",
-      timeout: Duration.seconds(900),
-      vpc: vpcStack.vpc,
-      environment: {
-        SM_DB_CREDENTIALS: db.secretPathUser.secretName,
-        RDS_PROXY_ENDPOINT: db.rdsProxyEndpoint,
-        USER_POOL: this.userPool.userPoolId,
-      },
-      functionName: `${id}-userFunction`,
-      memorySize: 512,
-      layers: [postgres],
-      role: lambdaRole,
-    });
-
-    lambdaUserFunction.applyRemovalPolicy(cdk.RemovalPolicy.DESTROY);
-
-    // Add the permission to the Lambda function's policy to allow API Gateway access
-    lambdaUserFunction.addPermission("AllowApiGatewayInvoke", {
-      principal: new iam.ServicePrincipal("apigateway.amazonaws.com"),
-      action: "lambda:InvokeFunction",
-      sourceArn: `arn:aws:execute-api:${this.region}:${this.account}:${this.api.restApiId}/*/*/user*`,
-    });
-
-    const cfnLambda_user = lambdaUserFunction.node
-      .defaultChild as lambda.CfnFunction;
-    cfnLambda_user.overrideLogicalId("userFunction");
 
     const lambdaAdminFunction = new lambda.Function(
       this,
@@ -462,59 +429,6 @@ export class ApiGatewayStack extends cdk.Stack {
       value: this.userPool.userPoolId,
       description: "The ID of the Cognito User Pool",
     });
-
-    const updateTimestampLambda = new lambda.Function(
-      this,
-      `${id}-updateTimestampLambda`,
-      {
-        runtime: lambda.Runtime.NODEJS_20_X,
-        code: lambda.Code.fromAsset("lambda/lib"),
-        handler: "updateLastSignIn.handler",
-        timeout: Duration.seconds(300),
-        environment: {
-          SM_DB_CREDENTIALS: db.secretPathTableCreator.secretName,
-          RDS_PROXY_ENDPOINT: db.rdsProxyEndpointTableCreator,
-        },
-        vpc: vpcStack.vpc,
-        functionName: `${id}-updateLastSignIn`,
-        memorySize: 128,
-        layers: [postgres],
-        role: coglambdaRole,
-      }
-    );
-
-    //cognito auto assign authenticated users to the admin group
-
-    this.userPool.addTrigger(
-      cognito.UserPoolOperation.POST_AUTHENTICATION,
-      updateTimestampLambda
-    );
-
-    coglambdaRole.addToPolicy(
-      new iam.PolicyStatement({
-        actions: ["ssm:GetParameter"],
-        resources: [`arn:aws:ssm:${this.region}:${this.account}:parameter/*`],
-      })
-    );
-
-    const preSignupLambda = new lambda.Function(this, "preSignupLambda", {
-      runtime: lambda.Runtime.NODEJS_20_X,
-      code: lambda.Code.fromAsset("lambda/lib"),
-      handler: "preSignup.handler",
-      timeout: Duration.seconds(300),
-      environment: {
-        ALLOWED_EMAIL_DOMAINS: "/DFO/AllowedEmailDomains",
-      },
-      vpc: vpcStack.vpc,
-      functionName: `${id}-preSignupLambda`,
-      memorySize: 128,
-      role: coglambdaRole,
-    });
-
-    this.userPool.addTrigger(
-      cognito.UserPoolOperation.PRE_SIGN_UP,
-      preSignupLambda
-    );
 
     // **
     //  *
@@ -1033,260 +947,6 @@ export class ApiGatewayStack extends cdk.Stack {
       ],
       resources: ["*"],
     }));
-    
-    
-
-    // Lambda function for generating presigned URLs
-    const generatePreSignedURL = new lambda.Function(
-      this,
-      `${id}-GeneratePreSignedURLFunc`,
-      {
-        runtime: lambda.Runtime.PYTHON_3_9,
-        code: lambda.Code.fromAsset("lambda/generatePreSignedURL"),
-        handler: "generatePreSignedURL.lambda_handler",
-        timeout: Duration.seconds(300),
-        memorySize: 128,
-        environment: {
-          BUCKET: dataIngestionBucket.bucketName,
-          REGION: this.region,
-        },
-        functionName: `${id}-GeneratePreSignedURLFunc`,
-        layers: [powertoolsLayer],
-      }
-    );
-
-    // Override the Logical ID of the Lambda Function to get ARN in OpenAPI
-    const cfnGeneratePreSignedURL = generatePreSignedURL.node
-      .defaultChild as lambda.CfnFunction;
-    cfnGeneratePreSignedURL.overrideLogicalId("GeneratePreSignedURLFunc");
-
-    // Grant the Lambda function the necessary permissions
-    dataIngestionBucket.grantReadWrite(generatePreSignedURL);
-    generatePreSignedURL.addToRolePolicy(
-      new iam.PolicyStatement({
-        actions: ["s3:PutObject", "s3:GetObject"],
-        resources: [
-          dataIngestionBucket.bucketArn,
-          `${dataIngestionBucket.bucketArn}/*`,
-        ],
-      })
-    );
-
-    // Add the permission to the Lambda function's policy to allow API Gateway access
-    generatePreSignedURL.addPermission("AllowApiGatewayInvoke", {
-      principal: new iam.ServicePrincipal("apigateway.amazonaws.com"),
-      action: "lambda:InvokeFunction",
-      sourceArn: `arn:aws:execute-api:${this.region}:${this.account}:${this.api.restApiId}/*/*/admin*`,
-    });
-
-    /**
-     *
-     * Create Lambda with container image for data ingestion workflow in RAG pipeline
-     * This function will be triggered when a file in uploaded or deleted fro, the S3 Bucket
-     */
-    const dataIngestFunction = new lambda.DockerImageFunction(
-      this,
-      `${id}-DataIngestFunction`,
-      {
-        code: lambda.DockerImageCode.fromImageAsset("./data_ingestion"),
-        memorySize: 512,
-        timeout: cdk.Duration.seconds(300),
-        vpc: vpcStack.vpc, // Pass the VPC
-        functionName: `${id}-DataIngestFunction`,
-        environment: {
-          SM_DB_CREDENTIALS: db.secretPathAdminName,
-          RDS_PROXY_ENDPOINT: db.rdsProxyEndpointAdmin,
-          BUCKET: dataIngestionBucket.bucketName,
-          REGION: this.region,
-          EMBEDDING_BUCKET_NAME: embeddingStorageBucket.bucketName,
-          EMBEDDING_MODEL_PARAM: embeddingModelParameter.parameterName,
-        },
-      }
-    );
-
-    // Override the Logical ID of the Lambda Function to get ARN in OpenAPI
-    const cfnDataIngestLambdaDockerFunction = dataIngestFunction.node
-      .defaultChild as lambda.CfnFunction;
-    cfnDataIngestLambdaDockerFunction.overrideLogicalId(
-      "DataIngestLambdaDockerFunctionReImaged"
-    );
-
-    dataIngestionBucket.grantRead(dataIngestFunction);
-
-    dataIngestFunction.addToRolePolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: ["s3:ListBucket"],
-        resources: [dataIngestionBucket.bucketArn], // Access to the specific bucket
-      })
-    );
-
-    dataIngestFunction.addToRolePolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: ["s3:ListBucket"],
-        resources: [embeddingStorageBucket.bucketArn], // Access to the specific bucket
-      })
-    );
-
-    dataIngestFunction.addToRolePolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: [
-          "s3:PutObject",
-          "s3:GetObject",
-          "s3:DeleteObject",
-          "s3:HeadObject",
-        ],
-        resources: [
-          `arn:aws:s3:::${embeddingStorageBucket.bucketName}/*`, // Grant access to all objects within this bucket
-        ],
-      })
-    );
-
-    dataIngestFunction.addToRolePolicy(bedrockPolicyStatement);
-
-    dataIngestFunction.addEventSource(
-      new lambdaEventSources.S3EventSource(dataIngestionBucket, {
-        events: [
-          s3.EventType.OBJECT_CREATED,
-          s3.EventType.OBJECT_REMOVED,
-          s3.EventType.OBJECT_RESTORE_COMPLETED,
-        ],
-      })
-    );
-
-    // Grant access to Secret Manager
-    dataIngestFunction.addToRolePolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: [
-          //Secrets Manager
-          "secretsmanager:GetSecretValue",
-        ],
-        resources: [
-          `arn:aws:secretsmanager:${this.region}:${this.account}:secret:*`,
-        ],
-      })
-    );
-
-    // Grant access to SSM Parameter Store for specific parameters
-    dataIngestFunction.addToRolePolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: ["ssm:GetParameter"],
-        resources: [embeddingModelParameter.parameterArn],
-      })
-    );
-
-    /**
-     *
-     * Create Lambda function that will return all file names for a specified course, concept, and module
-     */
-    const getDocumentsFunction = new lambda.Function(
-      this,
-      `${id}-GetDocumentsFunction`,
-      {
-        runtime: lambda.Runtime.PYTHON_3_9,
-        code: lambda.Code.fromAsset("lambda/getDocumentsFunction"),
-        handler: "getDocumentsFunction.lambda_handler",
-        timeout: Duration.seconds(300),
-        memorySize: 128,
-        vpc: vpcStack.vpc,
-        environment: {
-          SM_DB_CREDENTIALS: db.secretPathUser.secretName,
-          RDS_PROXY_ENDPOINT: db.rdsProxyEndpoint,
-          BUCKET: dataIngestionBucket.bucketName,
-          REGION: this.region,
-        },
-        functionName: `${id}-GetDocumentsFunction`,
-        layers: [psycopgLayer, powertoolsLayer],
-        role: coglambdaRole,
-      }
-    );
-
-    // Override the Logical ID of the Lambda Function to get ARN in OpenAPI
-    const cfnGetDocumentsFunction = getDocumentsFunction.node
-      .defaultChild as lambda.CfnFunction;
-    cfnGetDocumentsFunction.overrideLogicalId("GetDocumentsFunction");
-
-    // Grant the Lambda function read-only permissions to the S3 bucket
-    dataIngestionBucket.grantRead(getDocumentsFunction);
-
-    // Grant access to Secret Manager
-    getDocumentsFunction.addToRolePolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: [
-          //Secrets Manager
-          "secretsmanager:GetSecretValue",
-        ],
-        resources: [
-          `arn:aws:secretsmanager:${this.region}:${this.account}:secret:*`,
-        ],
-      })
-    );
-
-    // Add the permission to the Lambda function's policy to allow API Gateway access
-    getDocumentsFunction.addPermission("AllowApiGatewayInvoke", {
-      principal: new iam.ServicePrincipal("apigateway.amazonaws.com"),
-      action: "lambda:InvokeFunction",
-      sourceArn: `arn:aws:execute-api:${this.region}:${this.account}:${this.api.restApiId}/*/*/admin*`,
-    });
-
-    /**
-     *
-     * Create Lambda function to delete certain file
-     */
-    const deleteDocument = new lambda.Function(
-      this,
-      `${id}-DeleteDocumentFunc`,
-      {
-        runtime: lambda.Runtime.PYTHON_3_9,
-        code: lambda.Code.fromAsset("lambda/deleteDocument"),
-        handler: "deleteDocument.lambda_handler",
-        timeout: Duration.seconds(300),
-        memorySize: 128,
-        vpc: vpcStack.vpc,
-        environment: {
-          SM_DB_CREDENTIALS: db.secretPathUser.secretName, // Database User Credentials
-          RDS_PROXY_ENDPOINT: db.rdsProxyEndpoint, // RDS Proxy Endpoint
-          BUCKET: dataIngestionBucket.bucketName,
-          REGION: this.region,
-        },
-        functionName: `${id}-DeleteDocumentFunc`,
-        layers: [psycopgLayer, powertoolsLayer],
-      }
-    );
-
-    // Override the Logical ID of the Lambda Function to get ARN in OpenAPI
-    const cfndeleteDocument = deleteDocument.node
-      .defaultChild as lambda.CfnFunction;
-    cfndeleteDocument.overrideLogicalId("DeleteDocumentFunc");
-
-    // Grant the Lambda function the necessary permissions
-    dataIngestionBucket.grantDelete(deleteDocument);
-
-    // Grant access to Secret Manager
-    deleteDocument.addToRolePolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: [
-          //Secrets Manager
-          "secretsmanager:GetSecretValue",
-        ],
-        resources: [
-          `arn:aws:secretsmanager:${this.region}:${this.account}:secret:*`,
-        ],
-      })
-    );
-
-    // Add the permission to the Lambda function's policy to allow API Gateway access
-    deleteDocument.addPermission("AllowApiGatewayInvoke", {
-      principal: new iam.ServicePrincipal("apigateway.amazonaws.com"),
-      action: "lambda:InvokeFunction",
-      sourceArn: `arn:aws:execute-api:${this.region}:${this.account}:${this.api.restApiId}/*/*/admin*`,
-    });
 
     /**
      * Create Lambda function to get messages for a session
@@ -1377,101 +1037,6 @@ export class ApiGatewayStack extends cdk.Stack {
       sourceArn: `arn:aws:execute-api:${this.region}:${this.account}:${this.api.restApiId}/*/*/get_messages`,
     });
 
-
-
-
-
-
-    /**
-     *
-     * Create Lambda function to delete an entire module directory
-     */
-    const deleteCategoryFunction = new lambda.Function(
-      this,
-      `${id}-DeleteCategoryFunc`,
-      {
-        runtime: lambda.Runtime.PYTHON_3_9,
-        code: lambda.Code.fromAsset("lambda/deleteCategory"),
-        handler: "deleteCategory.lambda_handler",
-        timeout: Duration.seconds(300),
-        memorySize: 128,
-        vpc: vpcStack.vpc,
-        environment: {
-          SM_DB_CREDENTIALS: db.secretPathUser.secretName, // Database User Credentials
-          RDS_PROXY_ENDPOINT: db.rdsProxyEndpoint, // RDS Proxy Endpoint
-          BUCKET: dataIngestionBucket.bucketName,
-          REGION: this.region,
-        },
-        functionName: `${id}-DeleteCategoryFunc`,
-        layers: [psycopgLayer, powertoolsLayer],
-      }
-    );
-
-    //Override the Logical ID of the Lambda Function to get ARN in OpenAPI
-    const cfnDeleteCategoryFunction = deleteCategoryFunction.node
-      .defaultChild as lambda.CfnFunction;
-    cfnDeleteCategoryFunction.overrideLogicalId("DeleteCategoryFunc");
-
-    //Grant the Lambda function the necessary permissions
-    dataIngestionBucket.grantRead(deleteCategoryFunction);
-    dataIngestionBucket.grantDelete(deleteCategoryFunction);
-
-    deleteCategoryFunction.addToRolePolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: [
-          //Secrets Manager
-          "secretsmanager:GetSecretValue",
-        ],
-        resources: [
-          `arn:aws:secretsmanager:${this.region}:${this.account}:secret:*`,
-        ],
-      })
-    );
-
-    dataIngestionBucket.grantRead(dataIngestFunction);
-    // Add ListBucket permission explicitly
-    dataIngestFunction.addToRolePolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: ["s3:ListBucket"],
-        resources: [dataIngestionBucket.bucketArn], // Access to the specific bucket
-      })
-    );
-    dataIngestFunction.addToRolePolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: ["s3:ListBucket"],
-        resources: [
-          `arn:aws:s3:::${embeddingStorageBucket.bucketArn}/*`, // Grant access to all objects within this bucket
-        ],
-      })
-    );
-
-    dataIngestFunction.addToRolePolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: [
-          "s3:PutObject",
-          "s3:GetObject",
-          "s3:DeleteObject",
-          "s3:HeadObject",
-        ],
-        resources: [
-          `arn:aws:s3:::${embeddingStorageBucket.bucketName}/*`, // Grant access to all objects within this bucket
-        ],
-      })
-    );
-
-    //Add the permission to the Lambda function's policy to allow API Gateway access
-    deleteCategoryFunction.addPermission("AllowApiGatewayInvoke", {
-      principal: new iam.ServicePrincipal("apigateway.amazonaws.com"),
-      action: "lambda:InvokeFunction",
-      sourceArn: `arn:aws:execute-api:${this.region}:${this.account}:${this.api.restApiId}/*/*/admin*`,
-    });
-
-    
-    
     // // 1) create the new Lambda
     // const searchFunction = new lambda.Function(this, `${id}-searchFunction`, {
     //   runtime: lambda.Runtime.PYTHON_3_11,
@@ -1506,6 +1071,93 @@ export class ApiGatewayStack extends cdk.Stack {
     //   }
     // });
 
+    // Create WAF Web ACL
+    const webAcl = new wafv2.CfnWebACL(this, `${id}-WebACL`, {
+      description: 'Web ACL for API Gateway',
+      defaultAction: { allow: {} },
+      scope: 'REGIONAL',
+      visibilityConfig: {
+        cloudWatchMetricsEnabled: true,
+        metricName: `${id}-WebACLMetric`,
+        sampledRequestsEnabled: true,
+      },
+      rules: [
+        // Rate limiting rule
+        {
+          name: 'RateLimit',
+          priority: 2,
+          statement: {
+            rateBasedStatement: {
+              limit: 2000,
+              aggregateKeyType: 'IP',
+            },
+          },
+          action: { block: {} },
+          visibilityConfig: {
+            cloudWatchMetricsEnabled: true,
+            metricName: 'RateLimitMetric',
+            sampledRequestsEnabled: true,
+          },
+        },
+        // SQL injection protection
+        {
+          name: 'SQLInjectionProtection',
+          priority: 2,
+          statement: {
+            managedRuleGroupStatement: {
+              vendorName: 'AWS',
+              name: 'AWSManagedRulesSQLiRuleSet',
+            },
+          },
+          overrideAction: { none: {} },
+          visibilityConfig: {
+            cloudWatchMetricsEnabled: true,
+            metricName: 'SQLInjectionMetric',
+            sampledRequestsEnabled: true,
+          },
+        },
+        // Common attack protection
+        {
+          name: 'CommonAttackProtection',
+          priority: 1,
+          statement: {
+            managedRuleGroupStatement: {
+              vendorName: 'AWS',
+              name: 'AWSManagedRulesCommonRuleSet',
+            },
+          },
+          overrideAction: { none: {} },
+          visibilityConfig: {
+            cloudWatchMetricsEnabled: true,
+            metricName: 'CommonAttackMetric',
+            sampledRequestsEnabled: true,
+          },
+        },
+        // Known bad inputs
+        {
+          name: 'KnownBadInputs',
+          priority: 4,
+          statement: {
+            managedRuleGroupStatement: {
+              vendorName: 'AWS',
+              name: 'AWSManagedRulesKnownBadInputsRuleSet',
+            },
+          },
+          overrideAction: { none: {} },
+          visibilityConfig: {
+            cloudWatchMetricsEnabled: true,
+            metricName: 'KnownBadInputsMetric',
+            sampledRequestsEnabled: true,
+          },
+        },
+      ],
+    });
+
+    // Associate Web ACL with API Gateway
+    new wafv2.CfnWebACLAssociation(this, `${id}-WebACLAssociation`, {
+      resourceArn: this.api.deploymentStage.stageArn,
+      webAclArn: webAcl.attrArn,
+    });
 
   }
 }
