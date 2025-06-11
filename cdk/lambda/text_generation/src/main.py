@@ -5,10 +5,11 @@ import boto3
 import logging
 import uuid
 import datetime
-from opensearchpy import OpenSearch
+from opensearchpy import OpenSearch, RequestsHttpConnection
 import psycopg
 from langchain_aws import BedrockEmbeddings
 import time
+from aws_requests_auth.aws_auth import AWSRequestsAuth
 
 # Import helpers
 # from helpers.db import get_rds_connection
@@ -392,22 +393,34 @@ def handler(event, context):
 
     try:
         # Initialize OpenSearch, DB, and get configuration values
-        secrets = get_secret(OPENSEARCH_SEC)
-        opensearch_host = get_parameter(OPENSEARCH_HOST)
+        # secrets = get_secret(OPENSEARCH_SEC)
+        credentials = boto3.Session().get_credentials().get_frozen_credentials()
+        auth = AWSRequestsAuth(
+            aws_access_key=credentials.access_key,
+            aws_secret_access_key=credentials.secret_key,
+            aws_token=credentials.token,
+            aws_host=OPENSEARCH_HOST,
+            aws_region=REGION,
+            aws_service='es'
+        )
+        opensearch_host = OPENSEARCH_HOST
         opensearch_client = OpenSearch(
             hosts=[{'host': opensearch_host, 'port': 443}],
             http_compress=True,
-            http_auth=(secrets['username'], secrets['password']),
+            http_auth=auth,
             use_ssl=True,
-            verify_certs=True
+            verify_certs=True,
+            connection_class=RequestsHttpConnection,
         )
-        
+        logger.info("Hybrid search pipeline creation started...")
         create_hybrid_search_pipeline(
             client=opensearch_client,
             pipeline_name=SEARCH_PIPELINE_NAME,
             keyword_weight=KEYWORD_RATIO_OS_P,
             semantic_weight=SEMANTIC_RATIO_OS_P
         )
+
+        logger.info("Hybrid search pipeline created successfully.")
 
         # Set up RDS connection - This is hard coded to a test database for now
         tools_rds_secret = get_secret(RDS_SEC)

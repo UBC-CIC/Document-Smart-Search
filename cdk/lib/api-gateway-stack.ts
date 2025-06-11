@@ -709,7 +709,7 @@ export class ApiGatewayStack extends cdk.Stack {
     const opensearchHostParameter = new ssm.StringParameter(this, "OpensearchHostParameter", {
       parameterName: `/${id}/DFO/OpensearchHost`,
       description: "Opensearch host",
-      stringValue: "opensearch-host-test-glue",
+      stringValue: osStack.domain.domainEndpoint,
     });
 
     const indexNameParameter = new ssm.StringParameter(this, "IndexNameParameter", {
@@ -836,10 +836,22 @@ export class ApiGatewayStack extends cdk.Stack {
       resources: ["*"],
     });
 
+    const openSearchPolicyStatement = new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: [
+        "es:ESHttpGet",
+        "es:ESHttpPut",
+      ],
+      resources: [
+        `arn:aws:es:${this.region}:${this.account}:domain/${osStack.domain.domainName}/*`,
+      ],
+    });
 
 
     // Attach the custom Bedrock policy to Lambda function
     textGenFunc.addToRolePolicy(bedrockPolicyStatement);
+
+    textGenFunc.addToRolePolicy(openSearchPolicyStatement);
 
     textGenFunc.addToRolePolicy(bedrockGuardrailPolicyStatement); 
     
