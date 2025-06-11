@@ -80,8 +80,8 @@ After making the required changes in the fork created in the [Deployment Guide](
     }
   );
   ```
-  - Add permissions to invoke the model selected by finding `bedrockPolicyStatement` and changing the model id. 
-  For example to change the model to meta llama3 8b instruct, change `bedrockPolicyStatement` to:
+  - Add permissions to invoke the model selected by finding `bedrockPolicyStatement` and changing the model id.
+    For example to change the model to meta llama3 8b instruct, change `bedrockPolicyStatement` to:
   ```typescript
   const bedrockPolicyStatement = new iam.PolicyStatement({
     effect: iam.Effect.ALLOW,
