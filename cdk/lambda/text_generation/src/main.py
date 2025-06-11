@@ -35,7 +35,6 @@ KEYWORD_RATIO_OS_P = 0.3
 SEMANTIC_RATIO_OS_P = 0.7
 
 # Globals to be populated by init_constants()
-OPENSEARCH_SEC = None
 OPENSEARCH_HOST = None
 INDEX_NAME = None
 RDS_SEC = None
@@ -59,7 +58,7 @@ ssm_client = None # boto3.client("ssm", region_name=REGION)
 bedrock_runtime = None # boto3.client("bedrock-runtime", region_name=REGION)
 
 def init_constants():
-    global OPENSEARCH_SEC, OPENSEARCH_HOST, INDEX_NAME, RDS_SEC
+    global OPENSEARCH_HOST, INDEX_NAME, RDS_SEC
     global DFO_HTML_FULL_INDEX_NAME, DFO_MANDATE_FULL_INDEX_NAME, DFO_TOPIC_FULL_INDEX_NAME
     global BEDROCK_INFERENCE_PROFILE
     global RDS_PROXY_ENDPOINT, SM_DB_CREDENTIALS, TABLE_NAME_PARAM, EMBEDDING_MODEL_PARAM, BEDROCK_LLM_PARAM, REGION
@@ -80,7 +79,6 @@ def init_constants():
     EMBEDDING_MODEL_PARAM = os.environ["EMBEDDING_MODEL_PARAM"]
     TABLE_NAME_PARAM = os.environ["TABLE_NAME_PARAM"]
     OPENSEARCH_HOST = get_parameter(os.environ["OPENSEARCH_HOST"])
-    OPENSEARCH_SEC = get_parameter(os.environ["OPENSEARCH_SEC"])
     INDEX_NAME = get_parameter(os.environ["OPENSEARCH_INDEX_NAME"])
     RDS_SEC = get_parameter(os.environ["RDS_SEC"])
     DFO_HTML_FULL_INDEX_NAME = get_parameter(os.environ["DFO_HTML_FULL_INDEX_NAME"])

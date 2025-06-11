@@ -699,13 +699,6 @@ export class ApiGatewayStack extends cdk.Stack {
       }
     );
 
-
-    const opensearchSecParameter = new ssm.StringParameter(this, "OpensearchSecParameter", {
-      parameterName: `/${id}/DFO/OpensearchSec`,
-      description: "Opensearch security credentials",
-      stringValue: "opensearch-masteruser-test-glue",
-    });
-
     const opensearchHostParameter = new ssm.StringParameter(this, "OpensearchHostParameter", {
       parameterName: `/${id}/DFO/OpensearchHost`,
       description: "Opensearch host",
@@ -770,7 +763,6 @@ export class ApiGatewayStack extends cdk.Stack {
           EMBEDDING_MODEL_PARAM: embeddingModelParameter.parameterName,
           TABLE_NAME_PARAM: tableNameParameter.parameterName,
           OPENSEARCH_HOST: opensearchHostParameter.parameterName,
-          OPENSEARCH_SEC: opensearchSecParameter.parameterName,
           OPENSEARCH_INDEX_NAME: indexNameParameter.parameterName,
           RDS_SEC: rdsSecParameter.parameterName,
           DFO_HTML_FULL_INDEX_NAME: dfoHtmlFullIndexNameParameter.parameterName,
@@ -786,7 +778,6 @@ export class ApiGatewayStack extends cdk.Stack {
     embeddingModelParameter.grantRead(textGenFunc);
     tableNameParameter.grantRead(textGenFunc);
     opensearchHostParameter.grantRead(textGenFunc);
-    opensearchSecParameter.grantRead(textGenFunc);
     indexNameParameter.grantRead(textGenFunc);
     rdsSecParameter.grantRead(textGenFunc);
     dfoHtmlFullIndexNameParameter.grantRead(textGenFunc);
