@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
-import { fetchRelatedDocumentsByTopic, fetchTopicFilterOptions } from "../services/topicService";
+import {
+  fetchRelatedDocumentsByTopic,
+  fetchTopicFilterOptions,
+} from "../services/topicService";
 
 export function useTopicPopup() {
   const [popupState, setPopupState] = useState({
@@ -8,17 +11,20 @@ export function useTopicPopup() {
     topicType: "",
     excludeDocumentId: null,
   });
-  
+
   const [isLoading, setIsLoading] = useState(false);
-  const [allDocuments, setAllDocuments] = useState([]); 
+  const [allDocuments, setAllDocuments] = useState([]);
   const [displayedDocuments, setDisplayedDocuments] = useState([]);
   const [totalCount, setTotalCount] = useState(0); // Add state for total count from API
   const [metadata, setMetadata] = useState({});
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [filters, setFilters] = useState({ years: {}, documentTypes: {} });
-  const [sortBy, setSortBy] = useState('combined');
-  const [filterOptions, setFilterOptions] = useState({ years: [], documentTypes: [] });
+  const [sortBy, setSortBy] = useState("combined");
+  const [filterOptions, setFilterOptions] = useState({
+    years: [],
+    documentTypes: [],
+  });
   const resultsPerPage = 5;
 
   // Single effect responsible for both filter options and document loading
@@ -26,30 +32,54 @@ export function useTopicPopup() {
     if (popupState.isOpen && popupState.topicName) {
       // First, fetch the filter options
       fetchTopicFilterOptions()
-        .then(options => {
+        .then((options) => {
           setFilterOptions(options);
           const newFilters = {
-            years: Object.fromEntries(options.years.map(year => [year, false])),
-            documentTypes: Object.fromEntries(options.documentTypes.map(type => [type, false]))
+            years: Object.fromEntries(
+              options.years.map((year) => [year, false])
+            ),
+            documentTypes: Object.fromEntries(
+              options.documentTypes.map((type) => [type, false])
+            ),
           };
           setFilters(newFilters);
-          
+
           // Once filter options are set, load the documents if we have a topic name and type
           if (popupState.topicType) {
-            loadDocuments(popupState.topicName, popupState.topicType, newFilters, popupState.excludeDocumentId);
+            loadDocuments(
+              popupState.topicName,
+              popupState.topicType,
+              newFilters,
+              popupState.excludeDocumentId
+            );
           }
         })
-        .catch(error => {
+        .catch((error) => {
           console.error("Error fetching filter options:", error);
         });
     }
-  }, [popupState.isOpen, popupState.topicName, popupState.topicType, popupState.excludeDocumentId]);
+  }, [
+    popupState.isOpen,
+    popupState.topicName,
+    popupState.topicType,
+    popupState.excludeDocumentId,
+  ]);
 
   // Only reload documents when filters change (excluding initial load)
   useEffect(() => {
     // This condition ensures we don't trigger on the initial filter setup
-    if (popupState.isOpen && popupState.topicName && popupState.topicType && filterOptions.years.length > 0) {
-      loadDocuments(popupState.topicName, popupState.topicType, filters, popupState.excludeDocumentId);
+    if (
+      popupState.isOpen &&
+      popupState.topicName &&
+      popupState.topicType &&
+      filterOptions.years.length > 0
+    ) {
+      loadDocuments(
+        popupState.topicName,
+        popupState.topicType,
+        filters,
+        popupState.excludeDocumentId
+      );
     }
   }, [filters]);
 
@@ -57,11 +87,15 @@ export function useTopicPopup() {
   useEffect(() => {
     if (allDocuments.length > 0) {
       // Sort documents by sortBy
-      const sortedDocuments = sortDocuments(allDocuments, sortBy, popupState.topicType);
-      
+      const sortedDocuments = sortDocuments(
+        allDocuments,
+        sortBy,
+        popupState.topicType
+      );
+
       // Set total pages
       setTotalPages(Math.ceil(sortedDocuments.length / resultsPerPage));
-      
+
       // Slice for current page
       const startIndex = (currentPage - 1) * resultsPerPage;
       const endIndex = startIndex + resultsPerPage;
@@ -74,16 +108,16 @@ export function useTopicPopup() {
   const openPopup = (topicName, topicType, excludeDocumentId = null) => {
     // Set loading to true immediately when popup opens
     setIsLoading(true);
-    
+
     // Reset sortBy based on topic type
     // For derived topics, only semanticScore is valid
-    if (topicType === 'derived') {
-      setSortBy('semanticScore');
+    if (topicType === "derived") {
+      setSortBy("semanticScore");
     } else {
       // For mandate and dfo topics, default to combined score
-      setSortBy('combined');
+      setSortBy("combined");
     }
-    
+
     setPopupState({
       isOpen: true,
       topicName,
@@ -109,18 +143,23 @@ export function useTopicPopup() {
     setMetadata({});
   };
 
-  const loadDocuments = async (topicName, topicType, currentFilters, excludeDocId) => {
+  const loadDocuments = async (
+    topicName,
+    topicType,
+    currentFilters,
+    excludeDocId
+  ) => {
     if (!topicName || !topicType) {
       setIsLoading(false);
       return;
     }
-    
+
     // No need to set isLoading here since it's already set in openPopup
     // Only set it to false if we're reloading due to filter changes
     if (!isLoading) {
       setIsLoading(true);
     }
-    
+
     try {
       const result = await fetchRelatedDocumentsByTopic(
         topicName,
@@ -128,9 +167,9 @@ export function useTopicPopup() {
         currentFilters,
         excludeDocId
       );
-      
+
       setAllDocuments(result.documents || []);
-      setTotalCount(result.totalCount || 0); 
+      setTotalCount(result.totalCount || 0);
       setMetadata({});
     } catch (error) {
       console.error("Failed to load related documents:", error);
@@ -150,7 +189,7 @@ export function useTopicPopup() {
     setSortBy(newSortBy);
     setCurrentPage(1); // Reset to first page
   };
-  
+
   const handlePageChange = (page) => {
     setCurrentPage(page);
   };
@@ -158,22 +197,22 @@ export function useTopicPopup() {
   // Helper function to sort documents
   const sortDocuments = (docs, sort, topicType) => {
     const docsCopy = [...docs];
-    
+
     switch (sort) {
-      case 'semanticScore':
+      case "semanticScore":
         return docsCopy.sort((a, b) => b.semanticScore - a.semanticScore);
-      case 'llmScore':
-        if (topicType !== 'derived') {
-          return docsCopy.sort((a, b) => b.llmScore - a.llmScore); 
+      case "llmScore":
+        if (topicType !== "derived") {
+          return docsCopy.sort((a, b) => b.llmScore - a.llmScore);
         }
         return docsCopy;
-      case 'yearDesc':
+      case "yearDesc":
         return docsCopy.sort((a, b) => b.year - a.year);
-      case 'yearAsc':
+      case "yearAsc":
         return docsCopy.sort((a, b) => a.year - b.year);
-      case 'combined':
+      case "combined":
       default:
-        if (topicType === 'derived') {
+        if (topicType === "derived") {
           return docsCopy.sort((a, b) => b.semanticScore - a.semanticScore);
         }
         return docsCopy.sort((a, b) => {
@@ -199,6 +238,6 @@ export function useTopicPopup() {
     closePopup,
     handleFilterChange,
     handleSortChange,
-    handlePageChange
+    handlePageChange,
   };
 }

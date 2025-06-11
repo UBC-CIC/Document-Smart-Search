@@ -1,5 +1,5 @@
-import Image from "next/image"
-import mapleLeaf from "../app/flag_of_canada.png"
+import Image from "next/image";
+import mapleLeaf from "../app/flag_of_canada.png";
 
 const Header = ({ setPage }) => {
   return (
@@ -19,13 +19,14 @@ const Header = ({ setPage }) => {
           </div>
           {/* Government of Canada Wordmark */}
           <div className="leading-tight">
-            <p className="text-black font-bold text-sm sm:text-base">Fisheries and Oceans Canada</p>
+            <p className="text-black font-bold text-sm sm:text-base">
+              Fisheries and Oceans Canada
+            </p>
           </div>
         </div>
       </div>
     </header>
-  )
-}
+  );
+};
 
-export default Header
-
+export default Header;

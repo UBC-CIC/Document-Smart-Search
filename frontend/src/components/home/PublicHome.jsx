@@ -57,7 +57,8 @@ const PublicHome = () => {
     }),
     hover: {
       scale: 1.05,
-      boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+      boxShadow:
+        "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
       transition: { type: "spring", stiffness: 400, damping: 10 },
     },
   };
@@ -76,7 +77,8 @@ const PublicHome = () => {
     },
     hover: {
       scale: 1.05,
-      boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+      boxShadow:
+        "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
       transition: { type: "spring", stiffness: 400, damping: 10 },
     },
   };
@@ -84,17 +86,25 @@ const PublicHome = () => {
   // Updated feature cards data with new icons and text
   const featureCards = [
     {
-      icon: <BiSearch className="w-6 h-6 md:w-7 md:h-7 text-blue-600 dark:text-blue-400" />,
+      icon: (
+        <BiSearch className="w-6 h-6 md:w-7 md:h-7 text-blue-600 dark:text-blue-400" />
+      ),
       text: "Search Documents",
-      description: "Quickly find Fisheries & Oceans Canada research and documents.",
+      description:
+        "Quickly find Fisheries & Oceans Canada research and documents.",
     },
     {
-      icon: <AiOutlineAppstore className="w-6 h-6 md:w-7 md:h-7 text-purple-600 dark:text-purple-400" />,
+      icon: (
+        <AiOutlineAppstore className="w-6 h-6 md:w-7 md:h-7 text-purple-600 dark:text-purple-400" />
+      ),
       text: "Browse Mandates",
-      description: "Explore content by DFO mandates, domains, and research areas.",
+      description:
+        "Explore content by DFO mandates, domains, and research areas.",
     },
     {
-      icon: <MdTrendingUp className="w-6 h-6 md:w-7 md:h-7 text-green-600 dark:text-green-400" />,
+      icon: (
+        <MdTrendingUp className="w-6 h-6 md:w-7 md:h-7 text-green-600 dark:text-green-400" />
+      ),
       text: "Emerging Trends",
       description: "Discover trending topics and new research insights.",
     },
@@ -110,18 +120,20 @@ const PublicHome = () => {
   }
 
   return (
-<div className="min-h-screen flex flex-col justify-between bg-white dark:bg-gray-900 transition-colors duration-300">
+    <div className="min-h-screen flex flex-col justify-between bg-white dark:bg-gray-900 transition-colors duration-300">
       <Header />
 
-<motion.main
-  className="flex flex-col items-center py-10 px-4 gap-12 max-w-7xl mx-auto w-full"
-  initial="hidden"
-  animate="visible"
-  variants={containerVariants}
->
-
+      <motion.main
+        className="flex flex-col items-center py-10 px-4 gap-12 max-w-7xl mx-auto w-full"
+        initial="hidden"
+        animate="visible"
+        variants={containerVariants}
+      >
         {/* Top Section: Logo and Welcome Text */}
-        <motion.div className="space-y-4 sm:space-y-6 md:space-y-8" variants={itemVariants}>
+        <motion.div
+          className="space-y-4 sm:space-y-6 md:space-y-8"
+          variants={itemVariants}
+        >
           {/* Logo with shine effect */}
           <motion.div
             className="flex justify-center maple-leaf-container"
@@ -139,7 +151,10 @@ const PublicHome = () => {
           </motion.div>
 
           {/* Welcome Text */}
-          <motion.div className="text-center space-y-2 sm:space-y-3" variants={itemVariants}>
+          <motion.div
+            className="text-center space-y-2 sm:space-y-3"
+            variants={itemVariants}
+          >
             <h1 className="text-xl sm:text-2xl md:text-4xl font-bold text-gray-800 dark:text-white">
               Welcome to DFO Smart Search
             </h1>
@@ -151,7 +166,7 @@ const PublicHome = () => {
 
         {/* Middle Section: Feature Cards */}
         <div className="flex-1 flex flex-col justify-center my-6 sm:my-8 md:my-12">
-<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 max-w-5xl mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 max-w-5xl mx-auto">
             {featureCards.map((item, index) => (
               <motion.div
                 key={index}
@@ -181,7 +196,10 @@ const PublicHome = () => {
         </div>
 
         {/* Bottom Section: Get Started Button */}
-        <motion.div className="flex justify-center mb-6 sm:mb-8 md:mb-12" variants={buttonVariants}>
+        <motion.div
+          className="flex justify-center mb-6 sm:mb-8 md:mb-12"
+          variants={buttonVariants}
+        >
           <Button
             onClick={() => router.push("/chat")}
             className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800

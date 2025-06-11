@@ -1,6 +1,11 @@
-import { Search } from "lucide-react"
+import { Search } from "lucide-react";
 
-export default function SearchBar({ searchQuery, setSearchQuery, handleSearch, isLoading }) {
+export default function SearchBar({
+  searchQuery,
+  setSearchQuery,
+  handleSearch,
+  isLoading,
+}) {
   return (
     <div className="mb-6 md:mb-8">
       <form onSubmit={handleSearch} className="relative">
@@ -16,7 +21,9 @@ export default function SearchBar({ searchQuery, setSearchQuery, handleSearch, i
         <button
           type="submit"
           className={`absolute right-2 md:right-3 top-1/2 transform -translate-y-1/2 bg-white dark:bg-gray-600 p-1.5 md:p-2 rounded-md ${
-            isLoading || !searchQuery.trim() ? 'opacity-50 cursor-not-allowed' : ''
+            isLoading || !searchQuery.trim()
+              ? "opacity-50 cursor-not-allowed"
+              : ""
           }`}
           disabled={isLoading || !searchQuery.trim()}
         >
@@ -28,5 +35,5 @@ export default function SearchBar({ searchQuery, setSearchQuery, handleSearch, i
         </button>
       </form>
     </div>
-  )
+  );
 }

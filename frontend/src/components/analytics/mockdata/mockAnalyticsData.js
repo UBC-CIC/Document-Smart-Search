@@ -19,7 +19,7 @@ export const colorPalette = [
   "#843c39", // dark red-brown
   "#e7969c", // light pink
   "#a55194", // violet
-  "#9c9ede"  // lavender blue
+  "#9c9ede", // lavender blue
 ];
 
 // Mock topic data
@@ -77,20 +77,104 @@ export const mockTopicOptions = [
 
 // Mock mandate data
 export const mockMandateTrendsData = [
-  { year: 2010, "Sustainable Fisheries": 26, "Aquatic Ecosystem": 45, "Species at Risk": 12, "Indigenous Fisheries": 8 },
-  { year: 2011, "Sustainable Fisheries": 34, "Aquatic Ecosystem": 37, "Species at Risk": 14, "Indigenous Fisheries": 10 },
-  { year: 2012, "Sustainable Fisheries": 49, "Aquatic Ecosystem": 31, "Species at Risk": 18, "Indigenous Fisheries": 12 },
-  { year: 2013, "Sustainable Fisheries": 48, "Aquatic Ecosystem": 9,  "Species at Risk": 20, "Indigenous Fisheries": 13 },
-  { year: 2014, "Sustainable Fisheries": 46, "Aquatic Ecosystem": 19, "Species at Risk": 17, "Indigenous Fisheries": 9 },
-  { year: 2015, "Sustainable Fisheries": 5,  "Aquatic Ecosystem": 25, "Species at Risk": 22, "Indigenous Fisheries": 14 },
-  { year: 2016, "Sustainable Fisheries": 9,  "Aquatic Ecosystem": 23, "Species at Risk": 26, "Indigenous Fisheries": 15 },
-  { year: 2017, "Sustainable Fisheries": 9,  "Aquatic Ecosystem": 16, "Species at Risk": 19, "Indigenous Fisheries": 11 },
-  { year: 2018, "Sustainable Fisheries": 41, "Aquatic Ecosystem": 33, "Species at Risk": 13, "Indigenous Fisheries": 17 },
-  { year: 2019, "Sustainable Fisheries": 10, "Aquatic Ecosystem": 15, "Species at Risk": 15, "Indigenous Fisheries": 18 },
-  { year: 2020, "Sustainable Fisheries": 29, "Aquatic Ecosystem": 7,  "Species at Risk": 18, "Indigenous Fisheries": 22 },
-  { year: 2021, "Sustainable Fisheries": 47, "Aquatic Ecosystem": 28, "Species at Risk": 21, "Indigenous Fisheries": 25 },
-  { year: 2022, "Sustainable Fisheries": 25, "Aquatic Ecosystem": 15, "Species at Risk": 14, "Indigenous Fisheries": 20 },
-  { year: 2023, "Sustainable Fisheries": 20, "Aquatic Ecosystem": 11, "Species at Risk": 12, "Indigenous Fisheries": 16 },
+  {
+    year: 2010,
+    "Sustainable Fisheries": 26,
+    "Aquatic Ecosystem": 45,
+    "Species at Risk": 12,
+    "Indigenous Fisheries": 8,
+  },
+  {
+    year: 2011,
+    "Sustainable Fisheries": 34,
+    "Aquatic Ecosystem": 37,
+    "Species at Risk": 14,
+    "Indigenous Fisheries": 10,
+  },
+  {
+    year: 2012,
+    "Sustainable Fisheries": 49,
+    "Aquatic Ecosystem": 31,
+    "Species at Risk": 18,
+    "Indigenous Fisheries": 12,
+  },
+  {
+    year: 2013,
+    "Sustainable Fisheries": 48,
+    "Aquatic Ecosystem": 9,
+    "Species at Risk": 20,
+    "Indigenous Fisheries": 13,
+  },
+  {
+    year: 2014,
+    "Sustainable Fisheries": 46,
+    "Aquatic Ecosystem": 19,
+    "Species at Risk": 17,
+    "Indigenous Fisheries": 9,
+  },
+  {
+    year: 2015,
+    "Sustainable Fisheries": 5,
+    "Aquatic Ecosystem": 25,
+    "Species at Risk": 22,
+    "Indigenous Fisheries": 14,
+  },
+  {
+    year: 2016,
+    "Sustainable Fisheries": 9,
+    "Aquatic Ecosystem": 23,
+    "Species at Risk": 26,
+    "Indigenous Fisheries": 15,
+  },
+  {
+    year: 2017,
+    "Sustainable Fisheries": 9,
+    "Aquatic Ecosystem": 16,
+    "Species at Risk": 19,
+    "Indigenous Fisheries": 11,
+  },
+  {
+    year: 2018,
+    "Sustainable Fisheries": 41,
+    "Aquatic Ecosystem": 33,
+    "Species at Risk": 13,
+    "Indigenous Fisheries": 17,
+  },
+  {
+    year: 2019,
+    "Sustainable Fisheries": 10,
+    "Aquatic Ecosystem": 15,
+    "Species at Risk": 15,
+    "Indigenous Fisheries": 18,
+  },
+  {
+    year: 2020,
+    "Sustainable Fisheries": 29,
+    "Aquatic Ecosystem": 7,
+    "Species at Risk": 18,
+    "Indigenous Fisheries": 22,
+  },
+  {
+    year: 2021,
+    "Sustainable Fisheries": 47,
+    "Aquatic Ecosystem": 28,
+    "Species at Risk": 21,
+    "Indigenous Fisheries": 25,
+  },
+  {
+    year: 2022,
+    "Sustainable Fisheries": 25,
+    "Aquatic Ecosystem": 15,
+    "Species at Risk": 14,
+    "Indigenous Fisheries": 20,
+  },
+  {
+    year: 2023,
+    "Sustainable Fisheries": 20,
+    "Aquatic Ecosystem": 11,
+    "Species at Risk": 12,
+    "Indigenous Fisheries": 16,
+  },
 ];
 
 // Mock mandate option
@@ -98,7 +182,7 @@ export const mockMandateOptions = [
   "Sustainable Fisheries",
   "Species at Risk",
   "Aquatic Ecosystem",
-  "Indigenous Fisheries"
+  "Indigenous Fisheries",
 ];
 
 // Mock document type options
@@ -106,5 +190,5 @@ export const mockDocumentTypes = [
   "Research Document",
   "Science Advisory Report",
   "Science Response",
-  "Proceedings"
+  "Proceedings",
 ];

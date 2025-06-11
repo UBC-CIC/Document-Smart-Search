@@ -1,5 +1,8 @@
 import { getUserToken } from "@/lib/getUserToken";
-import { allMockResults, filterOptions as defaultFilters } from "../data/defaultData"
+import {
+  allMockResults,
+  filterOptions as defaultFilters,
+} from "../data/defaultData";
 
 // Simple boolean flag to enable/disable mock data
 export const USE_MOCK_DATA = false; // Set to false to disable mock data in development
@@ -14,7 +17,7 @@ export async function fetchFilterOptions() {
   try {
     // Define filters to request
     // const filtersToRequest = ["years", "topics", "mandates", "authors", "document_types"];
-    
+
     // Build the URL with query parameters
     const url = new URL(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/filters`);
     // url.searchParams.append("filters", filtersToRequest.join(","));
@@ -25,75 +28,90 @@ export async function fetchFilterOptions() {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`
-      }
+        Authorization: `Bearer ${token}`,
+      },
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
-    
-    const data = await response.json()
+
+    const data = await response.json();
 
     // console.log("Filter options fetched successfully:", data)
-    return data
+    return data;
   } catch (error) {
-    console.error("Error fetching filter options:", error.message)
-    return defaultFilters
+    console.error("Error fetching filter options:", error.message);
+    return defaultFilters;
   }
 }
 
 // Perform search against the API
 export async function performDocumentSearch(query, filters) {
-  // If this is an empty initial search (no query, no active filters), 
+  // If this is an empty initial search (no query, no active filters),
   // return an empty array instead of all results
-  const hasActiveFilters = Object.values(filters).some(filterGroup => 
-    Object.values(filterGroup).some(isActive => isActive)
-  )
-  
+  const hasActiveFilters = Object.values(filters).some((filterGroup) =>
+    Object.values(filterGroup).some((isActive) => isActive)
+  );
+
   if (!query && !hasActiveFilters) {
-    return []
+    return [];
   }
 
   // Use mock data if enabled
   if (USE_MOCK_DATA) {
     return filterMockData(query, filters);
   }
-  
+
   try {
     // Transform filter format for API
     const transformedFilters = {
-      years: Object.keys(filters.yearFilters || {}).filter(key => filters.yearFilters[key]),
-      topics: Object.keys(filters.topicFilters || {}).filter(key => filters.topicFilters[key]),
-      derivedTopics: Object.keys(filters.derivedTopicFilters || {}).filter(key => filters.derivedTopicFilters[key]),
-      mandates: Object.keys(filters.mandateFilters || {}).filter(key => filters.mandateFilters[key]),
-      authors: Object.keys(filters.authorFilters || {}).filter(key => filters.authorFilters[key]),
-      documentTypes: Object.keys(filters.documentTypeFilters || {}).filter(key => filters.documentTypeFilters[key]),
-    }
-    
+      years: Object.keys(filters.yearFilters || {}).filter(
+        (key) => filters.yearFilters[key]
+      ),
+      topics: Object.keys(filters.topicFilters || {}).filter(
+        (key) => filters.topicFilters[key]
+      ),
+      derivedTopics: Object.keys(filters.derivedTopicFilters || {}).filter(
+        (key) => filters.derivedTopicFilters[key]
+      ),
+      mandates: Object.keys(filters.mandateFilters || {}).filter(
+        (key) => filters.mandateFilters[key]
+      ),
+      authors: Object.keys(filters.authorFilters || {}).filter(
+        (key) => filters.authorFilters[key]
+      ),
+      documentTypes: Object.keys(filters.documentTypeFilters || {}).filter(
+        (key) => filters.documentTypeFilters[key]
+      ),
+    };
+
     // console.log("Performing document search with query:", query)
     // console.log("Transformed filters:", transformedFilters)
     // console.log("JSON SENDING:", JSON.stringify({ query, filters: transformedFilters }, null, 2))
 
     // Fetch user auth token
     const token = await getUserToken();
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/hybrid-search`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        user_query: query,
-        filters: transformedFilters,
-      }),
-    })
-    
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_ENDPOINT}user/hybrid-search`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          user_query: query,
+          filters: transformedFilters,
+        }),
+      }
+    );
+
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
-    
-    const data = await response.json()
+
+    const data = await response.json();
 
     // Sort results by semanticScore in descending order
     if (data.results && data.results.length > 0) {
@@ -107,102 +125,132 @@ export async function performDocumentSearch(query, filters) {
 
     // Log the highlights and results for debugging
     // console.log("data:", data.results[1])
-    return data.results || []
+    return data.results || [];
   } catch (error) {
-    console.error("Error performing document search:", error.message)
+    console.error("Error performing document search:", error.message);
     // Fall back to mock data filtering
     if (USE_MOCK_DATA) {
-      console.error("Using mock data due to API failure")
+      console.error("Using mock data due to API failure");
       return filterMockData(query, filters);
     }
-    return []
+    return [];
   }
 }
 
 // Helper function to filter mock data when API call fails
 function filterMockData(query, filters) {
-  const { 
-    yearFilters, 
+  const {
+    yearFilters,
     topicFilters,
     derivedTopicFilters,
-    mandateFilters, 
-    authorFilters, 
-    documentTypeFilters 
-  } = filters
-  
+    mandateFilters,
+    authorFilters,
+    documentTypeFilters,
+  } = filters;
+
   let filtered = allMockResults.filter((result) => {
     // Check if any year filter is active, if not, show all years
-    const anyYearFilterActive = Object.values(yearFilters).some((value) => value)
+    const anyYearFilterActive = Object.values(yearFilters).some(
+      (value) => value
+    );
     if (anyYearFilterActive && !yearFilters[result.csasYear || result.year]) {
-      return false
+      return false;
     }
 
     // Check if any topic filter is active
-    const anyTopicFilterActive = Object.values(topicFilters).some((value) => value)
+    const anyTopicFilterActive = Object.values(topicFilters).some(
+      (value) => value
+    );
     if (anyTopicFilterActive) {
-      const hasMatchingTopic = result.topics.some((topic) => topicFilters[topic])
+      const hasMatchingTopic = result.topics.some(
+        (topic) => topicFilters[topic]
+      );
       if (!hasMatchingTopic) {
-        return false
+        return false;
       }
     }
-    
+
     // Check if any derived topic filter is active
-    const anyDerivedTopicFilterActive = Object.values(derivedTopicFilters).some((value) => value)
+    const anyDerivedTopicFilterActive = Object.values(derivedTopicFilters).some(
+      (value) => value
+    );
     if (anyDerivedTopicFilterActive) {
       // For mock data, assume derivedTopics are in the topics array or check for a dedicated derivedTopics array
       const resultDerivedTopics = result.derivedTopics || result.topics || [];
-      const hasMatchingDerivedTopic = resultDerivedTopics.some((topic) => derivedTopicFilters[topic])
+      const hasMatchingDerivedTopic = resultDerivedTopics.some(
+        (topic) => derivedTopicFilters[topic]
+      );
       if (!hasMatchingDerivedTopic) {
-        return false
+        return false;
       }
     }
 
     // Check if any mandate filter is active
-    const anyMandateFilterActive = Object.values(mandateFilters).some((value) => value)
+    const anyMandateFilterActive = Object.values(mandateFilters).some(
+      (value) => value
+    );
     if (anyMandateFilterActive) {
-      const hasMatchingMandate = result.mandates.some((mandate) => mandateFilters[mandate])
+      const hasMatchingMandate = result.mandates.some(
+        (mandate) => mandateFilters[mandate]
+      );
       if (!hasMatchingMandate) {
-        return false
+        return false;
       }
     }
 
     // Check if any author filter is active - could be in csasEvent now
-    const anyAuthorFilterActive = Object.values(authorFilters).some((value) => value)
+    const anyAuthorFilterActive = Object.values(authorFilters).some(
+      (value) => value
+    );
     if (anyAuthorFilterActive) {
       const resultAuthor = result.author || "";
       const resultEvent = result.csasEvent || "";
       // Check both in author field or csasEvent
-      if (!authorFilters[resultAuthor] && !Object.keys(authorFilters).some(author => 
-        resultEvent.toLowerCase().includes(author.toLowerCase()))) {
+      if (
+        !authorFilters[resultAuthor] &&
+        !Object.keys(authorFilters).some((author) =>
+          resultEvent.toLowerCase().includes(author.toLowerCase())
+        )
+      ) {
         return false;
       }
     }
-    
+
     // Check if any document type filter is active
-    const anyDocTypeFilterActive = documentTypeFilters && Object.values(documentTypeFilters).some((value) => value)
+    const anyDocTypeFilterActive =
+      documentTypeFilters &&
+      Object.values(documentTypeFilters).some((value) => value);
     if (anyDocTypeFilterActive) {
       // Get document type, prioritize documentType over category for backwards compatibility
-      const docType = result.documentType || result.category || 'Unknown'
+      const docType = result.documentType || result.category || "Unknown";
       if (!documentTypeFilters[docType]) {
-        return false
+        return false;
       }
     }
 
     // Filter by search query
     if (query) {
-      const queryLower = query.toLowerCase()
+      const queryLower = query.toLowerCase();
       return (
         result.title.toLowerCase().includes(queryLower) ||
-        (result.csasEvent && result.csasEvent.toLowerCase().includes(queryLower)) ||
-        (result.documentType && result.documentType.toLowerCase().includes(queryLower)) ||
-        result.highlights.some((highlight) => highlight.toLowerCase().includes(queryLower)) ||
-        result.topics.some((topic) => topic.toLowerCase().includes(queryLower)) ||
-        result.mandates.some((mandate) => mandate.toLowerCase().includes(queryLower))
-      )
+        (result.csasEvent &&
+          result.csasEvent.toLowerCase().includes(queryLower)) ||
+        (result.documentType &&
+          result.documentType.toLowerCase().includes(queryLower)) ||
+        result.highlights.some((highlight) =>
+          highlight.toLowerCase().includes(queryLower)
+        ) ||
+        result.topics.some((topic) =>
+          topic.toLowerCase().includes(queryLower)
+        ) ||
+        result.mandates.some((mandate) =>
+          mandate.toLowerCase().includes(queryLower)
+        )
+      );
     }
 
-    return true
-  })
+    return true;
+  });
 
   // Sort mock results by semanticScore if available
   filtered.sort((a, b) => {
@@ -211,5 +259,5 @@ function filterMockData(query, filters) {
     return scoreB - scoreA; // Descending order
   });
 
-  return filtered
+  return filtered;
 }

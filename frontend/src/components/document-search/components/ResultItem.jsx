@@ -1,19 +1,20 @@
-import Link from "next/link"
-import { ChevronRight, Info } from "lucide-react"
-import { useState } from "react"
+import Link from "next/link";
+import { ChevronRight, Info } from "lucide-react";
+import { useState } from "react";
 
 export default function ResultItem({ result, openQuerySummary }) {
   const [showTooltip, setShowTooltip] = useState(false);
-  
+
   // Relevancy explanation tooltip
-  const relevancyExplanation = "Relevance score represents a hybrid score combining semantic similarity (70%) and keyword matching (30%) based on a given query. Since semantic scoring is relative to all documents in the database, a high percentage doesn't always guarantee relevance to your specific question."
+  const relevancyExplanation =
+    "Relevance score represents a hybrid score combining semantic similarity (70%) and keyword matching (30%) based on a given query. Since semantic scoring is relative to all documents in the database, a high percentage doesn't always guarantee relevance to your specific question.";
 
   // Function to determine the background color based on score
   const getScoreColor = (score) => {
     if (!score) return "bg-gray-300";
-    
+
     const percentage = score * 100;
-    
+
     if (percentage < 40) {
       return "bg-red-500";
     } else if (percentage < 70) {
@@ -24,10 +25,10 @@ export default function ResultItem({ result, openQuerySummary }) {
   };
 
   // Calculate the score percentage
-  const scorePercentage = result.semanticScore 
-    ? Math.round(result.semanticScore * 100) 
+  const scorePercentage = result.semanticScore
+    ? Math.round(result.semanticScore * 100)
     : null;
-    
+
   return (
     <>
       <style jsx global>{`
@@ -35,7 +36,7 @@ export default function ResultItem({ result, openQuerySummary }) {
           font-style: normal;
           font-weight: bold;
         }
-        
+
         .score-badge {
           padding: 3px 8px;
           border-radius: 12px;
@@ -46,10 +47,12 @@ export default function ResultItem({ result, openQuerySummary }) {
           transition: background-color 0.3s ease;
         }
       `}</style>
-      
+
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-3 md:p-4 border dark:border-gray-700">
         <div className="flex justify-between mb-2">
-          <div className="text-xs md:text-sm text-blue-600 dark:text-blue-400">{result.documentType || "Unknown Type"}</div>
+          <div className="text-xs md:text-sm text-blue-600 dark:text-blue-400">
+            {result.documentType || "Unknown Type"}
+          </div>
         </div>
 
         {/* <div className="flex justify-between mb-2">
@@ -58,26 +61,41 @@ export default function ResultItem({ result, openQuerySummary }) {
 
         <div className="mb-2">
           <div className="text-xs md:text-sm text-gray-500 dark:text-gray-400">
-            {result.csasEvent ? `CSAS Event: ${result.csasEvent} (${result.csasYear})` : "No Associated CSAS Event"}
+            {result.csasEvent
+              ? `CSAS Event: ${result.csasEvent} (${result.csasYear})`
+              : "No Associated CSAS Event"}
           </div>
         </div>
 
         <div className="mb-2">
           <div className="text-xs md:text-sm text-gray-500 dark:text-gray-400">
-            Document Year: {result.year ? result.year : (result.csasYear ? `${result.csasYear}*` : "Unknown")}
+            Document Year:{" "}
+            {result.year
+              ? result.year
+              : result.csasYear
+              ? `${result.csasYear}*`
+              : "Unknown"}
           </div>
         </div>
 
         <div className="mt-3 md:mt-4 mb-2">
           <div className="flex flex-col sm:flex-row sm:justify-between gap-2 mb-2">
-            <div className="font-medium dark:text-white text-sm md:text-base">{
-            result.title.length > 20 ? `${result.title.substring(0, 70)}...` : result.title
-            }</div>
+            <div className="font-medium dark:text-white text-sm md:text-base">
+              {result.title.length > 20
+                ? `${result.title.substring(0, 70)}...`
+                : result.title}
+            </div>
             <div className="flex space-x-2 text-xs md:text-sm">
-              <Link href={`/documents/${result.id}`} className="text-blue-600 dark:text-blue-400">
+              <Link
+                href={`/documents/${result.id}`}
+                className="text-blue-600 dark:text-blue-400"
+              >
                 Document Summary
               </Link>
-              <button className="text-blue-600 dark:text-blue-400" onClick={() => openQuerySummary(result.id)}>
+              <button
+                className="text-blue-600 dark:text-blue-400"
+                onClick={() => openQuerySummary(result.id)}
+              >
                 Query Summary
               </button>
             </div>
@@ -87,25 +105,28 @@ export default function ResultItem({ result, openQuerySummary }) {
             {result.highlight && result.highlight.length > 0 ? (
               <ul className="list-disc pl-5 text-xs md:text-sm dark:text-gray-300">
                 {result.highlight.map((hl, index) => (
-                  <li 
-                    key={index} 
-                    dangerouslySetInnerHTML={{ __html: hl }}
-                  />
+                  <li key={index} dangerouslySetInnerHTML={{ __html: hl }} />
                 ))}
               </ul>
             ) : (
-              <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">No highlights found</p>
+              <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">
+                No highlights found
+              </p>
             )}
           </div>
         </div>
 
         <div className="flex justify-between items-center mt-2">
           <div className="text-xs md:text-sm flex items-center">
-            <span className="text-gray-500 dark:text-gray-400 mr-2">Relevance Score:</span>
-            <span className={`score-badge ${getScoreColor(result.semanticScore)}`}>
-              {scorePercentage !== null ? `${scorePercentage}%` : 'N/A'}
+            <span className="text-gray-500 dark:text-gray-400 mr-2">
+              Relevance Score:
             </span>
-            <div 
+            <span
+              className={`score-badge ${getScoreColor(result.semanticScore)}`}
+            >
+              {scorePercentage !== null ? `${scorePercentage}%` : "N/A"}
+            </span>
+            <div
               className="ml-1 relative cursor-help"
               onMouseEnter={() => setShowTooltip(true)}
               onMouseLeave={() => setShowTooltip(false)}
@@ -124,10 +145,11 @@ export default function ResultItem({ result, openQuerySummary }) {
             rel="noopener noreferrer"
             className="text-blue-600 dark:text-blue-400 text-xs md:text-sm flex items-center"
           >
-            View Web Page <ChevronRight className="h-3 w-3 md:h-4 md:w-4 ml-1" />
+            View Web Page{" "}
+            <ChevronRight className="h-3 w-3 md:h-4 md:w-4 ml-1" />
           </a>
         </div>
       </div>
     </>
-  )
+  );
 }

@@ -13,7 +13,7 @@ export class VpcStack extends Stack {
     // VPC for application
     this.vpc = new ec2.Vpc(this, `${id}-Vpc`, {
       //cidr: "10.0.0.0/16",
-      ipAddresses: ec2.IpAddresses.cidr('10.0.0.0/16'),
+      ipAddresses: ec2.IpAddresses.cidr("10.0.0.0/16"),
       natGatewayProvider: natGatewayProvider,
       natGateways: 1,
       maxAzs: 2,
@@ -27,10 +27,10 @@ export class VpcStack extends Stack {
           subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
         },
         {
-            name: "isolated-subnet-1",
-            subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+          name: "isolated-subnet-1",
+          subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
         },
-      ]
+      ],
     });
 
     this.vpc.addFlowLog(`${id}-vpcFlowLog`);

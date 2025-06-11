@@ -1,7 +1,7 @@
 // Mock data for semantically similar documents
 export const mockSimilarDocuments = {
   // Document ID 6472
-  "6472": [
+  6472: [
     {
       id: "7001",
       title: "Atlantic Salmon Population Monitoring Framework",
@@ -9,7 +9,7 @@ export const mockSimilarDocuments = {
       year: "2022",
       semanticScore: 0.92,
       csasEvent: "East Coast Salmon Monitoring Program",
-      csasYear: "2022"
+      csasYear: "2022",
     },
     {
       id: "7002",
@@ -18,7 +18,7 @@ export const mockSimilarDocuments = {
       year: "2021",
       semanticScore: 0.89,
       csasEvent: "Atlantic Salmon Habitat Review",
-      csasYear: "2021"
+      csasYear: "2021",
     },
     {
       id: "7003",
@@ -27,7 +27,7 @@ export const mockSimilarDocuments = {
       year: "2023",
       semanticScore: 0.87,
       csasEvent: "Salmon Distribution Modelling",
-      csasYear: "2023"
+      csasYear: "2023",
     },
     {
       id: "6273",
@@ -36,7 +36,7 @@ export const mockSimilarDocuments = {
       year: "2021",
       semanticScore: 0.84,
       csasEvent: "Aquaculture Sustainability Framework",
-      csasYear: "2021"
+      csasYear: "2021",
     },
     {
       id: "7004",
@@ -45,7 +45,7 @@ export const mockSimilarDocuments = {
       year: "2022",
       semanticScore: 0.82,
       csasEvent: "Climate Impact on Salmon Habitat",
-      csasYear: "2022"
+      csasYear: "2022",
     },
     {
       id: "7005",
@@ -54,7 +54,7 @@ export const mockSimilarDocuments = {
       year: "2020",
       semanticScore: 0.79,
       csasEvent: "Comparative Salmon Study",
-      csasYear: "2020"
+      csasYear: "2020",
     },
     {
       id: "7006",
@@ -63,11 +63,11 @@ export const mockSimilarDocuments = {
       year: "2019",
       semanticScore: 0.77,
       csasEvent: "Salmon Migration Review",
-      csasYear: "2019"
-    }
+      csasYear: "2019",
+    },
   ],
   // Document ID 6273
-  "6273": [
+  6273: [
     {
       id: "8001",
       title: "Advances in Aquaculture Technologies",
@@ -75,7 +75,7 @@ export const mockSimilarDocuments = {
       year: "2023",
       semanticScore: 0.91,
       csasEvent: "Aquaculture Technology Workshop",
-      csasYear: "2023"
+      csasYear: "2023",
     },
     {
       id: "8002",
@@ -84,7 +84,7 @@ export const mockSimilarDocuments = {
       year: "2022",
       semanticScore: 0.88,
       csasEvent: "Environmental Assessment Framework",
-      csasYear: "2022"
+      csasYear: "2022",
     },
     {
       id: "8003",
@@ -93,7 +93,7 @@ export const mockSimilarDocuments = {
       year: "2021",
       semanticScore: 0.86,
       csasEvent: "Sustainable Feed for Fish",
-      csasYear: "2021"
+      csasYear: "2021",
     },
     {
       id: "8004",
@@ -102,7 +102,7 @@ export const mockSimilarDocuments = {
       year: "2020",
       semanticScore: 0.83,
       csasEvent: "Water Management in Aquaculture",
-      csasYear: "2020"
+      csasYear: "2020",
     },
     {
       id: "8005",
@@ -111,7 +111,7 @@ export const mockSimilarDocuments = {
       year: "2022",
       semanticScore: 0.81,
       csasEvent: "Disease Management in Aquaculture",
-      csasYear: "2022"
+      csasYear: "2022",
     },
     {
       id: "8006",
@@ -120,9 +120,9 @@ export const mockSimilarDocuments = {
       year: "2021",
       semanticScore: 0.78,
       csasEvent: "Economic Aspects of Aquaculture",
-      csasYear: "2021"
-    }
-  ]
+      csasYear: "2021",
+    },
+  ],
 };
 
 // Default similar documents for when a document ID doesn't match
@@ -134,28 +134,33 @@ export const defaultSimilarDocuments = [
     year: "2023",
     semanticScore: 0.72,
     csasEvent: "Marine Conservation Planning",
-    csasYear: "2023"
+    csasYear: "2023",
   },
   {
     id: "9002",
     title: "Fisheries Conservation and Management",
     documentType: "Scientific Advice",
     year: "2022",
-    semanticScore: 0.70,
+    semanticScore: 0.7,
     csasEvent: "Fisheries Management Framework",
-    csasYear: "2022"
+    csasYear: "2022",
   },
   {
     id: "9003",
     title: "Coastal Habitat Restoration Techniques",
     documentType: "Research Document",
     year: "2021",
-    semanticScore: 0.67
-  }
+    semanticScore: 0.67,
+  },
 ];
 
 // Years and document types for filtering
 export const similarDocumentFilterOptions = {
   years: ["2023", "2022", "2021", "2020", "2019"],
-  documentTypes: ["Research Document", "Scientific Advice", "Terms of Reference", "Policy"]
+  documentTypes: [
+    "Research Document",
+    "Scientific Advice",
+    "Terms of Reference",
+    "Policy",
+  ],
 };

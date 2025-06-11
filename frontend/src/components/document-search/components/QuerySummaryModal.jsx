@@ -9,7 +9,7 @@ export default function QuerySummaryModal({
   userQuery,
 }) {
   if (!isOpen) return null;
-  
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
       <div
@@ -42,7 +42,9 @@ export default function QuerySummaryModal({
                   style={{ animationDelay: "0.4s" }}
                 ></div>
               </div>
-              <p className="text-gray-600 dark:text-gray-400 text-sm">Generating AI summary...</p>
+              <p className="text-gray-600 dark:text-gray-400 text-sm">
+                Generating AI summary...
+              </p>
             </div>
           ) : (
             <>
@@ -56,9 +58,13 @@ export default function QuerySummaryModal({
               </div>
 
               <div>
-                <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Key Insights</h4>
+                <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
+                  Key Insights
+                </h4>
                 <ul className="list-disc pl-5 text-sm dark:text-gray-300 space-y-1">
-                  {(summaryData?.keyInsights || ["No key insights available"]).map((insight, index) => (
+                  {(
+                    summaryData?.keyInsights || ["No key insights available"]
+                  ).map((insight, index) => (
                     <li key={index}>{insight}</li>
                   ))}
                 </ul>
@@ -69,11 +75,18 @@ export default function QuerySummaryModal({
 
         <div className="p-4 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-700 text-xs text-gray-500 dark:text-gray-400 italic">
           {userQuery ? (
-            <span>Summary generated for user query: "{userQuery}". This summary was generated using AI and may not capture all nuances of the document. Please refer to the
-            original document for complete information.</span>
+            <span>
+              Summary generated for user query: "{userQuery}". This summary was
+              generated using AI and may not capture all nuances of the
+              document. Please refer to the original document for complete
+              information.
+            </span>
           ) : (
-            <span>This summary was generated using AI and may not capture all nuances of the document. Please refer to the
-            original document for complete information.</span>
+            <span>
+              This summary was generated using AI and may not capture all
+              nuances of the document. Please refer to the original document for
+              complete information.
+            </span>
           )}
         </div>
       </div>

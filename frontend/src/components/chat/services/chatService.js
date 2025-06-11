@@ -7,12 +7,12 @@ import { getUserToken } from "@/lib/getUserToken";
 // Create a new chat session
 export async function createChatSession(fingerprint) {
   try {
-  // Fetch user auth token
-  const token = await getUserToken();
+    // Fetch user auth token
+    const token = await getUserToken();
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_ENDPOINT}user/create_session?user_info=${encodeURIComponent(
-        fingerprint
-      )}`,
+      `${
+        process.env.NEXT_PUBLIC_API_ENDPOINT
+      }user/create_session?user_info=${encodeURIComponent(fingerprint)}`,
       {
         method: "POST",
         headers: {
@@ -41,7 +41,9 @@ export async function fetchChatMessages(sessionId) {
     // Fetch user auth token
     const token = await getUserToken();
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_ENDPOINT}user/get_messages?session_id=${encodeURIComponent(sessionId)}`,
+      `${
+        process.env.NEXT_PUBLIC_API_ENDPOINT
+      }user/get_messages?session_id=${encodeURIComponent(sessionId)}`,
       {
         method: "GET",
         headers: {
@@ -67,7 +69,9 @@ export async function sendChatMessage(session, fingerprint, content, userRole) {
   const token = await getUserToken();
   try {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_ENDPOINT}user/text_generation?session_id=${encodeURIComponent(
+      `${
+        process.env.NEXT_PUBLIC_API_ENDPOINT
+      }user/text_generation?session_id=${encodeURIComponent(
         session
       )}&user_info=${encodeURIComponent(fingerprint)}`,
       {
@@ -85,7 +89,9 @@ export async function sendChatMessage(session, fingerprint, content, userRole) {
 
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      throw new Error(
+        errorData.message || `HTTP error! status: ${response.status}`
+      );
     }
 
     return await response.json();
@@ -96,23 +102,33 @@ export async function sendChatMessage(session, fingerprint, content, userRole) {
 }
 
 // Send feedback about the chat
-export async function submitFeedback(fingerprint, session, userRole, rating, description) {
+export async function submitFeedback(
+  fingerprint,
+  session,
+  userRole,
+  rating,
+  description
+) {
   try {
     const token = await getUserToken();
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_ENDPOINT}user/create_feedback?user_info=${encodeURIComponent(
+      `${
+        process.env.NEXT_PUBLIC_API_ENDPOINT
+      }user/create_feedback?user_info=${encodeURIComponent(
         fingerprint
-      )}&session_id=${encodeURIComponent(session)}&user_role=${encodeURIComponent(
+      )}&session_id=${encodeURIComponent(
+        session
+      )}&user_role=${encodeURIComponent(
         userRole
       )}&feedback_rating=${encodeURIComponent(
         rating
       )}&feedback_description=${encodeURIComponent(description)}`,
-      { 
+      {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
-        }, 
+        },
       }
     );
 

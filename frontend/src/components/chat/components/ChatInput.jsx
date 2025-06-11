@@ -1,24 +1,27 @@
-import React, { useRef, useEffect } from 'react';
-import { Send, RefreshCw, Download, Mic, MicOff } from 'lucide-react';
+import React, { useRef, useEffect } from "react";
+import { Send, RefreshCw, Download, Mic, MicOff } from "lucide-react";
 
-const ChatInput = ({ 
-  userInput, 
-  setUserInput, 
+const ChatInput = ({
+  userInput,
+  setUserInput,
   sendMessage,
   isLoading,
   resetSession,
   toggleListening,
   isListening,
   showDownloadButton,
-  downloadChatHistory
+  downloadChatHistory,
 }) => {
   const textareaRef = useRef(null);
-  
+
   // Handle automatic textarea resize
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height = `${Math.min(Math.max(textareaRef.current.scrollHeight, 24), 120)}px`;
+      textareaRef.current.style.height = `${Math.min(
+        Math.max(textareaRef.current.scrollHeight, 24),
+        120
+      )}px`;
     }
   }, [userInput]);
 
@@ -36,14 +39,14 @@ const ChatInput = ({
     <div className="w-full max-w-6xl mx-auto px-4 py-4 space-y-4">
       <div className="relative flex items-center w-full bg-gray-100 rounded-full px-4 py-2">
         <div className="flex items-center space-x-2">
-          <button 
-            onClick={resetSession} 
+          <button
+            onClick={resetSession}
             className="p-1.5 hover:bg-gray-200 rounded-full"
             title="New conversation"
           >
             <RefreshCw size={20} className="text-gray-600" />
           </button>
-          
+
           {showDownloadButton && (
             <button
               onClick={downloadChatHistory}
@@ -53,10 +56,12 @@ const ChatInput = ({
               <Download size={20} />
             </button>
           )}
-          
+
           <button
             onClick={toggleListening}
-            className={`p-1.5 hover:bg-gray-200 rounded-full ${isListening ? "text-red-500" : "text-gray-600"}`}
+            className={`p-1.5 hover:bg-gray-200 rounded-full ${
+              isListening ? "text-red-500" : "text-gray-600"
+            }`}
             title={isListening ? "Stop listening" : "Start voice input"}
           >
             {isListening ? <MicOff size={20} /> : <Mic size={20} />}
@@ -79,13 +84,18 @@ const ChatInput = ({
           onInput={(e) => {
             const target = e.target;
             target.style.height = "auto";
-            target.style.height = `${Math.min(Math.max(target.scrollHeight, 24), 120)}px`;
+            target.style.height = `${Math.min(
+              Math.max(target.scrollHeight, 24),
+              120
+            )}px`;
           }}
           disabled={isLoading}
         />
 
         <button
-          onClick={() => !isLoading && userInput.trim() && sendMessage(userInput)}
+          onClick={() =>
+            !isLoading && userInput.trim() && sendMessage(userInput)
+          }
           className={`p-2 rounded-full ${
             isLoading || !userInput.trim()
               ? "opacity-50 cursor-not-allowed text-gray-400"

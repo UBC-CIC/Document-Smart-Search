@@ -1,6 +1,6 @@
-import { ChevronDown, ChevronRight, X } from "lucide-react"
-import AsyncFilterSelect from "./AsyncFilterSelect"
-import DateRangeSelector from "./DateRangeSelector"
+import { ChevronDown, ChevronRight, X } from "lucide-react";
+import AsyncFilterSelect from "./AsyncFilterSelect";
+import DateRangeSelector from "./DateRangeSelector";
 
 export default function Filters({
   isFilterOpen,
@@ -17,7 +17,7 @@ export default function Filters({
   documentTypeFilters,
   setDocumentTypeFilters,
   resetFilters,
-  isLoading
+  isLoading,
 }) {
   return (
     <div
@@ -27,8 +27,8 @@ export default function Filters({
     >
       <div className="flex justify-between items-center mb-4">
         <h3 className="font-medium dark:text-white">Search Settings</h3>
-        <button 
-          className="text-blue-600 dark:text-blue-400 text-sm hover:underline" 
+        <button
+          className="text-blue-600 dark:text-blue-400 text-sm hover:underline"
           onClick={resetFilters}
           disabled={isLoading}
         >
@@ -39,7 +39,10 @@ export default function Filters({
       {/* Filter sections */}
       <div className="space-y-4">
         {/* Year Range Filter */}
-        <DateRangeSelector yearFilters={yearFilters} setYearFilters={setYearFilters} />
+        <DateRangeSelector
+          yearFilters={yearFilters}
+          setYearFilters={setYearFilters}
+        />
 
         {/* Document Type Filter */}
         <AsyncFilterSelect
@@ -48,7 +51,7 @@ export default function Filters({
           setFilters={setDocumentTypeFilters}
           placeholder="Search document types..."
         />
-        
+
         {/* Mandate Filter */}
         <AsyncFilterSelect
           title="DFO Mandates"
@@ -82,5 +85,5 @@ export default function Filters({
         /> */}
       </div>
     </div>
-  )
+  );
 }

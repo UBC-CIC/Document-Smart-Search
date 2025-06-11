@@ -7,10 +7,16 @@ export function useFeedback(fingerprint, session, messages) {
   const [isSendingFeedback, setIsSendingFeedback] = useState(false);
 
   const getUserRole = (messageHistory) => {
-    const firstHumanMessage = messageHistory.find((msg) => msg.role === "user" || msg.Type === "human");
+    const firstHumanMessage = messageHistory.find(
+      (msg) => msg.role === "user" || msg.Type === "human"
+    );
     if (!firstHumanMessage) return "";
 
-    const content = (firstHumanMessage.content || firstHumanMessage.Content || "").toLowerCase();
+    const content = (
+      firstHumanMessage.content ||
+      firstHumanMessage.Content ||
+      ""
+    ).toLowerCase();
     if (content.includes("public")) return "public";
     if (content.includes("internal researcher")) return "internal_researcher";
     if (content.includes("policy maker")) return "policy_maker";
@@ -21,27 +27,33 @@ export function useFeedback(fingerprint, session, messages) {
   const submitFeedback = async (updatedFeedback = null) => {
     // Use the directly passed feedback if available, otherwise use state
     const feedbackToSubmit = updatedFeedback || feedback;
-    
-    if (!feedbackToSubmit.rating || isSendingFeedback || !fingerprint || !session) return;
+
+    if (
+      !feedbackToSubmit.rating ||
+      isSendingFeedback ||
+      !fingerprint ||
+      !session
+    )
+      return;
 
     setIsSendingFeedback(true);
     let userRole = getUserRole(messages);
-    
+
     // Ensure userRole has a default value
     if (!userRole) userRole = "public";
-    
+
     // Ensure description is never empty
-    const description = feedbackToSubmit.description?.length 
-      ? feedbackToSubmit.description.join(", ") 
+    const description = feedbackToSubmit.description?.length
+      ? feedbackToSubmit.description.join(", ")
       : "No specific feedback provided";
 
     try {
       // Send feedback to the API
       await sendFeedback(
-        fingerprint, 
-        session, 
-        userRole, 
-        feedbackToSubmit.rating, 
+        fingerprint,
+        session,
+        userRole,
+        feedbackToSubmit.rating,
         description
       );
 
@@ -60,6 +72,6 @@ export function useFeedback(fingerprint, session, messages) {
     feedback,
     setFeedback,
     isSendingFeedback,
-    submitFeedback
+    submitFeedback,
   };
 }

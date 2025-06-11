@@ -1,15 +1,15 @@
-import * as cdk from 'aws-cdk-lib';
-import { Construct } from 'constructs';
-import * as s3 from 'aws-cdk-lib/aws-s3';
-import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
-import * as iam from 'aws-cdk-lib/aws-iam';
-import * as glue from 'aws-cdk-lib/aws-glue';
-import * as ec2 from 'aws-cdk-lib/aws-ec2';
-import { Effect, ManagedPolicy, PolicyStatement } from 'aws-cdk-lib/aws-iam';
-import { RemovalPolicy } from 'aws-cdk-lib';
-import { VpcStack } from './vpc-stack';
-import { DatabaseStack } from './database-stack';
-import { OpenSearchStack } from './opensearch-stack';
+import * as cdk from "aws-cdk-lib";
+import { Construct } from "constructs";
+import * as s3 from "aws-cdk-lib/aws-s3";
+import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
+import * as iam from "aws-cdk-lib/aws-iam";
+import * as glue from "aws-cdk-lib/aws-glue";
+import * as ec2 from "aws-cdk-lib/aws-ec2";
+import { Effect, ManagedPolicy, PolicyStatement } from "aws-cdk-lib/aws-iam";
+import { RemovalPolicy } from "aws-cdk-lib";
+import { VpcStack } from "./vpc-stack";
+import { DatabaseStack } from "./database-stack";
+import { OpenSearchStack } from "./opensearch-stack";
 
 // Interface for Glue job arguments
 interface GlueJobArguments {
@@ -21,7 +21,14 @@ export class DataPipelineStack extends cdk.Stack {
   public readonly glueBucket: s3.Bucket;
   public readonly glueConnection: glue.CfnConnection;
 
-  constructor(scope: Construct, id: string, vpcStack: VpcStack, databaseStack: DatabaseStack, opensearchStack: OpenSearchStack, props?: cdk.StackProps) {
+  constructor(
+    scope: Construct,
+    id: string,
+    vpcStack: VpcStack,
+    databaseStack: DatabaseStack,
+    opensearchStack: OpenSearchStack,
+    props?: cdk.StackProps
+  ) {
     super(scope, id, props);
 
     // Create S3 bucket for data uploads with batch structure
@@ -34,10 +41,10 @@ export class DataPipelineStack extends cdk.Stack {
     });
 
     // Create empty folders in the data upload bucket
-    new s3deploy.BucketDeployment(this, 'CreateEmptyFolders', {
+    new s3deploy.BucketDeployment(this, "CreateEmptyFolders", {
       sources: [
-        s3deploy.Source.data('batches/.ignore', ''),
-        s3deploy.Source.data('bertopic_models/.ignore', ''),
+        s3deploy.Source.data("batches/.ignore", ""),
+        s3deploy.Source.data("bertopic_models/.ignore", ""),
       ],
       destinationBucket: this.dataUploadBucket,
     });
@@ -50,30 +57,39 @@ export class DataPipelineStack extends cdk.Stack {
     });
 
     // Upload existing Glue scripts to the scripts bucket
-    new s3deploy.BucketDeployment(this, 'DeployGlueScripts', {
-      sources: [
-        s3deploy.Source.asset('./glue/scripts/'),
-      ],
+    new s3deploy.BucketDeployment(this, "DeployGlueScripts", {
+      sources: [s3deploy.Source.asset("./glue/scripts/")],
       destinationBucket: this.glueBucket,
-      destinationKeyPrefix: 'glue/scripts',
-      exclude: ['*.ipynb', '*test*', '*src*', '*DS_Store', '*__pycache__*', '*.pyc', '*.json', '*temp*']
+      destinationKeyPrefix: "glue/scripts",
+      exclude: [
+        "*.ipynb",
+        "*test*",
+        "*src*",
+        "*DS_Store",
+        "*__pycache__*",
+        "*.pyc",
+        "*.json",
+        "*temp*",
+      ],
     });
 
     // Upload existing Glue scripts to the scripts bucket
-    new s3deploy.BucketDeployment(this, 'DeployGlueCustomModules', {
-      sources: [
-        s3deploy.Source.asset('./glue/custom_modules/src/dist/'),
-      ],
+    new s3deploy.BucketDeployment(this, "DeployGlueCustomModules", {
+      sources: [s3deploy.Source.asset("./glue/custom_modules/src/dist/")],
       destinationBucket: this.glueBucket,
-      destinationKeyPrefix: 'glue/custom_modules',
-      exclude: ['*DS_Store', '*__pycache__*', '*.json']
+      destinationKeyPrefix: "glue/custom_modules",
+      exclude: ["*DS_Store", "*__pycache__*", "*.json"],
     });
 
-    const glueSecurityGroup = new ec2.SecurityGroup(this, "glueSelfReferencingSG", {
-      vpc: vpcStack.vpc,
-      allowAllOutbound: true,
-      description: "Self-referencing security group for Glue",
-    });
+    const glueSecurityGroup = new ec2.SecurityGroup(
+      this,
+      "glueSelfReferencingSG",
+      {
+        vpc: vpcStack.vpc,
+        allowAllOutbound: true,
+        description: "Self-referencing security group for Glue",
+      }
+    );
     // add self-referencing ingress rule
     glueSecurityGroup.addIngressRule(
       glueSecurityGroup,
@@ -81,14 +97,13 @@ export class DataPipelineStack extends cdk.Stack {
       "self-referencing security group rule"
     );
 
-
     // Create Glue network connection
-    this.glueConnection = new glue.CfnConnection(this, 'GlueVpcConnection', {
+    this.glueConnection = new glue.CfnConnection(this, "GlueVpcConnection", {
       catalogId: this.account,
       connectionInput: {
         name: `${id}-glue-vpc-connection`,
-        description: 'VPC connection for Glue jobs',
-        connectionType: 'NETWORK',
+        description: "VPC connection for Glue jobs",
+        connectionType: "NETWORK",
         physicalConnectionRequirements: {
           availabilityZone: vpcStack.vpc.availabilityZones[0],
           securityGroupIdList: [glueSecurityGroup.securityGroupId],
@@ -100,34 +115,48 @@ export class DataPipelineStack extends cdk.Stack {
 
     // Create an IAM role for Glue jobs
     const roleName = `AWSGlueServiceRole-${id}-datapipeline`;
-    const glueJobRole = new iam.Role(this, 'GlueJobRole', {
+    const glueJobRole = new iam.Role(this, "GlueJobRole", {
       roleName: roleName,
-      assumedBy: new iam.ServicePrincipal('glue.amazonaws.com'),
-      description: 'Role used by AWS Glue for data pipeline processing',
+      assumedBy: new iam.ServicePrincipal("glue.amazonaws.com"),
+      description: "Role used by AWS Glue for data pipeline processing",
     });
     glueJobRole.applyRemovalPolicy(RemovalPolicy.DESTROY);
 
     // Add necessary permissions to Glue role
     // Add S3 access
-    glueJobRole.addToPolicy(new iam.PolicyStatement({
-      effect: Effect.ALLOW,
-      actions: [
-        's3:*',
-      ],
-      resources: [
-        this.dataUploadBucket.bucketArn,
-        `${this.dataUploadBucket.bucketArn}/*`,
-        this.glueBucket.bucketArn,
-        `${this.glueBucket.bucketArn}/*`,
-      ],
-    }));
+    glueJobRole.addToPolicy(
+      new iam.PolicyStatement({
+        effect: Effect.ALLOW,
+        actions: ["s3:*"],
+        resources: [
+          this.dataUploadBucket.bucketArn,
+          `${this.dataUploadBucket.bucketArn}/*`,
+          this.glueBucket.bucketArn,
+          `${this.glueBucket.bucketArn}/*`,
+        ],
+      })
+    );
 
-    glueJobRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSSMReadOnlyAccess"));
-    glueJobRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName("SecretsManagerReadWrite"));
-    glueJobRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSSMReadOnlyAccess"));
-    glueJobRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName("service-role/AWSGlueServiceRole"));
-    glueJobRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonBedrockFullAccess"));
-    glueJobRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonS3FullAccess"));
+    glueJobRole.addManagedPolicy(
+      iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSSMReadOnlyAccess")
+    );
+    glueJobRole.addManagedPolicy(
+      iam.ManagedPolicy.fromAwsManagedPolicyName("SecretsManagerReadWrite")
+    );
+    glueJobRole.addManagedPolicy(
+      iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSSMReadOnlyAccess")
+    );
+    glueJobRole.addManagedPolicy(
+      iam.ManagedPolicy.fromAwsManagedPolicyName(
+        "service-role/AWSGlueServiceRole"
+      )
+    );
+    glueJobRole.addManagedPolicy(
+      iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonBedrockFullAccess")
+    );
+    glueJobRole.addManagedPolicy(
+      iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonS3FullAccess")
+    );
 
     // Add Glue access
     const PYTHON_VER = "3.9";
@@ -136,7 +165,8 @@ export class DataPipelineStack extends cdk.Stack {
     const MAX_RETRIES = 0;
     const MAX_CAPACITY = 1;
     const TIMEOUT = 170;
-    const PYTHON_LIBS = "psycopg[binary]==3.2.6,boto3==1.38.1,langchain==0.3.12,langchain-community==0.3.12,langchain-aws==0.2.21,opensearch-py==2.5.0,pandas==2.2.3,openpyxl==3.1.5,numpy==1.26.4,scikit-learn==1.6.1,aiohttp==3.11.10,beautifulsoup4==4.12.3,bertopic==0.16.2,langdetect==1.0.9"
+    const PYTHON_LIBS =
+      "psycopg[binary]==3.2.6,boto3==1.38.1,langchain==0.3.12,langchain-community==0.3.12,langchain-aws==0.2.21,opensearch-py==2.5.0,pandas==2.2.3,openpyxl==3.1.5,numpy==1.26.4,scikit-learn==1.6.1,aiohttp==3.11.10,beautifulsoup4==4.12.3,bertopic==0.16.2,langdetect==1.0.9";
 
     // Function to get common job arguments
     const getCommonJobArguments = (): GlueJobArguments => {
@@ -144,21 +174,22 @@ export class DataPipelineStack extends cdk.Stack {
         "--extra-py-files": `s3://${this.glueBucket.bucketName}/glue/custom_modules/src-0.1-py3-none-any.whl`,
         "--additional-python-modules": PYTHON_LIBS,
         "library-set": "analytics",
-        "--batch_id": "2025_05_21",  // Will be set at runtime
+        "--batch_id": "2025_05_21", // Will be set at runtime
         "--bucket_name": this.dataUploadBucket.bucketName,
         "--region_name": "us-west-2",
-        "--html_urls_path": "s3://dfo-datapipeline-dfodatapipelinedatauploadbucket8e-zsfxa89bwwx2/batches/2025_05_21/html_data/CSASDocuments.xlsx",  // Will be set at runtime
+        "--html_urls_path":
+          "s3://dfo-datapipeline-dfodatapipelinedatauploadbucket8e-zsfxa89bwwx2/batches/2025_05_21/html_data/CSASDocuments.xlsx", // Will be set at runtime
         "--embedding_model": "amazon.titan-embed-text-v2:0",
-        "--opensearch_secret":  "DFO-OpenSearch-opensearch/admin/credentials",// opensearchStack.userSecret.secretName,
-        "--opensearch_host": "/DFO-OpenSearch/opensearch/host",  // opensearchStack.domain.domainEndpoint
-        "--rds_secret": "DFO-Database-DFO/credentials/DbCredential",// databaseStack.secretPathUser.secretName,
+        "--opensearch_secret": "DFO-OpenSearch-opensearch/admin/credentials", // opensearchStack.userSecret.secretName,
+        "--opensearch_host": "/DFO-OpenSearch/opensearch/host", // opensearchStack.domain.domainEndpoint
+        "--rds_secret": "DFO-Database-DFO/credentials/DbCredential", // databaseStack.secretPathUser.secretName,
         "--dfo_html_full_index_name": "dfo-html-full-index",
         "--dfo_topic_full_index_name": "dfo-topic-full-index",
         "--dfo_mandate_full_index_name": "dfo-mandate-full-index",
         "--pipeline_mode": "full_update",
         "--sm_method": "numpy",
         "--topic_modelling_mode": "retrain",
-        "--llm_model": "us.meta.llama3-3-70b-instruct-v1:0"
+        "--llm_model": "us.meta.llama3-3-70b-instruct-v1:0",
       };
     };
 
@@ -186,43 +217,51 @@ export class DataPipelineStack extends cdk.Stack {
         },
       }),
 
-      ingestTopicsAndMandates: new glue.CfnJob(this, "ingest_topics_and_mandates", {
-        name: `${id}-ingest-topics-and-mandates`,
-        role: glueJobRole.roleArn,
-        command: {
-          name: "pythonshell",
-          pythonVersion: PYTHON_VER,
-          scriptLocation: `s3://${this.glueBucket.bucketName}/glue/scripts/ingest_topics_and_mandates.py`,
-        },
-        executionProperty: { maxConcurrentRuns: MAX_CONCURRENT_RUNS },
-        maxRetries: MAX_RETRIES,
-        maxCapacity: MAX_CAPACITY,
-        timeout: TIMEOUT,
-        glueVersion: GLUE_VER,
-        defaultArguments: commonArgs,
-        connections: {
-          connections: [`${id}-glue-vpc-connection`],
-        },
-      }),
+      ingestTopicsAndMandates: new glue.CfnJob(
+        this,
+        "ingest_topics_and_mandates",
+        {
+          name: `${id}-ingest-topics-and-mandates`,
+          role: glueJobRole.roleArn,
+          command: {
+            name: "pythonshell",
+            pythonVersion: PYTHON_VER,
+            scriptLocation: `s3://${this.glueBucket.bucketName}/glue/scripts/ingest_topics_and_mandates.py`,
+          },
+          executionProperty: { maxConcurrentRuns: MAX_CONCURRENT_RUNS },
+          maxRetries: MAX_RETRIES,
+          maxCapacity: MAX_CAPACITY,
+          timeout: TIMEOUT,
+          glueVersion: GLUE_VER,
+          defaultArguments: commonArgs,
+          connections: {
+            connections: [`${id}-glue-vpc-connection`],
+          },
+        }
+      ),
 
-      vectorLlmCategorization: new glue.CfnJob(this, "vector_llm_categorization", {
-        name: `${id}-vector-llm-categorization`,
-        role: glueJobRole.roleArn,
-        command: {
-          name: "pythonshell",
-          pythonVersion: PYTHON_VER,
-          scriptLocation: `s3://${this.glueBucket.bucketName}/glue/scripts/vector_llm_categorization.py`,
-        },
-        executionProperty: { maxConcurrentRuns: MAX_CONCURRENT_RUNS },
-        maxRetries: MAX_RETRIES,
-        maxCapacity: MAX_CAPACITY,
-        timeout: TIMEOUT,
-        glueVersion: GLUE_VER,
-        defaultArguments: commonArgs,
-        connections: {
-          connections: [`${id}-glue-vpc-connection`],
-        },
-      }),
+      vectorLlmCategorization: new glue.CfnJob(
+        this,
+        "vector_llm_categorization",
+        {
+          name: `${id}-vector-llm-categorization`,
+          role: glueJobRole.roleArn,
+          command: {
+            name: "pythonshell",
+            pythonVersion: PYTHON_VER,
+            scriptLocation: `s3://${this.glueBucket.bucketName}/glue/scripts/vector_llm_categorization.py`,
+          },
+          executionProperty: { maxConcurrentRuns: MAX_CONCURRENT_RUNS },
+          maxRetries: MAX_RETRIES,
+          maxCapacity: MAX_CAPACITY,
+          timeout: TIMEOUT,
+          glueVersion: GLUE_VER,
+          defaultArguments: commonArgs,
+          connections: {
+            connections: [`${id}-glue-vpc-connection`],
+          },
+        }
+      ),
 
       sqlIngestion: new glue.CfnJob(this, "sql_ingestion", {
         name: `${id}-sql-ingestion`,
@@ -268,12 +307,12 @@ export class DataPipelineStack extends cdk.Stack {
       name: `${id}-data-pipeline-workflow`,
       description: "Workflow for processing and categorizing documents",
       defaultRunProperties: {
-        "--batch_id":  "",
+        "--batch_id": "",
         "--html_urls_path": "",
         "--opensearch_host": "",
         "--opensearch_secret": "",
         "--rds_secret": "",
-      }
+      },
     });
 
     // Create triggers for the workflow - now fully sequential
@@ -288,25 +327,29 @@ export class DataPipelineStack extends cdk.Stack {
       ],
     });
 
-    const ingestTopicsTrigger = new glue.CfnTrigger(this, "IngestTopicsTrigger", {
-      name: `${id}-ingest-topics-trigger`,
-      type: "CONDITIONAL",
-      workflowName: workflow.name,
-      predicate: {
-        conditions: [
+    const ingestTopicsTrigger = new glue.CfnTrigger(
+      this,
+      "IngestTopicsTrigger",
+      {
+        name: `${id}-ingest-topics-trigger`,
+        type: "CONDITIONAL",
+        workflowName: workflow.name,
+        predicate: {
+          conditions: [
+            {
+              jobName: jobs.cleanAndIngestHtml.name,
+              state: "SUCCEEDED",
+              logicalOperator: "EQUALS",
+            },
+          ],
+        },
+        actions: [
           {
-            jobName: jobs.cleanAndIngestHtml.name,
-            state: "SUCCEEDED",
-            logicalOperator: "EQUALS",
+            jobName: jobs.ingestTopicsAndMandates.name,
           },
         ],
-      },
-      actions: [
-        {
-          jobName: jobs.ingestTopicsAndMandates.name,
-        },
-      ],
-    });
+      }
+    );
 
     const vectorLlmTrigger = new glue.CfnTrigger(this, "VectorLlmTrigger", {
       name: `${id}-vector-llm-trigger`,
@@ -328,45 +371,53 @@ export class DataPipelineStack extends cdk.Stack {
       ],
     });
 
-    const sqlIngestionTrigger = new glue.CfnTrigger(this, "SqlIngestionTrigger", {
-      name: `${id}-sql-ingestion-trigger`,
-      type: "CONDITIONAL",
-      workflowName: workflow.name,
-      predicate: {
-        conditions: [
-          {
-            jobName: jobs.vectorLlmCategorization.name,
-            state: "SUCCEEDED",
-            logicalOperator: "EQUALS",
-          },
-        ],
-      },
-      actions: [
-        {
-          jobName: jobs.sqlIngestion.name,
+    const sqlIngestionTrigger = new glue.CfnTrigger(
+      this,
+      "SqlIngestionTrigger",
+      {
+        name: `${id}-sql-ingestion-trigger`,
+        type: "CONDITIONAL",
+        workflowName: workflow.name,
+        predicate: {
+          conditions: [
+            {
+              jobName: jobs.vectorLlmCategorization.name,
+              state: "SUCCEEDED",
+              logicalOperator: "EQUALS",
+            },
+          ],
         },
-      ],
-    });
-
-    const topicModellingTrigger = new glue.CfnTrigger(this, "TopicModellingTrigger", {
-      name: `${id}-topic-modelling-trigger`,
-      type: "CONDITIONAL",
-      workflowName: workflow.name,
-      predicate: {
-        conditions: [
+        actions: [
           {
             jobName: jobs.sqlIngestion.name,
-            state: "SUCCEEDED",
-            logicalOperator: "EQUALS",
           },
         ],
-      },
-      actions: [
-        {
-          jobName: jobs.topicModelling.name,
+      }
+    );
+
+    const topicModellingTrigger = new glue.CfnTrigger(
+      this,
+      "TopicModellingTrigger",
+      {
+        name: `${id}-topic-modelling-trigger`,
+        type: "CONDITIONAL",
+        workflowName: workflow.name,
+        predicate: {
+          conditions: [
+            {
+              jobName: jobs.sqlIngestion.name,
+              state: "SUCCEEDED",
+              logicalOperator: "EQUALS",
+            },
+          ],
         },
-      ],
-    });
+        actions: [
+          {
+            jobName: jobs.topicModelling.name,
+          },
+        ],
+      }
+    );
 
     // Set dependencies
     startTrigger.addDependency(workflow);
@@ -376,8 +427,9 @@ export class DataPipelineStack extends cdk.Stack {
     topicModellingTrigger.addDependency(workflow);
 
     // Apply removal policy to all resources
-    Object.values(jobs).forEach(job => job.applyRemovalPolicy(RemovalPolicy.DESTROY));
+    Object.values(jobs).forEach((job) =>
+      job.applyRemovalPolicy(RemovalPolicy.DESTROY)
+    );
     workflow.applyRemovalPolicy(RemovalPolicy.DESTROY);
   }
 }
-

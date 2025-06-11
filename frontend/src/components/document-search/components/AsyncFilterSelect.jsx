@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import AsyncSelect from "react-select/async";
 
-export default function AsyncFilterSelect({ 
-  title, 
-  options, 
+export default function AsyncFilterSelect({
+  title,
+  options,
   filters,
   setFilters,
   placeholder = "Search...",
@@ -19,16 +19,16 @@ export default function AsyncFilterSelect({
   }, []);
 
   // Convert option format for react-select
-  const availableOptions = Object.keys(filters).map(item => ({
+  const availableOptions = Object.keys(filters).map((item) => ({
     label: item,
-    value: item
+    value: item,
   }));
 
   // Handle search function for AsyncSelect
   const loadOptions = async (inputValue) => {
     if (!inputValue) return availableOptions;
-    
-    return availableOptions.filter(option =>
+
+    return availableOptions.filter((option) =>
       option.label.toLowerCase().includes(inputValue.toLowerCase())
     );
   };
@@ -36,22 +36,22 @@ export default function AsyncFilterSelect({
   // Update filters when selection changes
   const handleSelectionChange = (selected) => {
     setSelectedOptions(selected || []);
-    
+
     // Update filter states to match selection
     const updatedFilters = { ...filters };
-    
+
     // First, set all to false
-    Object.keys(updatedFilters).forEach(key => {
+    Object.keys(updatedFilters).forEach((key) => {
       updatedFilters[key] = false;
     });
-    
+
     // Then set selected ones to true
-    (selected || []).forEach(option => {
+    (selected || []).forEach((option) => {
       if (updatedFilters.hasOwnProperty(option.value)) {
         updatedFilters[option.value] = true;
       }
     });
-    
+
     setFilters(updatedFilters);
   };
 
@@ -73,19 +73,19 @@ export default function AsyncFilterSelect({
         styles={{
           control: (base) => ({
             ...base,
-            backgroundColor: 'white',
+            backgroundColor: "white",
           }),
           menu: (base) => ({
             ...base,
-            backgroundColor: 'white',
+            backgroundColor: "white",
             zIndex: 50,
           }),
-          menuPortal: (base) => ({ 
-            ...base, 
-            zIndex: 9999 
+          menuPortal: (base) => ({
+            ...base,
+            zIndex: 9999,
           }),
         }}
-        menuPortalTarget={typeof window !== 'undefined' ? document.body : null}
+        menuPortalTarget={typeof window !== "undefined" ? document.body : null}
       />
     </div>
   );
