@@ -774,13 +774,25 @@ export class ApiGatewayStack extends cdk.Stack {
           OPENSEARCH_INDEX_NAME: indexNameParameter.parameterName,
           RDS_SEC: rdsSecParameter.parameterName,
           DFO_HTML_FULL_INDEX_NAME: dfoHtmlFullIndexNameParameter.parameterName,
-          DFO_MANDATE_FULL_INDEX_NAME: dfoMandateFullIndexNameParameter.stringValue,
+          DFO_MANDATE_FULL_INDEX_NAME: dfoMandateFullIndexNameParameter.parameterName,
           BEDROCK_INFERENCE_PROFILE: bedrockInferenceProfileParameter.parameterName,
-          INDEX_NAME: indexNameParameter.stringValue,
-          DFO_TOPIC_FULL_INDEX_NAME: dfoTopicFullIndexNameParameter.stringValue,
+          INDEX_NAME: indexNameParameter.parameterName,
+          DFO_TOPIC_FULL_INDEX_NAME: dfoTopicFullIndexNameParameter.parameterName,
         },
       }
     );
+
+    bedrockLLMParameter.grantRead(textGenFunc);
+    embeddingModelParameter.grantRead(textGenFunc);
+    tableNameParameter.grantRead(textGenFunc);
+    opensearchHostParameter.grantRead(textGenFunc);
+    opensearchSecParameter.grantRead(textGenFunc);
+    indexNameParameter.grantRead(textGenFunc);
+    rdsSecParameter.grantRead(textGenFunc);
+    dfoHtmlFullIndexNameParameter.grantRead(textGenFunc);
+    dfoMandateFullIndexNameParameter.grantRead(textGenFunc);
+    bedrockInferenceProfileParameter.grantRead(textGenFunc);
+    dfoTopicFullIndexNameParameter.grantRead(textGenFunc);
 
     // Override the Logical ID of the Lambda Function to get ARN in OpenAPI
     const cfnTextGenDockerFunc = textGenFunc.node
@@ -819,6 +831,7 @@ export class ApiGatewayStack extends cdk.Stack {
         "bedrock:CreateGuardrailVersion",
         "bedrock:DescribeGuardrail",
         "bedrock:GetGuardrail",
+        "bedrock:InvokeModelWithResponseStream"
       ],
       resources: ["*"],
     });
