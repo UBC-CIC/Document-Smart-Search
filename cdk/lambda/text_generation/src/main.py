@@ -5,10 +5,11 @@ import boto3
 import logging
 import uuid
 import datetime
-from opensearchpy import OpenSearch
+from opensearchpy import OpenSearch, RequestsHttpConnection
 import psycopg
 from langchain_aws import BedrockEmbeddings
 import time
+from aws_requests_auth.aws_auth import AWSRequestsAuth
 
 # Import helpers
 # from helpers.db import get_rds_connection
@@ -34,7 +35,6 @@ KEYWORD_RATIO_OS_P = 0.3
 SEMANTIC_RATIO_OS_P = 0.7
 
 # Globals to be populated by init_constants()
-OPENSEARCH_SEC = None
 OPENSEARCH_HOST = None
 INDEX_NAME = None
 RDS_SEC = None
@@ -58,7 +58,7 @@ ssm_client = None # boto3.client("ssm", region_name=REGION)
 bedrock_runtime = None # boto3.client("bedrock-runtime", region_name=REGION)
 
 def init_constants():
-    global OPENSEARCH_SEC, OPENSEARCH_HOST, INDEX_NAME, RDS_SEC
+    global OPENSEARCH_HOST, INDEX_NAME, RDS_SEC
     global DFO_HTML_FULL_INDEX_NAME, DFO_MANDATE_FULL_INDEX_NAME, DFO_TOPIC_FULL_INDEX_NAME
     global BEDROCK_INFERENCE_PROFILE
     global RDS_PROXY_ENDPOINT, SM_DB_CREDENTIALS, TABLE_NAME_PARAM, EMBEDDING_MODEL_PARAM, BEDROCK_LLM_PARAM, REGION
@@ -79,7 +79,6 @@ def init_constants():
     EMBEDDING_MODEL_PARAM = os.environ["EMBEDDING_MODEL_PARAM"]
     TABLE_NAME_PARAM = os.environ["TABLE_NAME_PARAM"]
     OPENSEARCH_HOST = get_parameter(os.environ["OPENSEARCH_HOST"])
-    OPENSEARCH_SEC = get_parameter(os.environ["OPENSEARCH_SEC"])
     INDEX_NAME = get_parameter(os.environ["OPENSEARCH_INDEX_NAME"])
     RDS_SEC = get_parameter(os.environ["RDS_SEC"])
     DFO_HTML_FULL_INDEX_NAME = get_parameter(os.environ["DFO_HTML_FULL_INDEX_NAME"])
@@ -392,22 +391,34 @@ def handler(event, context):
 
     try:
         # Initialize OpenSearch, DB, and get configuration values
-        secrets = get_secret(OPENSEARCH_SEC)
-        opensearch_host = get_parameter(OPENSEARCH_HOST)
+        # secrets = get_secret(OPENSEARCH_SEC)
+        credentials = boto3.Session().get_credentials().get_frozen_credentials()
+        auth = AWSRequestsAuth(
+            aws_access_key=credentials.access_key,
+            aws_secret_access_key=credentials.secret_key,
+            aws_token=credentials.token,
+            aws_host=OPENSEARCH_HOST,
+            aws_region=REGION,
+            aws_service='es'
+        )
+        opensearch_host = OPENSEARCH_HOST
         opensearch_client = OpenSearch(
             hosts=[{'host': opensearch_host, 'port': 443}],
             http_compress=True,
-            http_auth=(secrets['username'], secrets['password']),
+            http_auth=auth,
             use_ssl=True,
-            verify_certs=True
+            verify_certs=True,
+            connection_class=RequestsHttpConnection,
         )
-        
+        logger.info("Hybrid search pipeline creation started...")
         create_hybrid_search_pipeline(
             client=opensearch_client,
             pipeline_name=SEARCH_PIPELINE_NAME,
             keyword_weight=KEYWORD_RATIO_OS_P,
             semantic_weight=SEMANTIC_RATIO_OS_P
         )
+
+        logger.info("Hybrid search pipeline created successfully.")
 
         # Set up RDS connection - This is hard coded to a test database for now
         tools_rds_secret = get_secret(RDS_SEC)

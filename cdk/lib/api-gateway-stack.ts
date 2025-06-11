@@ -548,6 +548,48 @@ export class ApiGatewayStack extends cdk.Stack {
       }
     );
 
+    const opensearchHostParameter = new ssm.StringParameter(this, "OpensearchHostParameter", {
+      parameterName: `/${id}/DFO/OpensearchHost`,
+      description: "Opensearch host",
+      stringValue: osStack.domain.domainEndpoint,
+    });
+
+    const indexNameParameter = new ssm.StringParameter(this, "IndexNameParameter", {
+      parameterName: `/${id}/DFO/IndexName`,
+      description: "Opensearch index name",
+      stringValue: "dfo-html-full-index",
+    });
+
+    const dfoMandateFullIndexNameParameter = new ssm.StringParameter(this, "DfoMandateFullIndexNameParameter", {
+      parameterName: `/${id}/DFO/DfoMandateFullIndexName`,
+      description: "DFO Mandate full index name",
+      stringValue: "dfo-mandate-full-index",
+    });
+
+    const rdsSecParameter = new ssm.StringParameter(this, "RdsSecParameter", {
+      parameterName: `/${id}/DFO/RdsSec`,
+      description: "RDS security credentials",
+      stringValue: "rds/dfo-db-glue-test",
+    });
+
+    const dfoHtmlFullIndexNameParameter = new ssm.StringParameter(this, "DfoHtmlFullIndexNameParameter", {
+      parameterName: `/${id}/DFO/DfoHtmlFullIndexName`,
+      description: "DFO HTML full index name",
+      stringValue: "dfo-html-full-index",
+    });
+
+    const bedrockInferenceProfileParameter = new ssm.StringParameter(this, "BedrockInferenceProfileParameter", {
+      parameterName: `/${id}/DFO/BedrockInferenceProfile`,
+      description: "Bedrock inference profile for text generation",
+      stringValue: "us.meta.llama3-3-70b-instruct-v1:0",
+    });
+
+    const dfoTopicFullIndexNameParameter = new ssm.StringParameter(this, "DfoTopicFullIndexNameParameter", {
+      parameterName: `/${id}/DFO/DfoTopicFullIndexName`,
+      description: "DFO Topic full index name",
+      stringValue: "dfo-topic-full-index",
+    });
+
     /**
      * Create Lambda with container image for text generation workflow in RAG pipeline
      */
@@ -569,9 +611,28 @@ export class ApiGatewayStack extends cdk.Stack {
           BEDROCK_LLM_PARAM: bedrockLLMParameter.parameterName,
           EMBEDDING_MODEL_PARAM: embeddingModelParameter.parameterName,
           TABLE_NAME_PARAM: tableNameParameter.parameterName,
+          OPENSEARCH_HOST: opensearchHostParameter.parameterName,
+          OPENSEARCH_INDEX_NAME: indexNameParameter.parameterName,
+          RDS_SEC: rdsSecParameter.parameterName,
+          DFO_HTML_FULL_INDEX_NAME: dfoHtmlFullIndexNameParameter.parameterName,
+          DFO_MANDATE_FULL_INDEX_NAME: dfoMandateFullIndexNameParameter.parameterName,
+          BEDROCK_INFERENCE_PROFILE: bedrockInferenceProfileParameter.parameterName,
+          INDEX_NAME: indexNameParameter.parameterName,
+          DFO_TOPIC_FULL_INDEX_NAME: dfoTopicFullIndexNameParameter.parameterName,
         },
       }
     );
+
+    bedrockLLMParameter.grantRead(textGenFunc);
+    embeddingModelParameter.grantRead(textGenFunc);
+    tableNameParameter.grantRead(textGenFunc);
+    opensearchHostParameter.grantRead(textGenFunc);
+    indexNameParameter.grantRead(textGenFunc);
+    rdsSecParameter.grantRead(textGenFunc);
+    dfoHtmlFullIndexNameParameter.grantRead(textGenFunc);
+    dfoMandateFullIndexNameParameter.grantRead(textGenFunc);
+    bedrockInferenceProfileParameter.grantRead(textGenFunc);
+    dfoTopicFullIndexNameParameter.grantRead(textGenFunc);
 
     // Override the Logical ID of the Lambda Function to get ARN in OpenAPI
     const cfnTextGenDockerFunc = textGenFunc.node
@@ -599,8 +660,40 @@ export class ApiGatewayStack extends cdk.Stack {
       ],
     });
 
+    const bedrockGuardrailPolicyStatement = new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: [
+        "bedrock:ApplyGuardrail",
+        "bedrock:InvokeModel",
+        "bedrock:InvokeEndpoint",
+        "bedrock:ListGuardrails",
+        "bedrock:CreateGuardrail",
+        "bedrock:CreateGuardrailVersion",
+        "bedrock:DescribeGuardrail",
+        "bedrock:GetGuardrail",
+        "bedrock:InvokeModelWithResponseStream"
+      ],
+      resources: ["*"],
+    });
+
+    const openSearchPolicyStatement = new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: [
+        "es:ESHttpGet",
+        "es:ESHttpPut",
+      ],
+      resources: [
+        `arn:aws:es:${this.region}:${this.account}:domain/${osStack.domain.domainName}/*`,
+      ],
+    });
+
+
     // Attach the custom Bedrock policy to Lambda function
     textGenFunc.addToRolePolicy(bedrockPolicyStatement);
+
+    textGenFunc.addToRolePolicy(openSearchPolicyStatement);
+
+    textGenFunc.addToRolePolicy(bedrockGuardrailPolicyStatement); 
     
     // TODO: Restrict this later!
     textGenFunc.addToRolePolicy(
