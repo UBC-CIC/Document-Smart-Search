@@ -1,8 +1,6 @@
-# DFO
+# Smart Document Categorization System
 
-This prototype explores how Large Language Models (LLMs) can enhance digital learning by providing an accessible and interactive way for the general public, educators, and administrators to engage with the Department of Fisheries and Oceans (DFO). Acting as a conversational guide, the chatbot allows users to ask questions and receive tailored responses aligned with DFO principles and recommendations. This approach fosters a broader understanding of technology-enhanced learning, making digital literacy concepts and strategies more approachable and relevant across educational and public contexts.
-
-
+This system explores how Large Language Models (LLMs) and vector embeddings can enhance document organization by providing an intelligent and automated way to categorize and analyze large collections of documents. Acting as a smart document processor, the system automatically identifies relevant topics and mandates for each document, providing explainable categorizations with confidence scores. The system also allows for chatbot functionality, where users can ask questions and receive tailored responses aligned with topics and mandates. This approach makes document management more efficient and insightful, enabling better organization and discovery of information across large document repositories.
 
 | Index                                               | Description                                             |
 | :-------------------------------------------------- | :------------------------------------------------------ |
@@ -32,66 +30,82 @@ Please refer to the [Web App User Guide](./docs/userGuide.md) for instructions o
 ## Directories
 
 ```
-├── cdk
-│   ├── bin
-│   ├── data_ingestion
-│   ├── lambda
-│   ├── layers
-│   ├── lib
-│   └── text_generation
-├── docs
-├── frontend
-│   ├── public
-│   └── src
-│       ├── app
-│       └── components
-│           ├── chat
-│           ├── home
-│           └── ui
-└── frontendAdmin
-    ├── public
-    └── src
-        ├── app
-        └── components
-            ├── analytics
-            ├── auth
-            ├── categories
-            ├── files
-            ├── history
-            ├── prompt
-            └── ui
-
-
+├── cdk/                           # AWS CDK infrastructure code
+│   ├── bin/                       # CDK app entry point
+│   ├── data_ingestion/           # Data ingestion components
+│   ├── file_search/              # File search functionality
+│   ├── glue/                     # AWS Glue jobs and scripts
+│   │   ├── scripts/              # Glue job scripts
+│   │   └── custom_modules/       # Shared Python modules
+│   ├── lambda/                   # AWS Lambda functions
+│   ├── layers/                   # Lambda layers
+│   ├── lib/                      # CDK stack definitions
+│   ├── sql_schema/              # Database schema definitions
+│   └── text_generation/         # Text generation components
+├── docs/                         # Project documentation
+├── export/                       # Export files
+├── frontend/                     # Public-facing web application
+│   ├── public/                   # Static assets
+│   └── src/                      # Source code
+│       ├── app/                  # Next.js app router
+│       └── components/           # React components
+│           ├── analytics/        # Analytics components
+│           ├── chat/            # Chat interface components
+│           ├── document-detail/ # Document detail view
+│           ├── document-search/ # Document search interface
+│           ├── home/            # Home page components
+│           └── ui/              # Shared UI components
+└── frontendAdmin/                # Admin web application
+    ├── public/                   # Static assets
+    └── src/                      # Source code
+        ├── app/                  # Next.js app router
+        └── components/           # React components
+            ├── analytics/        # Analytics dashboard
+            ├── auth/            # Authentication components
+            ├── feedback/        # User feedback components
+            ├── history/         # History tracking
+            ├── prompt/          # Prompt management
+            └── ui/              # Shared UI components
 ```
 
-1. `/cdk`: Contains the deployment code for the app's AWS infrastructure
-   - `/bin`: Contains the instantiation of CDK stack
-   - `/data_ingestion`: Contains the code required for the Data Ingestion step in retrieval-augmented generation. This folder is used by a Lambda function that runs a container which updates the vectorstore for a course when files are uploaded or deleted.
-   - `/lambda`: Contains the lambda functions for the project
-   - `/layers`: Contains the required layers for lambda functions
-   - `/lib`: Contains the deployment code for all infrastructure stacks
-   - `/text_generation`: Contains the code required for the Text Generation step in retrieval-augmented generation. This folder is used by a Lambda function that runs a container which retrieves specific documents and invokes the LLM to generate appropriate responses during a conversation.
-2. `/docs`: Contains documentation for the application
-3. `/frontend`: Contains the user interface of the general public application
-   - `/public`: public assets used in the application
-   - `/src`: contains the frontend code of the application
-     - `/app`: Nextjs App Router
-     - `/components`: Contains components used in the application
-       - `/chat`: Contains chat components used in the application
-       - `/home`: Contains home components used in the application
-       - `/ui`: Contains shadcn ui components used in the application
-4. `/frontendAdmin`: Contains the user interface of the administrator application
-   - `/public`: public assets used in the application
-   - `/src`: contains the frontend code of the application
-     - `/app`: Nextjs App Router
-     - `/components`: Contains components used in the application
-       - `/analytics`: Contains chat components used in the application
-       - `/auth`: Contains auth components used in the application
-       - `/categories`: Contains category components used in the application
-       - `/files`: Contains file components used in the application
-       - `/history`: Contains chat history components used in the application
-       - `/prompt`: Contains prompt modification components used in the application
-       - `/ui`: Contains shadcn ui components used in the application
+1. `/cdk`: Contains the AWS CDK infrastructure code
+   - `/bin`: CDK app entry point and stack instantiation
+   - `/data_ingestion`: Data ingestion pipeline components
+   - `/file_search`: File search and indexing functionality
+   - `/glue`: AWS Glue jobs for data processing
+     - `/scripts`: Glue job Python scripts
+     - `/custom_modules`: Shared Python modules
+   - `/lambda`: AWS Lambda functions
+   - `/layers`: Lambda layers for shared dependencies
+   - `/lib`: CDK stack definitions and infrastructure code
+   - `/sql_schema`: Database schema and migration files
+   - `/text_generation`: Text generation and processing components
+
+2. `/docs`: Project documentation and guides
+
+3. `/frontend`: Public-facing web application
+   - `/public`: Static assets and public files
+   - `/src`: Application source code
+     - `/app`: Next.js app router and pages
+     - `/components`: React components and UI elements
+       - `/analytics`: Analytics and reporting components
+       - `/chat`: Chat interface and messaging components
+       - `/document-detail`: Document viewing and details
+       - `/document-search`: Search interface and results
+       - `/home`: Home page and landing components
+       - `/ui`: Shared UI components and styles
+
+4. `/frontendAdmin`: Administrative web application
+   - `/public`: Static assets and public files
+   - `/src`: Application source code
+     - `/app`: Next.js app router and pages
+     - `/components`: React components and UI elements
+       - `/analytics`: Analytics dashboard and metrics
+       - `/auth`: Authentication and authorization
+       - `/feedback`: User feedback management
+       - `/history`: History tracking and logs
+       - `/prompt`: Prompt management and configuration
+       - `/ui`: Shared UI components and styles
 
 ## API Documentation
 
@@ -107,7 +121,7 @@ N/A
 
 ## Credits
 
-This application was architected and developed by [Kanish Khanna](https://www.linkedin.com/in/kanishkhanna/), [Sean Woo](https://www.linkedin.com/in/seanwoo4/), [Aurora Cheng](https://www.linkedin.com/in/aurora-cheng04/), [Harshinee Sriram](https://www.linkedin.com/in/harshineesriram/), and [Aman Prakash](https://www.linkedin.com/in/aman-prakash-aa48b421b/), with project assistance by [Amy Cao](https://www.linkedin.com/in/amy-c-2313121b1/). Thanks to the UBC Cloud Innovation Centre Technical and Project Management teams for their guidance and support.
+This application was architected and developed by [Daniel Long](https://www.linkedin.com/in/pin-hong-long/), [Tien Nguyen](https://www.linkedin.com/in/nhantien/), [Nikhil Sinclair](https://www.linkedin.com/in/nikhil-sinclair/), and [Zayan Sheikh](https://www.linkedin.com/in/zayans/), with project assistance by [Amy Cao](https://www.linkedin.com/in/amy-c-2313121b1/) and Harleen Chahal. Thanks to the UBC Cloud Innovation Centre Technical and Project Management teams for their guidance and support.
 
 ## License
 
@@ -120,6 +134,6 @@ Licenses of libraries and tools used by the system are listed below:
 - For PostgreSQL and pgvector
 - "a liberal Open Source license, similar to the BSD or MIT licenses."
 
-[LLaMa 3 Community License Agreement](https://llama.meta.com/llama3/license/)
+[LLaMa 3.3 Community License Agreement](https://www.llama.com/llama3_3/license/)
 
-- For Llama 3 70B Instruct model
+- For Llama 3.3 70B Instruct model
