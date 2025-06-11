@@ -28,6 +28,8 @@ import { createS3Buckets } from "./api-gateway-helpers/s3";
 import { createLayers } from "./api-gateway-helpers/layers";
 import { createRolesAndPolicies } from "./api-gateway-helpers/roles";
 import { DockerImageAsset, Platform } from 'aws-cdk-lib/aws-ecr-assets';
+import * as wafv2 from "aws-cdk-lib/aws-wafv2";
+import { table } from "console";
 
 export class ApiGatewayStack extends cdk.Stack {
   private readonly api: apigateway.SpecRestApi;
@@ -54,9 +56,6 @@ export class ApiGatewayStack extends cdk.Stack {
   ) {
     super(scope, id, props);
 
-
-
-
     const osEndpoint = ssm.StringParameter.valueForStringParameter(
       this,
       `/${osStack.stackName}/opensearch/host`
@@ -82,10 +81,6 @@ export class ApiGatewayStack extends cdk.Stack {
       `${id}-PowertoolsLayer`,
       `arn:aws:lambda:${this.region}:017000801446:layer:AWSLambdaPowertoolsPythonV2:78`
     );
-
-    this.layerList["psycopg2"] = psycopgLayer;
-    this.layerList["postgres"] = postgres;
-    this.layerList["jwt"] = jwt;
 
     const { userPool, appClient, identityPool, secret } =
       createCognitoResources(this, id);
@@ -137,6 +132,64 @@ export class ApiGatewayStack extends cdk.Stack {
 
     this.stageARN_APIGW = this.api.deploymentStage.stageArn;
     this.apiGW_basedURL = this.api.urlForPath();
+
+    // Waf Firewall
+    const waf = new wafv2.CfnWebACL(this, `${id}-waf`, {
+      description: "waf for DFO",
+      scope: "REGIONAL",
+      defaultAction: { allow: {} },
+      visibilityConfig: {
+        sampledRequestsEnabled: true,
+        cloudWatchMetricsEnabled: true,
+        metricName: "DFO-firewall",
+      },
+      rules: [
+        {
+          name: "AWS-AWSManagedRulesCommonRuleSet",
+          priority: 1,
+          statement: {
+            managedRuleGroupStatement: {
+              vendorName: "AWS",
+              name: "AWSManagedRulesCommonRuleSet",
+            },
+          },
+          overrideAction: { none: {} },
+          visibilityConfig: {
+            sampledRequestsEnabled: true,
+            cloudWatchMetricsEnabled: true,
+            metricName: "AWS-AWSManagedRulesCommonRuleSet",
+          },
+        },
+        {
+          name: "LimitRequests1000",
+          priority: 2,
+          action: {
+            block: {},
+          },
+          statement: {
+            rateBasedStatement: {
+              limit: 1000,
+              aggregateKeyType: "IP",
+            },
+          },
+          visibilityConfig: {
+            sampledRequestsEnabled: true,
+            cloudWatchMetricsEnabled: true,
+            metricName: "LimitRequests1000",
+          },
+        },
+      ],
+    });
+    const wafAssociation = new wafv2.CfnWebACLAssociation(
+      this,
+      `${id}-waf-association`,
+      {
+        resourceArn: `arn:aws:apigateway:${this.region}::/restapis/${this.api.restApiId}/stages/${this.api.deploymentStage.stageName}`,
+        webAclArn: waf.attrArn,
+      }
+    );
+
+    wafAssociation.node.addDependency(this.api.deploymentStage);
 
     const { adminRole, unauthenticatedRole } = createRolesAndPolicies(
       this,
@@ -463,6 +516,73 @@ export class ApiGatewayStack extends cdk.Stack {
       .defaultChild as lambda.CfnFunction;
     apiGW_authorizationFunction.overrideLogicalId("adminLambdaAuthorizer");
 
+    const jwtSecret = new secretsmanager.Secret(this, `${id}-JwtSecret`, {
+      secretName: `${id}-DFO-JWTSecret`,
+      generateSecretString: {
+        secretStringTemplate: JSON.stringify({}),
+        generateStringKey: 'jwtSecret',
+        excludePunctuation: true,
+        passwordLength: 64,
+      },
+    });
+
+
+    const userAuthFunction = new lambda.Function(
+      this,
+      `${id}-user-authorization-api-gateway`,
+      {
+        runtime: lambda.Runtime.NODEJS_20_X,
+        code: lambda.Code.fromAsset("lambda/userAuthorizerFunction"),
+        handler: "userAuthorizerFunction.handler",
+        timeout: Duration.seconds(300),
+        memorySize: 256,
+        layers: [jwt],
+        role: lambdaRole,
+        environment: {
+          JWT_SECRET: jwtSecret.secretArn,
+        },
+        functionName: `${id}-userLambdaAuthorizer`,
+      }
+    );
+
+      jwtSecret.grantRead(userAuthFunction);
+
+        const publicTokenLambda = new lambda.Function(this, `${id}-PublicTokenFunction`, {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: "publicTokenFunction.handler",
+      layers: [jwt],
+      code: lambda.Code.fromAsset("lambda/publicTokenFunction"),
+      environment: {
+        JWT_SECRET: jwtSecret.secretArn,
+      },
+      timeout: Duration.seconds(30),
+      memorySize: 128,
+      role: lambdaRole,
+    });
+
+    jwtSecret.grantRead(publicTokenLambda);
+
+    // Add the permission to the Lambda function's policy to allow API Gateway access
+    publicTokenLambda.grantInvoke(
+      new iam.ServicePrincipal("apigateway.amazonaws.com")
+    );
+
+    // Change Logical ID to match the one decleared in YAML file of Open API
+    const apiGW_publicTokenFunction = publicTokenLambda.node
+      .defaultChild as lambda.CfnFunction;
+    apiGW_publicTokenFunction.overrideLogicalId("PublicTokenFunction");
+
+    // Add the permission to the Lambda function's policy to allow API Gateway access
+    userAuthFunction.grantInvoke(
+      new iam.ServicePrincipal("apigateway.amazonaws.com")
+    );
+
+    // Change Logical ID to match the one decleared in YAML file of Open API
+    const apiGW_userauthorizationFunction = userAuthFunction.node
+      .defaultChild as lambda.CfnFunction;
+    apiGW_userauthorizationFunction.overrideLogicalId("userLambdaAuthorizer");
+
+
     // Create parameters for Bedrock LLM ID, Embedding Model ID, and Table Name in Parameter Store
     const bedrockLLMParameter = new ssm.StringParameter(
       this,
@@ -493,6 +613,55 @@ export class ApiGatewayStack extends cdk.Stack {
       }
     );
 
+
+    const opensearchSecParameter = new ssm.StringParameter(this, "OpensearchSecParameter", {
+      parameterName: `/${id}/DFO/OpensearchSec`,
+      description: "Opensearch security credentials",
+      stringValue: "opensearch-masteruser-test-glue",
+    });
+
+    const opensearchHostParameter = new ssm.StringParameter(this, "OpensearchHostParameter", {
+      parameterName: `/${id}/DFO/OpensearchHost`,
+      description: "Opensearch host",
+      stringValue: "opensearch-host-test-glue",
+    });
+
+    const indexNameParameter = new ssm.StringParameter(this, "IndexNameParameter", {
+      parameterName: `/${id}/DFO/IndexName`,
+      description: "Opensearch index name",
+      stringValue: "dfo-html-full-index",
+    });
+
+    const dfoMandateFullIndexNameParameter = new ssm.StringParameter(this, "DfoMandateFullIndexNameParameter", {
+      parameterName: `/${id}/DFO/DfoMandateFullIndexName`,
+      description: "DFO Mandate full index name",
+      stringValue: "dfo-mandate-full-index",
+    });
+
+    const rdsSecParameter = new ssm.StringParameter(this, "RdsSecParameter", {
+      parameterName: `/${id}/DFO/RdsSec`,
+      description: "RDS security credentials",
+      stringValue: "rds/dfo-db-glue-test",
+    });
+
+    const dfoHtmlFullIndexNameParameter = new ssm.StringParameter(this, "DfoHtmlFullIndexNameParameter", {
+      parameterName: `/${id}/DFO/DfoHtmlFullIndexName`,
+      description: "DFO HTML full index name",
+      stringValue: "dfo-html-full-index",
+    });
+
+    const bedrockInferenceProfileParameter = new ssm.StringParameter(this, "BedrockInferenceProfileParameter", {
+      parameterName: `/${id}/DFO/BedrockInferenceProfile`,
+      description: "Bedrock inference profile for text generation",
+      stringValue: "us.meta.llama3-3-70b-instruct-v1:0",
+    });
+
+    const dfoTopicFullIndexNameParameter = new ssm.StringParameter(this, "DfoTopicFullIndexNameParameter", {
+      parameterName: `/${id}/DFO/DfoTopicFullIndexName`,
+      description: "DFO Topic full index name",
+      stringValue: "dfo-topic-full-index",
+    });
+
     /**
      * Create Lambda with container image for text generation workflow in RAG pipeline
      */
@@ -514,9 +683,30 @@ export class ApiGatewayStack extends cdk.Stack {
           BEDROCK_LLM_PARAM: bedrockLLMParameter.parameterName,
           EMBEDDING_MODEL_PARAM: embeddingModelParameter.parameterName,
           TABLE_NAME_PARAM: tableNameParameter.parameterName,
+          OPENSEARCH_HOST: opensearchHostParameter.parameterName,
+          OPENSEARCH_SEC: opensearchSecParameter.parameterName,
+          OPENSEARCH_INDEX_NAME: indexNameParameter.parameterName,
+          RDS_SEC: rdsSecParameter.parameterName,
+          DFO_HTML_FULL_INDEX_NAME: dfoHtmlFullIndexNameParameter.parameterName,
+          DFO_MANDATE_FULL_INDEX_NAME: dfoMandateFullIndexNameParameter.parameterName,
+          BEDROCK_INFERENCE_PROFILE: bedrockInferenceProfileParameter.parameterName,
+          INDEX_NAME: indexNameParameter.parameterName,
+          DFO_TOPIC_FULL_INDEX_NAME: dfoTopicFullIndexNameParameter.parameterName,
         },
       }
     );
+
+    bedrockLLMParameter.grantRead(textGenFunc);
+    embeddingModelParameter.grantRead(textGenFunc);
+    tableNameParameter.grantRead(textGenFunc);
+    opensearchHostParameter.grantRead(textGenFunc);
+    opensearchSecParameter.grantRead(textGenFunc);
+    indexNameParameter.grantRead(textGenFunc);
+    rdsSecParameter.grantRead(textGenFunc);
+    dfoHtmlFullIndexNameParameter.grantRead(textGenFunc);
+    dfoMandateFullIndexNameParameter.grantRead(textGenFunc);
+    bedrockInferenceProfileParameter.grantRead(textGenFunc);
+    dfoTopicFullIndexNameParameter.grantRead(textGenFunc);
 
     // Override the Logical ID of the Lambda Function to get ARN in OpenAPI
     const cfnTextGenDockerFunc = textGenFunc.node
@@ -544,37 +734,35 @@ export class ApiGatewayStack extends cdk.Stack {
       ],
     });
 
+    const bedrockGuardrailPolicyStatement = new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: [
+        "bedrock:ApplyGuardrail",
+        "bedrock:InvokeModel",
+        "bedrock:InvokeEndpoint",
+        "bedrock:ListGuardrails",
+        "bedrock:CreateGuardrail",
+        "bedrock:CreateGuardrailVersion",
+        "bedrock:DescribeGuardrail",
+        "bedrock:GetGuardrail",
+        "bedrock:InvokeModelWithResponseStream"
+      ],
+      resources: ["*"],
+    });
+
+
+
     // Attach the custom Bedrock policy to Lambda function
     textGenFunc.addToRolePolicy(bedrockPolicyStatement);
+
+    textGenFunc.addToRolePolicy(bedrockGuardrailPolicyStatement); 
     
-    // TODO: Restrict this later!
     textGenFunc.addToRolePolicy(
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
-        actions: ["ssm:*"],
-        resources: ["arn:aws:ssm:*:*:parameter/*"],
-      })
-    );
-    
-    // TODO: Restrict this later!
-    textGenFunc.addToRolePolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: ["bedrock:*"],
-        resources: ["*"],
-      })
-    );
-    
-    // Grant access to Secret Manager
-    textGenFunc.addToRolePolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: [
-          //Secrets Manager
-          "secretsmanager:GetSecretValue",
-        ],
+        actions: ["secretsmanager:GetSecretValue"],
         resources: [
-          `arn:aws:secretsmanager:${this.region}:${this.account}:secret:*`,
+          `arn:aws:secretsmanager:${this.region}:${this.account}:secret:*`
         ],
       })
     );

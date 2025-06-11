@@ -1,3 +1,4 @@
+import { getUserToken } from "@/lib/getUserToken";
 import { allMockResults, filterOptions as defaultFilters } from "../data/defaultData"
 
 // Simple boolean flag to enable/disable mock data
@@ -18,10 +19,13 @@ export async function fetchFilterOptions() {
     const url = new URL(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/filters`);
     // url.searchParams.append("filters", filtersToRequest.join(","));
 
+    // Fetch user auth token
+    const token = await getUserToken();
     const response = await fetch(url, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
       }
     });
 
@@ -71,10 +75,13 @@ export async function performDocumentSearch(query, filters) {
     // console.log("Transformed filters:", transformedFilters)
     // console.log("JSON SENDING:", JSON.stringify({ query, filters: transformedFilters }, null, 2))
 
+    // Fetch user auth token
+    const token = await getUserToken();
     const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/hybrid-search`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
       },
       body: JSON.stringify({
         user_query: query,

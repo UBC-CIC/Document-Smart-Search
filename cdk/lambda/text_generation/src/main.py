@@ -28,48 +28,64 @@ from helpers.tools.setup import initialize_tools
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
 
-# Environment variables
-# DB_SECRET_NAME = os.environ["SM_DB_CREDENTIALS"]
-# REGION = os.environ["REGION"]
-# RDS_PROXY_ENDPOINT = os.environ["RDS_PROXY_ENDPOINT"]
-# BEDROCK_LLM_PARAM = os.environ["BEDROCK_LLM_PARAM"]
-# EMBEDDING_MODEL_PARAM = os.environ["EMBEDDING_MODEL_PARAM"]
-# DYNAMODB_TABLE_NAME = os.environ["TABLE_NAME_PARAM"]
-
 # Constants
 SEARCH_PIPELINE_NAME = "html_hybrid_search"
 KEYWORD_RATIO_OS_P = 0.3
 SEMANTIC_RATIO_OS_P = 0.7
 
-# Hardcoded constants (for now)
-OPENSEARCH_SEC = "opensearch-masteruser-test-glue"
-OPENSEARCH_HOST = "opensearch-host-test-glue"
-INDEX_NAME = "dfo-html-full-index"
-RDS_SEC = "rds/dfo-db-glue-test"
+# Globals to be populated by init_constants()
+OPENSEARCH_SEC = None
+OPENSEARCH_HOST = None
+INDEX_NAME = None
+RDS_SEC = None
 
-DFO_HTML_FULL_INDEX_NAME = "dfo-html-full-index"
-DFO_MANDATE_FULL_INDEX_NAME = "dfo-mandate-full-index"
-DFO_TOPIC_FULL_INDEX_NAME = "dfo-topic-full-index"
+DFO_HTML_FULL_INDEX_NAME = None
+DFO_MANDATE_FULL_INDEX_NAME = None
+DFO_TOPIC_FULL_INDEX_NAME = None
 
-# REGION_NAME = "us-west-2"
-# EMBEDDING_MODEL_PARAM = "amazon.titan-embed-text-v2:0"
-# Other parameters - these should be passed in as environment variables
-BEDROCK_INFERENCE_PROFILE = "us.meta.llama3-3-70b-instruct-v1:0"
-# EMBEDDING_MODEL_ID = "amazon.titan-embed-text-v2:0"
-# DYNAMODB_TABLE_NAME = "DynamoDB-Conversation-Table"
+BEDROCK_INFERENCE_PROFILE = None
 
-# Constants from the original stack
-RDS_PROXY_ENDPOINT = os.environ["RDS_PROXY_ENDPOINT"]
-SM_DB_CREDENTIALS = os.environ["SM_DB_CREDENTIALS"]
-TABLE_NAME_PARAM = os.environ["TABLE_NAME_PARAM"]
-EMBEDDING_MODEL_PARAM = os.environ["EMBEDDING_MODEL_PARAM"]
-BEDROCK_LLM_PARAM = os.environ["BEDROCK_LLM_PARAM"]
-REGION = os.environ["REGION"]
+RDS_PROXY_ENDPOINT = None
+SM_DB_CREDENTIALS = None
+TABLE_NAME_PARAM = None
+EMBEDDING_MODEL_PARAM = None
+BEDROCK_LLM_PARAM = None
+REGION = None
 
 # AWS Clients
-secrets_manager_client = boto3.client("secretsmanager", region_name=REGION)
-ssm_client = boto3.client("ssm", region_name=REGION)
-bedrock_runtime = boto3.client("bedrock-runtime", region_name=REGION)
+secrets_manager_client = None # boto3.client("secretsmanager", region_name=REGION)
+ssm_client = None # boto3.client("ssm", region_name=REGION)
+bedrock_runtime = None # boto3.client("bedrock-runtime", region_name=REGION)
+
+def init_constants():
+    global OPENSEARCH_SEC, OPENSEARCH_HOST, INDEX_NAME, RDS_SEC
+    global DFO_HTML_FULL_INDEX_NAME, DFO_MANDATE_FULL_INDEX_NAME, DFO_TOPIC_FULL_INDEX_NAME
+    global BEDROCK_INFERENCE_PROFILE
+    global RDS_PROXY_ENDPOINT, SM_DB_CREDENTIALS, TABLE_NAME_PARAM, EMBEDDING_MODEL_PARAM, BEDROCK_LLM_PARAM, REGION
+    global secrets_manager_client, ssm_client, bedrock_runtime  # boto3 clients
+
+    # Load environment variables
+    SM_DB_CREDENTIALS = os.environ["SM_DB_CREDENTIALS"]
+    RDS_PROXY_ENDPOINT = os.environ["RDS_PROXY_ENDPOINT"]
+    REGION = os.environ["REGION"]
+
+    # Init AWS clients (after REGION is known)
+    secrets_manager_client = boto3.client("secretsmanager", region_name=REGION)
+    ssm_client = boto3.client("ssm", region_name=REGION)
+    bedrock_runtime = boto3.client("bedrock-runtime", region_name=REGION)
+
+    # Load and resolve SSM parameters
+    BEDROCK_LLM_PARAM = os.environ["BEDROCK_LLM_PARAM"]
+    EMBEDDING_MODEL_PARAM = os.environ["EMBEDDING_MODEL_PARAM"]
+    TABLE_NAME_PARAM = os.environ["TABLE_NAME_PARAM"]
+    OPENSEARCH_HOST = get_parameter(os.environ["OPENSEARCH_HOST"])
+    OPENSEARCH_SEC = get_parameter(os.environ["OPENSEARCH_SEC"])
+    INDEX_NAME = get_parameter(os.environ["OPENSEARCH_INDEX_NAME"])
+    RDS_SEC = get_parameter(os.environ["RDS_SEC"])
+    DFO_HTML_FULL_INDEX_NAME = get_parameter(os.environ["DFO_HTML_FULL_INDEX_NAME"])
+    DFO_MANDATE_FULL_INDEX_NAME = get_parameter(os.environ["DFO_MANDATE_FULL_INDEX_NAME"])
+    DFO_TOPIC_FULL_INDEX_NAME = get_parameter(os.environ["DFO_TOPIC_FULL_INDEX_NAME"])
+    BEDROCK_INFERENCE_PROFILE = get_parameter(os.environ["BEDROCK_INFERENCE_PROFILE"])
 
 def get_parameter(param_name: str):
     """Get parameter from SSM parameter store with caching."""
@@ -283,6 +299,7 @@ def handler(event, context):
     query_params = event.get("queryStringParameters", {})
     session_id = query_params.get("session_id", "")
     user_info = query_params.get("user_info", "")
+    init_constants()
     
     if not session_id:
         logger.error("Missing required parameter: session_id")
@@ -375,7 +392,6 @@ def handler(event, context):
 
     try:
         # Initialize OpenSearch, DB, and get configuration values
-        # Set up OpenSearch client - This is hard coded to a test database for now
         secrets = get_secret(OPENSEARCH_SEC)
         opensearch_host = get_parameter(OPENSEARCH_HOST)
         opensearch_client = OpenSearch(

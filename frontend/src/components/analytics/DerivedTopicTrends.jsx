@@ -7,6 +7,7 @@ import { ResponsiveContainer } from "recharts";
 import { useClickAway } from "react-use";
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, Bar, BarChart, Cell } from 'recharts';
 import { colorPalette, mockTopicTrendsData, mockTopicOptions, mockDocumentTypes } from "./mockdata/mockAnalyticsData";
+import { getUserToken } from "@/lib/getUserToken";
 
 // Set this to false to use real API data
 const USE_MOCK_DATA = false;
@@ -22,11 +23,12 @@ const fetchFilterOptions = async () => {
     // Build the URL with query parameters
     const url = new URL(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/filters`);
     url.searchParams.append("filters", filtersToRequest.join(","));
-
+    const token = await getUserToken();
     const response = await fetch(url, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
       }
     });
 
@@ -113,11 +115,12 @@ export default function DerivedTopicTrends() {
       if (selectedDocTypes.length > 0) {
         url.searchParams.append("document_types", selectedDocTypes.join(","));
       }
-
+      const token = await getUserToken();
       const response = await fetch(url, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
         },
       });
 
