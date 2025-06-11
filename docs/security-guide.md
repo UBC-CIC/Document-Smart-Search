@@ -78,22 +78,10 @@ The application is protected by AWS WAF with the following rules:
      - Size restrictions
 
 2. **Rate Limiting** (Priority: 2)
-   - Limits requests to 2000 per IP address
+   - Limits requests to 1000 per IP address
    - Helps prevent DDoS attacks
    - Configurable thresholds
    - IP-based rate limiting
-
-3. **SQL Injection Protection** (Priority: 3)
-   - AWS managed rules for SQL injection detection
-   - Blocks common SQL injection patterns
-   - Protects database operations
-   - Regular rule updates
-
-4. **Known Bad Inputs** (Priority: 4)
-   - Blocks requests with known malicious patterns
-   - AWS managed rules for known bad inputs
-   - Protects against automated attacks
-   - Regular updates to threat intelligence
 
 ### WAF Monitoring
 

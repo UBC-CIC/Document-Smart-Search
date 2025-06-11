@@ -28,7 +28,6 @@ import { createS3Buckets } from "./api-gateway-helpers/s3";
 import { createLayers } from "./api-gateway-helpers/layers";
 import { createRolesAndPolicies } from "./api-gateway-helpers/roles";
 import { DockerImageAsset, Platform } from 'aws-cdk-lib/aws-ecr-assets';
-import * as wafv2 from "aws-cdk-lib/aws-wafv2";
 import { table } from "console";
 
 export class ApiGatewayStack extends cdk.Stack {
@@ -1258,94 +1257,5 @@ export class ApiGatewayStack extends cdk.Stack {
     //     "method.request.querystring.q": false
     //   }
     // });
-
-    // Create WAF Web ACL
-    const webAcl = new wafv2.CfnWebACL(this, `${id}-WebACL`, {
-      description: 'Web ACL for API Gateway',
-      defaultAction: { allow: {} },
-      scope: 'REGIONAL',
-      visibilityConfig: {
-        cloudWatchMetricsEnabled: true,
-        metricName: `${id}-WebACLMetric`,
-        sampledRequestsEnabled: true,
-      },
-      rules: [
-        // Rate limiting rule
-        {
-          name: 'RateLimit',
-          priority: 2,
-          statement: {
-            rateBasedStatement: {
-              limit: 2000,
-              aggregateKeyType: 'IP',
-            },
-          },
-          action: { block: {} },
-          visibilityConfig: {
-            cloudWatchMetricsEnabled: true,
-            metricName: 'RateLimitMetric',
-            sampledRequestsEnabled: true,
-          },
-        },
-        // SQL injection protection
-        {
-          name: 'SQLInjectionProtection',
-          priority: 2,
-          statement: {
-            managedRuleGroupStatement: {
-              vendorName: 'AWS',
-              name: 'AWSManagedRulesSQLiRuleSet',
-            },
-          },
-          overrideAction: { none: {} },
-          visibilityConfig: {
-            cloudWatchMetricsEnabled: true,
-            metricName: 'SQLInjectionMetric',
-            sampledRequestsEnabled: true,
-          },
-        },
-        // Common attack protection
-        {
-          name: 'CommonAttackProtection',
-          priority: 1,
-          statement: {
-            managedRuleGroupStatement: {
-              vendorName: 'AWS',
-              name: 'AWSManagedRulesCommonRuleSet',
-            },
-          },
-          overrideAction: { none: {} },
-          visibilityConfig: {
-            cloudWatchMetricsEnabled: true,
-            metricName: 'CommonAttackMetric',
-            sampledRequestsEnabled: true,
-          },
-        },
-        // Known bad inputs
-        {
-          name: 'KnownBadInputs',
-          priority: 4,
-          statement: {
-            managedRuleGroupStatement: {
-              vendorName: 'AWS',
-              name: 'AWSManagedRulesKnownBadInputsRuleSet',
-            },
-          },
-          overrideAction: { none: {} },
-          visibilityConfig: {
-            cloudWatchMetricsEnabled: true,
-            metricName: 'KnownBadInputsMetric',
-            sampledRequestsEnabled: true,
-          },
-        },
-      ],
-    });
-
-    // Associate Web ACL with API Gateway
-    new wafv2.CfnWebACLAssociation(this, `${id}-WebACLAssociation`, {
-      resourceArn: this.api.deploymentStage.stageArn,
-      webAclArn: webAcl.attrArn,
-    });
-
   }
 }
