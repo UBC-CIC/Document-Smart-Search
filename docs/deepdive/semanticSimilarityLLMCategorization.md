@@ -5,102 +5,87 @@
 - [Vector-LLM Categorization: A Technical Deep Dive](#vector-llm-categorization-a-technical-deep-dive)
   - [Table of Contents](#table-of-contents)
   - [Core Architecture: A Hybrid Approach](#core-architecture-a-hybrid-approach)
-    - [1. Vector Similarity Stage: Efficient Candidate Selection](#1-vector-similarity-stage-efficient-candidate-selection)
-    - [2. LLM Classification Stage: High-Fidelity Final Verdict](#2-llm-classification-stage-high-fidelity-final-verdict)
+  - [1. Vector Similarity Stage: Efficient Candidate Selection](#1-vector-similarity-stage-efficient-candidate-selection)
+  - [2. LLM Classification Stage: High-Fidelity Final Verdict](#2-llm-classification-stage-high-fidelity-final-verdict)
+    - [Reliability Features:](#reliability-features)
   - [Key Parameters and Their Rationale](#key-parameters-and-their-rationale)
   - [Processing Pipeline](#processing-pipeline)
     - [Document Selection Modes](#document-selection-modes)
-    - [Categorization Process](#categorization-process)
-    - [Result Processing](#result-processing)
-  - [Error Handling and Validation](#error-handling-and-validation)
-  - [Performance Considerations](#performance-considerations)
+    - [Categorization and Result Processing](#categorization-and-result-processing)
+  - [Error Handling and Performance](#error-handling-and-performance)
   - [Future Improvements](#future-improvements)
-
----
 
 ## Core Architecture: A Hybrid Approach
 
-The categorization system is composed of two tightly integrated stages:
+Our document categorization system is built on a two-stage architecture that intelligently combines the speed of vector search with the analytical depth of a Large Language Model (LLM). This hybrid model allows us to classify documents against topics and mandates with both high efficiency and nuanced accuracy.
 
-### 1. Vector Similarity Stage: Efficient Candidate Selection
+## 1. Vector Similarity Stage: Efficient Candidate Selection
 
-In this first stage, the system rapidly narrows down a list of possible topic or mandate matches for a given document. This is accomplished by converting both documents and candidate labels into embeddings using **Amazon Titan Embeddings V2**. These embeddings are numerical vectors that capture semantic meaning.
+The first stage acts as a high-speed, intelligent filter. Its goal is to rapidly sift through a vast number of potential topics and mandates and present only the most plausible candidates for a given document. This is achieved by transforming the unstructured text of both documents and candidate labels into rich numerical representations called embeddings, using **Amazon Titan Embeddings V2**.
 
-* The similarity between the document and candidate embeddings is computed using **cosine similarity**, which identifies how closely aligned the vectors are in multi-dimensional space.
-* Two backends are supported:
+We calculate the relationship between a document and a potential topic using **cosine similarity**, a robust metric that measures the contextual alignment between two embeddings.
 
-  * **NumPy-based cosine similarity** is used for smaller-scale or local development scenarios.
-  * **OpenSearch KNN search** is utilized for production-grade workloads, enabling rapid similarity search over millions of embeddings.
-* Before performing comparisons, all embeddings are **normalized**, ensuring that cosine similarity values are accurate and meaningful.
-* Topics and mandates can be described by multiple textual variants. The system intelligently selects the **maximum similarity score** across these descriptions to ensure that the strongest signal is used.
+The system offers two backends for this process:
 
-### 2. LLM Classification Stage: High-Fidelity Final Verdict
+* **NumPy-based calculation**: Ideal for local development and smaller-scale workloads.
+* **OpenSearch's K-Nearest Neighbor (KNN)**: Enables highly scalable and rapid similarity searches across millions of documents.
 
-After identifying top candidate matches via vector similarity, the system delegates final classification to an LLM. This ensures nuanced understanding and accurate decision-making.
+To ensure mathematical integrity, **all embeddings are normalized before comparison**, guaranteeing accurate and directly comparable cosine similarity scores.
 
-* The model used is **LLaMA 3 70B**, accessed through **Amazon Bedrock**, selected for its strong reasoning and large context window.
-* Several mechanisms enhance reliability:
+To accommodate multiple descriptive variants of topics and mandates, the system uses the **maximum similarity score** across all variants, ensuring the strongest semantic link is captured.
 
-  * **Deterministic Output:** The model temperature is set to `0`, ensuring the same input always produces the same output.
-  * **Structured JSON Output:** The LLM is prompted to return a JSON object specifying classification results (`belongs`, `relevance`, and `explanation`). This structure makes parsing reliable and reduces integration errors.
-  * **Automatic JSON Repair:** If the model returns malformed JSON, a built-in validator attempts to auto-correct it, improving system robustness.
+## 2. LLM Classification Stage: High-Fidelity Final Verdict
+
+Once the initial stage identifies a short list of promising candidates, the system passes them to a **Large Language Model** for a final, nuanced judgment. This step provides deeper, context-aware analysis beyond simple similarity.
+
+We use **LLaMA 3 70B** via **Amazon Bedrock**, chosen for its:
+
+* Exceptional reasoning abilities
+* Large context window
+* Proven capacity to follow complex instructions
+
+### Reliability Features:
+
+* **Deterministic Output**: Setting the model’s temperature to `0` ensures consistent outputs for the same input—crucial for auditability.
+* **Structured JSON Output**: Responses are formatted into a structured JSON with `belongs`, `relevance`, and `explanation` fields.
+* **Automatic JSON Repair**: A validation layer corrects malformed JSON responses automatically, increasing system robustness.
 
 
 ## Key Parameters and Their Rationale
 
-A few parameters govern the system's balance of performance, cost, and accuracy:
-
-* **TOP\_N = 7:** The number of top candidates selected via similarity. Choosing 7 provides a wide enough set for the LLM to consider multiple plausible options, without overwhelming the LLM or consuming too much context.
-* **DESIRED\_THRESHOLD = 0.2:** Any candidate with a cosine similarity below this value is discarded. This prevents low-quality matches from wasting LLM compute and helps reduce classification noise.
-
+* **`TOP_N = 7`**: Number of top candidates passed from the vector stage to the LLM. Provides a broad yet concise input set for the LLM.
+* **`DESIRED_THRESHOLD = 0.2`**: Minimum similarity score required for a candidate to be considered. Effectively filters out irrelevant matches.
 
 ## Processing Pipeline
 
-The system operates as a flexible pipeline, capable of adapting to different operational scenarios.
+The system is built as a flexible data processing pipeline, adaptable to varying operational requirements.
 
 ### Document Selection Modes
 
-* **`html_only`:** Optimized for daily runs where only new or updated HTML documents need classification.
-* **`topics_only`:** Triggered when topic/mandate definitions are updated, causing a re-categorization of all documents.
-* **`full_update`:** Reprocesses the entire document set. When run at scale, documents are retrieved in batches using the OpenSearch scroll API to ensure efficiency.
+* **`html_only`**: Standard mode for processing newly ingested or updated documents.
+* **`topics_only`**: Triggers re-categorization when topic or mandate definitions change.
+* **`full_update`**: Reprocesses the entire dataset, using the **OpenSearch scroll API** for batch retrieval.
 
-### Categorization Process
+### Categorization and Result Processing
 
-* Both topics and mandates are processed in **parallel**, maximizing throughput.
-* Each document goes through **two filters**: vector similarity, followed by LLM classification.
-* The pipeline includes **comprehensive validation** and **automatic retry logic** to handle transient failures or malformed inputs.
+* Topics and mandates are processed in **parallel** for efficiency.
+* Each document flows through both the **vector similarity** and **LLM classification** stages.
+* A classification is finalized **only if the LLM affirms** the document belongs to the category.
+* Confirmed results are used to:
 
-### Result Processing
+  * Generate CSV reports for auditing and analysis
+  * Update the OpenSearch index using **efficient bulk operations**
 
-* A document is only categorized if the LLM affirms it **"belongs"** to a topic or mandate.
-* Confirmed classifications are used to:
+## Error Handling and Performance
 
-  * Generate **CSV reports** containing metadata, similarity scores, and LLM decisions.
-  * Perform **OpenSearch updates**, writing results back to the master index using efficient bulk operations.
-
-## Error Handling and Validation
-
-Reliability is built into every layer of the system:
-
-* Input documents are validated before processing.
-* LLM responses are checked against a strict schema.
-* If JSON output from the LLM is malformed, the system attempts automatic repair.
-* OpenSearch updates are performed with detailed error tracking and retry mechanisms to guard against transient issues.
-
-## Performance Considerations
-
-The pipeline is designed with performance and scale in mind:
-
-* Efficient **batching** is used for all document retrieval and processing.
-* **Parallelization** is leveraged at multiple stages.
-* Most importantly, **smart candidate filtering** ensures that expensive LLM calls are only made for plausible candidates.
+* Comprehensive **validation** and **retry logic** ensures reliability during transient failures.
+* Smart candidate filtering ensures LLM resources are only used for the most plausible candidates.
 
 ## Future Improvements
 
-To make the system even more efficient and accurate, the following enhancements are planned:
+* **Embedding Model Evaluation**: Benchmarking alternative models (e.g., Cohere, Mistral) to optimize accuracy, speed, and cost.
+* **Batch Inference for Cost Reduction**: Moving non-urgent classification (e.g., `full_update`) to **Amazon Bedrock's Batch Inference** for cost efficiency.
+* **Prompt Engineering Enhancements**: Refining prompts and adding few-shot examples to improve classification and explanation quality.
 
-* **Embedding Model Evaluation:** Explore other embedding providers (e.g., Cohere, Mistral) to improve the balance between accuracy, inference speed, and cost.
-* **Batch Inference with Bedrock:** For full reprocessing, shift from real-time to **batch LLM inference** to reduce cost for time-insensitive workload. This is one of the most expensive part of the pipeline.
-* **Prompt Engineering Enhancements:** Refine the prompts used for LLM classification to improve accuracy and interpretability.
 
-This hybrid system effectively bridges the gap between fast semantic filtering and deep contextual understanding, offering a powerful and scalable solution for document classification.
+This hybrid system effectively bridges fast semantic filtering and deep contextual understanding, offering a **powerful and scalable solution for document classification**.

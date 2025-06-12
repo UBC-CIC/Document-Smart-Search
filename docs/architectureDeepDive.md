@@ -7,6 +7,20 @@
   - [Architecture](#architecture)
   - [Description](#description)
   - [Database Schema](#database-schema)
+    - [Users Table](#users-table)
+    - [Prompts Table](#prompts-table)
+    - [Sessions Table](#sessions-table)
+    - [User Engagement Log Table](#user-engagement-log-table)
+    - [Feedback Table](#feedback-table)
+    - [CSAS Events Table](#csas-events-table)
+    - [Documents Table](#documents-table)
+    - [Mandates Table](#mandates-table)
+    - [Subcategories Table](#subcategories-table)
+    - [Topics Table](#topics-table)
+    - [Derived Topics Table](#derived-topics-table)
+    - [Documents Derived Topic Table](#documents-derived-topic-table)
+    - [Documents Mandates Table](#documents-mandates-table)
+    - [Documents Topics Table](#documents-topics-table)
   - [Data Processing Pipeline (Glue Scripts)](#data-processing-pipeline-glue-scripts)
     - [Pipeline Overview](#pipeline-overview)
     - [Data Flow](#data-flow)
@@ -79,7 +93,159 @@
 
 ## Database Schema
 
-![Database Schema](./images/database_schema.png)
+![Database Schema](./images/architecture/database_schema.png)
+
+### Users Table
+Stores user account information and authentication details. This table maintains user profiles and tracks their activity within the system.
+
+| Column Name | Data Type | Description | Constraints |
+|------------|-----------|-------------|-------------|
+| user_id | uuid | Unique identifier for each user | PK |
+| user_email | varchar | User's email address | |
+| time_account_created | timestamp | When the user account was created | |
+| last_sign_in | timestamp | Most recent sign-in timestamp | |
+
+### Prompts Table
+Contains different prompt templates used for various user roles in the system. These prompts are used to guide the LLM in generating appropriate responses based on user context.
+
+| Column Name | Data Type | Description | Constraints |
+|------------|-----------|-------------|-------------|
+| public | text | Public-facing prompt template | |
+| internal_researcher | text | Prompt template for internal researchers | |
+| policy_maker | text | Prompt template for policy makers | |
+| external_researcher | text | Prompt template for external researchers | |
+| time_created | timestamp | When the prompt was created | |
+
+### Sessions Table
+Tracks user sessions and their duration. This table helps in monitoring user engagement and maintaining session state.
+
+| Column Name | Data Type | Description | Constraints |
+|------------|-----------|-------------|-------------|
+| session_id | uuid | Unique identifier for each session | PK |
+| time_created | timestamp | When the session was created | |
+
+### User Engagement Log Table
+Records detailed user interactions with documents and the system. This table helps in understanding user behavior and improving the system based on usage patterns.
+
+| Column Name | Data Type | Description | Constraints |
+|------------|-----------|-------------|-------------|
+| log_id | uuid | Unique identifier for each log entry | PK |
+| session_id | uuid | Reference to the session | FK (sessions) |
+| document_id | uuid | Reference to the document | |
+| engagement_type | varchar | Type of user engagement | |
+| engagement_details | text | Detailed information about the engagement | |
+| user_role | varchar | Role of the user | |
+| user_info | text | Additional user information | |
+| timestamp | timestamp | When the engagement occurred | |
+
+### Feedback Table
+Stores user feedback about the system's performance and suggestions for improvement. This data is used for continuous system enhancement.
+
+| Column Name | Data Type | Description | Constraints |
+|------------|-----------|-------------|-------------|
+| feedback_id | uuid | Unique identifier for each feedback | PK |
+| session_id | uuid | Reference to the session | FK (sessions) |
+| feedback_rating | integer | Numerical rating of the feedback | |
+| timestamp | timestamp | When the feedback was submitted | |
+| feedback_description | varchar | Detailed feedback description | |
+
+### CSAS Events Table
+Maintains information about events associated with documents. This table helps in organizing documents by their related events and tracking event-specific information.
+
+| Column Name | Data Type | Description | Constraints |
+|------------|-----------|-------------|-------------|
+| event_year | INT | Year of the event | PK |
+| event_subject | TEXT | Subject of the event | PK |
+| last_updated | TIMESTAMP | Last update timestamp | |
+
+### Documents Table
+Core table storing metadata about all documents in the system. This includes document URLs, types, and associated event information.
+
+| Column Name | Data Type | Description | Constraints |
+|------------|-----------|-------------|-------------|
+| html_url | TEXT | URL of the HTML document | PK |
+| year | INT | Publication year | |
+| title | TEXT | Document title | |
+| doc_type | TEXT | Type of document | |
+| pdf_url | TEXT | URL of the PDF version | |
+| doc_language | TEXT | Document language | |
+| event_year | INT | Year of associated event | FK (csas_events) |
+| event_subject | TEXT | Subject of associated event | FK (csas_events) |
+| last_updated | TIMESTAMP | Last update timestamp | |
+
+### Mandates Table
+Contains the list of mandates used for document categorization. Mandates represent high-level organizational goals or requirements.
+
+| Column Name | Data Type | Description | Constraints |
+|------------|-----------|-------------|-------------|
+| mandate_name | TEXT | Name of the mandate | PK |
+| last_updated | TIMESTAMP | Last update timestamp | |
+
+### Subcategories Table
+Represents the hierarchical structure of topics under mandates. This table maintains the relationship between mandates and their subcategories.
+
+| Column Name | Data Type | Description | Constraints |
+|------------|-----------|-------------|-------------|
+| subcategory_name | TEXT | Name of the subcategory | PK |
+| mandate_name | TEXT | Associated mandate | FK (mandates) |
+| last_updated | TIMESTAMP | Last update timestamp | |
+
+### Topics Table
+Stores the detailed topics used for document categorization. Topics are organized hierarchically under subcategories and mandates.
+
+| Column Name | Data Type | Description | Constraints |
+|------------|-----------|-------------|-------------|
+| topic_name | TEXT | Name of the topic | PK |
+| subcategory_name | TEXT | Associated subcategory | FK (subcategories) |
+| mandate_name | TEXT | Associated mandate | FK (mandates) |
+| last_updated | TIMESTAMP | Last update timestamp | |
+
+### Derived Topics Table
+Contains topics that are automatically discovered through topic modeling. These topics are derived from document content analysis rather than being predefined.
+
+| Column Name | Data Type | Description | Constraints |
+|------------|-----------|-------------|-------------|
+| topic_name | TEXT | Name of the derived topic | PK |
+| representation | TEXT[] | Array of topic representations | |
+| representative_docs | TEXT[] | Array of representative documents | |
+| last_updated | TIMESTAMP | Last update timestamp | |
+
+### Documents Derived Topic Table
+Maps documents to their automatically discovered topics. This table stores the relationship between documents and derived topics along with confidence scores.
+
+| Column Name | Data Type | Description | Constraints |
+|------------|-----------|-------------|-------------|
+| html_url | TEXT | Document URL | PK, FK (documents) |
+| topic_name | TEXT | Derived topic name | PK, FK (derived_topics) |
+| confidence_score | NUMERIC | Confidence score of the categorization | |
+| last_updated | TIMESTAMP | Last update timestamp | |
+
+### Documents Mandates Table
+Links documents to their associated mandates. This table stores both LLM-based and semantic similarity scores for mandate categorization.
+
+| Column Name | Data Type | Description | Constraints |
+|------------|-----------|-------------|-------------|
+| html_url | TEXT | Document URL | PK, FK (documents) |
+| mandate_name | TEXT | Mandate name | PK, FK (mandates) |
+| llm_belongs | TEXT | LLM categorization result | |
+| llm_score | INT | LLM confidence score | |
+| llm_explanation | TEXT | LLM explanation for categorization | |
+| semantic_score | NUMERIC | Semantic similarity score | |
+| last_updated | TIMESTAMP | Last update timestamp | |
+
+### Documents Topics Table
+Maps documents to their associated topics. This table maintains the relationship between documents and topics, including categorization scores and explanations.
+
+| Column Name | Data Type | Description | Constraints |
+|------------|-----------|-------------|-------------|
+| html_url | TEXT | Document URL | PK, FK (documents) |
+| topic_name | TEXT | Topic name | PK, FK (topics) |
+| llm_belongs | TEXT | LLM categorization result | |
+| llm_score | INT | LLM confidence score | |
+| llm_explanation | TEXT | LLM explanation for categorization | |
+| semantic_score | NUMERIC | Semantic similarity score | |
+| isPrimary | BOOLEAN | Whether this is a primary topic | |
+| last_updated | TIMESTAMP | Last update timestamp | |
 
 ## Data Processing Pipeline (Glue Scripts)
 

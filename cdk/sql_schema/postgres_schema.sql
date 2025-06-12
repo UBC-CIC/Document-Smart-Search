@@ -1,93 +1,139 @@
--- CSAS Events Table (Composite Primary Key)
-CREATE TABLE IF NOT EXISTS "csas_events" (
-    "event_year" INT NOT NULL,
-    "event_subject" TEXT NOT NULL,
-    "last_updated" TIMESTAMP,
-    PRIMARY KEY ("event_year", "event_subject")
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+CREATE TABLE "users" (
+  "user_id" uuid PRIMARY KEY DEFAULT (uuid_generate_v4()),
+  "user_email" varchar,
+  "time_account_created" timestamp,
+  "last_sign_in" timestamp
 );
 
--- Documents Table
-CREATE TABLE IF NOT EXISTS "documents" (
-    "html_url" TEXT PRIMARY KEY,
-    "year" INT,
-    "title" TEXT,
-    "doc_type" TEXT,
-    "pdf_url" TEXT,
-    "doc_language" TEXT,
-    "event_year" INT,
-    "event_subject" TEXT,
-    "last_updated" TIMESTAMP,
-    FOREIGN KEY ("event_year", "event_subject") REFERENCES "csas_events" ("event_year", "event_subject") ON DELETE SET NULL
+CREATE TABLE "prompts" (
+  "public" text,
+  "internal_researcher" text,
+  "policy_maker" text,
+  "external_researcher" text,
+  "time_created" timestamp
 );
 
--- Mandates Table
-CREATE TABLE IF NOT EXISTS "mandates" (
-    "mandate_name" TEXT PRIMARY KEY,
-    "last_updated" TIMESTAMP
+CREATE TABLE "sessions" (
+  "session_id" uuid PRIMARY KEY DEFAULT (uuid_generate_v4()),
+  "time_created" timestamp
 );
 
--- Subcategories Table
-CREATE TABLE IF NOT EXISTS "subcategories" (
-    "subcategory_name" TEXT PRIMARY KEY,
-    "mandate_name" TEXT NOT NULL,
-    "last_updated" TIMESTAMP,
-    FOREIGN KEY ("mandate_name") REFERENCES "mandates" ("mandate_name") ON DELETE CASCADE
+CREATE TABLE "user_engagement_log" (
+  "log_id" uuid PRIMARY KEY,
+  "session_id" uuid,
+  "document_id" uuid,
+  "engagement_type" varchar,
+  "engagement_details" text,
+  "user_role" varchar,
+  "user_info" text,
+  "timestamp" timestamp
 );
 
--- Topics Table
-CREATE TABLE IF NOT EXISTS "topics" (
-    "topic_name" TEXT PRIMARY KEY,
-    "subcategory_name" TEXT,
-    "mandate_name" TEXT NOT NULL, 
-    "last_updated" TIMESTAMP,
-    FOREIGN KEY ("subcategory_name") REFERENCES "subcategories" ("subcategory_name") ON DELETE SET NULL,
-    FOREIGN KEY ("mandate_name") REFERENCES "mandates" ("mandate_name") ON DELETE CASCADE
+CREATE TABLE "feedback" (
+  "feedback_id" uuid PRIMARY KEY,
+  "session_id" uuid,
+  "feedback_rating" integer,
+  "timestamp" timestamp,
+  "feedback_description" varchar
 );
 
--- Derived Topics Table
-CREATE TABLE IF NOT EXISTS "derived_topics" (
-    "topic_name" TEXT PRIMARY KEY,
-    "representation" TEXT[],
-    "representative_docs" TEXT[],
-    "last_updated" TIMESTAMP
+CREATE TABLE "csas_events" (
+  "event_year" INT NOT NULL,
+  "event_subject" TEXT NOT NULL,
+  "last_updated" TIMESTAMP,
+  PRIMARY KEY ("event_year", "event_subject")
 );
 
--- Document-Derived_topics Many-to-One Table
-CREATE TABLE IF NOT EXISTS "documents_derived_topic" (
-    "html_url" TEXT NOT NULL,
-    "topic_name" TEXT NOT NULL,
-    "confidence_score" NUMERIC,
-    "last_updated" TIMESTAMP,
-    PRIMARY KEY("html_url", "topic_name"),
-    FOREIGN KEY ("html_url") REFERENCES "documents" ("html_url") ON DELETE CASCADE,
-    FOREIGN KEY ("topic_name") REFERENCES "derived_topics" ("topic_name") ON DELETE CASCADE
+CREATE TABLE "documents" (
+  "html_url" TEXT PRIMARY KEY,
+  "year" INT,
+  "title" TEXT,
+  "doc_type" TEXT,
+  "pdf_url" TEXT,
+  "doc_language" TEXT,
+  "event_year" INT,
+  "event_subject" TEXT,
+  "last_updated" TIMESTAMP
 );
 
--- Document-Mandates Many-to-Many Table
-CREATE TABLE IF NOT EXISTS "documents_mandates" (
-    "html_url" TEXT NOT NULL,
-    "mandate_name" TEXT NOT NULL,
-    "llm_belongs" TEXT,
-    "llm_score" INT,
-    "llm_explanation" TEXT,
-    "semantic_score" NUMERIC,
-    "last_updated" TIMESTAMP,
-    PRIMARY KEY ("html_url", "mandate_name"),
-    FOREIGN KEY ("html_url") REFERENCES "documents" ("html_url") ON DELETE CASCADE,
-    FOREIGN KEY ("mandate_name") REFERENCES "mandates" ("mandate_name") ON DELETE CASCADE
+CREATE TABLE "mandates" (
+  "mandate_name" TEXT PRIMARY KEY,
+  "last_updated" TIMESTAMP
 );
 
--- Document-Topics Many-to-Many Table
-CREATE TABLE IF NOT EXISTS "documents_topics" (
-    "html_url" TEXT NOT NULL,
-    "topic_name" TEXT NOT NULL,
-    "llm_belongs" TEXT,
-    "llm_score" INT,
-    "llm_explanation" TEXT,
-    "semantic_score" NUMERIC,
-    "isPrimary" BOOLEAN NOT NULL,
-    "last_updated" TIMESTAMP,
-    PRIMARY KEY ("html_url", "topic_name"),
-    FOREIGN KEY ("html_url") REFERENCES "documents" ("html_url") ON DELETE CASCADE,
-    FOREIGN KEY ("topic_name") REFERENCES "topics" ("topic_name") ON DELETE CASCADE
+CREATE TABLE "subcategories" (
+  "subcategory_name" TEXT PRIMARY KEY,
+  "mandate_name" TEXT NOT NULL,
+  "last_updated" TIMESTAMP
 );
+
+CREATE TABLE "topics" (
+  "topic_name" TEXT PRIMARY KEY,
+  "subcategory_name" TEXT,
+  "mandate_name" TEXT NOT NULL,
+  "last_updated" TIMESTAMP
+);
+
+CREATE TABLE "derived_topics" (
+  "topic_name" TEXT PRIMARY KEY,
+  "representation" TEXT[],
+  "representative_docs" TEXT[],
+  "last_updated" TIMESTAMP
+);
+
+CREATE TABLE "documents_derived_topic" (
+  "html_url" TEXT NOT NULL,
+  "topic_name" TEXT NOT NULL,
+  "confidence_score" NUMERIC,
+  "last_updated" TIMESTAMP,
+  PRIMARY KEY ("html_url", "topic_name")
+);
+
+CREATE TABLE "documents_mandates" (
+  "html_url" TEXT NOT NULL,
+  "mandate_name" TEXT NOT NULL,
+  "llm_belongs" TEXT,
+  "llm_score" INT,
+  "llm_explanation" TEXT,
+  "semantic_score" NUMERIC,
+  "last_updated" TIMESTAMP,
+  PRIMARY KEY ("html_url", "mandate_name")
+);
+
+CREATE TABLE "documents_topics" (
+  "html_url" TEXT NOT NULL,
+  "topic_name" TEXT NOT NULL,
+  "llm_belongs" TEXT,
+  "llm_score" INT,
+  "llm_explanation" TEXT,
+  "semantic_score" NUMERIC,
+  "isPrimary" BOOLEAN NOT NULL,
+  "last_updated" TIMESTAMP,
+  PRIMARY KEY ("html_url", "topic_name")
+);
+
+ALTER TABLE "user_engagement_log" ADD FOREIGN KEY ("session_id") REFERENCES "sessions" ("session_id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE "feedback" ADD FOREIGN KEY ("session_id") REFERENCES "sessions" ("session_id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE "documents" ADD FOREIGN KEY ("event_year", "event_subject") REFERENCES "csas_events" ("event_year", "event_subject") ON DELETE SET NULL;
+
+ALTER TABLE "subcategories" ADD FOREIGN KEY ("mandate_name") REFERENCES "mandates" ("mandate_name") ON DELETE CASCADE;
+
+ALTER TABLE "topics" ADD FOREIGN KEY ("subcategory_name") REFERENCES "subcategories" ("subcategory_name") ON DELETE SET NULL;
+
+ALTER TABLE "topics" ADD FOREIGN KEY ("mandate_name") REFERENCES "mandates" ("mandate_name") ON DELETE CASCADE;
+
+ALTER TABLE "documents_derived_topic" ADD FOREIGN KEY ("html_url") REFERENCES "documents" ("html_url") ON DELETE CASCADE;
+
+ALTER TABLE "documents_derived_topic" ADD FOREIGN KEY ("topic_name") REFERENCES "derived_topics" ("topic_name") ON DELETE CASCADE;
+
+ALTER TABLE "documents_mandates" ADD FOREIGN KEY ("html_url") REFERENCES "documents" ("html_url") ON DELETE CASCADE;
+
+ALTER TABLE "documents_mandates" ADD FOREIGN KEY ("mandate_name") REFERENCES "mandates" ("mandate_name") ON DELETE CASCADE;
+
+ALTER TABLE "documents_topics" ADD FOREIGN KEY ("html_url") REFERENCES "documents" ("html_url") ON DELETE CASCADE;
+
+ALTER TABLE "documents_topics" ADD FOREIGN KEY ("topic_name") REFERENCES "topics" ("topic_name") ON DELETE CASCADE;
