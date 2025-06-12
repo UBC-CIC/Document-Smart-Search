@@ -69,15 +69,26 @@ Each feedback entry can also be clicked on for further details, similar to the c
 
 ## Public View
 
+### Landing Page
+
 Upon opening the public view of the app, users are greeted with a home page. Clicking on "About" or "T&C" will open a modal which either describes the DFO project or shows the terms and conditions of using the assistant.
 ![image](./images/home.png)
 
-After clicking Get Started, the assistant will initiate the conversation by prompting the user to select their role. Users can click one of the 3 options to select their role.
-![image](./images/initial-message.png)
+### AI Assistant
+
+After clicking Get Started, the assistant will initiate the conversation by prompting the user to select their role. Users must click one of the 4 options to select their role before they can begin interacting with the AI assistant.
+![image](./images/initial_message.png)
 
 Users can then type their question to the assistant, or click on a recommended question to ask to the assistant. Pressing the send icon or the enter key will send the users question to the assistant. Pressing the refresh button will create a new session and restart the conversation with the assistant.
-![image](./images/selecting-messages.png)
+![image](./images/selecting_messages.png)
 
-Clicking "My task is done" will open a feedback message where users can rate the assistant from 1 star to 5 stars and provide additional feedback. Clicking "Send Feedback" will complete the feedback process.
+Once the user sends a message and recieves a response from the assistant, they are also able to click on the "Sources" button in the lower right corner of the screen, which will reveal some of the sources (including documents) the assistant retrieved information from to answer the user's question.
+![image](./images/sources.png)
+
+Clicking the "Rate" button under any AI message will open a feedback prompt, in which users can rate the assistant from 1 to 5 stars and provide additional details. Clicking "Send Feedback" will complete the feedback process.
 ![image](./images/feedback.png)
-![image](./images/feedback-completion.png)
+![image](./images/feedback_completion.png)
+
+### Document Search
+
+### Analytics
