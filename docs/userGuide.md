@@ -102,3 +102,9 @@ Users may also view the document itself by clicking the "View Web Page" option. 
 ![image](./images/doc_search_use.png)
 
 ### Analytics
+
+Once the user has navigated to the analytics tab through the navbar at the top of the page, they will be greeted with a few filtering options prior to seeing the analytics. They will also see tabs at the top of the page, denoting whether they are looking at analytics for topics, derived topics, or mandates.
+![image](./images/analytics_start.png)
+To generate graphs for the analytics, users simply select a filter (mainly the topic/derived topic/mandate filter at the bottom of the filter box), and can then narrow their searches using the other filtering options, such as timeframe and document type. They are also able to choose 10 random topics, rather than individually selecting them.
+
+![image](./images/analytics_charts.png)
