@@ -91,4 +91,14 @@ Clicking the "Rate" button under any AI message will open a feedback prompt, in 
 
 ### Document Search
 
+By navigating to the "Document Search" tab at the top of the page, users can search for specific documents that may be relevant to their queries. To narrow their search, users can select from a few filtering options if desired (such as timeframe, topics, and more) and the left-hand side of the screen. From here, users are able to use the searchbar at the top to search with a specific query.
+
+![image](./images/doc_search_start.png)
+
+Once a search has been made, users are presented with a list of related documents, as well as a score denoting how relevant they are to the given query. This list can be sorted by relevance, oldest or newest first, or alphabetically.
+
+Users may also view the document itself by clicking the "View Web Page" option. Upon clicking the "Document Summary" button, a short summary will be created for the document, and the "Query Summary" button will present the user with a written, AI-generated summary denoting how relevant the document is to the user's original query, incase the relevance score was not descriptive enough.
+
+![image](./images/doc_search_use.png)
+
 ### Analytics
