@@ -1,8 +1,8 @@
 openapi: 3.0.0
 servers: []
 info:
-  title: DFO Smart Search API
-  description: This API intended to deploy on aws API Gateway
+  title: Smart Search API
+  description: This API is intended to be deployed on AWS API Gateway
   version: "1.0.0"
 tags:
   - name: User
@@ -371,7 +371,7 @@ paths:
       tags:
         - User
       summary: Semantic search for similar documents
-      operationId: user_search_get
+      operationId: user_hybrid_search_get
       parameters:
         - in: query
           name: user_info
@@ -454,7 +454,7 @@ paths:
       tags:
         - User
       summary: Semantic search for similar documents
-      operationId: user_search_get
+      operationId: user_similarity_search_get
       parameters:
         - in: query
           name: user_info
