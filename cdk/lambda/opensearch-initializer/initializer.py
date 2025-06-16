@@ -35,162 +35,6 @@ client = OpenSearch(
     timeout=60
 )
 
-def create_topic_index(client: OpenSearch, index_name: str, dimension: int = 1024) -> None:
-    """
-    Creates an OpenSearch index for DFO topics with KNN vector search and required metadata fields.
-    
-    Fields:
-      - topic_name: text
-      - topic_description: text
-      - topic_name_and_description: text (used to compute vector embeddings)
-      - related_themes: keyword (list of strings)
-      - chunk_embedding: knn_vector field for embeddings of topic_name_and_description
-    """
-    if client.indices.exists(index=index_name):
-        print(f"Topic index '{index_name}' already exists")
-        return
-
-    index_settings = {
-        "settings": {
-            "index": {
-                "knn": True
-            }
-        },
-        "mappings": {
-            "properties": {
-                "chunk_embedding": {
-                    "type": "knn_vector",
-                    "dimension": dimension,
-                    "method": {
-                        "name": "hnsw",
-                        "space_type": "cosinesimil",
-                        "engine": "nmslib",
-                        "parameters": {"ef_construction": 512, "m": 16}
-                    }
-                },
-                "name": {"type": "text"},
-                "description": {"type": "text"},
-                "name_and_description": {"type": "text"},
-                "type": {"type": "keyword"},
-                "tag": {"type": "keyword"},
-                "parent_tag": {"type": "keyword"},
-                "mandate_tag": {"type": "keyword"}
-            }
-        }
-    }
-
-    client.indices.create(index=index_name, body=index_settings)
-    print(f"Topic index '{index_name}' created.")
-
-def create_mandate_index(client: OpenSearch, index_name: str, dimension: int = 1024) -> None:
-    """
-    Creates an OpenSearch index for DFO mandates with KNN vector search and required metadata fields.
-    
-    Fields:
-      - mandate: text
-      - short_description: text
-      - description: text
-      - mandate_and_description: text (used to compute vector embeddings)
-      - chunk_embedding: knn_vector field for embeddings of mandate_and_description
-    """
-    if client.indices.exists(index=index_name):
-        print(f"Mandate index '{index_name}' already exists")
-        return
-
-    index_settings = {
-        "settings": {
-            "index": {"knn": True}
-        },
-        "mappings": {
-            "properties": {
-                "chunk_embedding": {
-                    "type": "knn_vector",
-                    "dimension": dimension,
-                    "method": {
-                        "name": "hnsw",
-                        "space_type": "cosinesimil",
-                        "engine": "nmslib",
-                        "parameters": {"ef_construction": 512, "m": 16}
-                    }
-                },
-                "name": {"type": "text"},
-                "description": {"type": "text"},
-                "name_and_description": {"type": "text"},
-                "tag": {"type": "keyword"}
-            }
-        }
-    }
-    
-    client.indices.create(index=index_name, body=index_settings)
-    print(f"Mandate index '{index_name}' created.")
-
-def create_html_index(client: OpenSearch, index_name: str, dimension: int = 1024) -> None:
-    """
-    Creates an OpenSearch index for DFO HTML documents with KNN vector search.
-
-    This mapping includes all the original metadata fields (e.g., csas_html_year,
-    csas_html_title, html_url, pdf_url, html_language, html_page_title, html_year, html_doc_type)
-    and additional normalized metadata fields (year, doc_title, doc_url, download_url, language).
-    """
-    if client.indices.exists(index=index_name):
-        print(f"Index '{index_name}' already exists")
-        return
-
-    index_settings = {
-        "settings": {
-            "index": {"knn": True}
-        },
-        "mappings": {
-            "properties": {
-                "chunk_embedding": {
-                    "type": "knn_vector",
-                    "dimension": dimension,
-                    "method": {
-                        "name": "hnsw",
-                        "space_type": "cosinesimil",
-                        "engine": "nmslib",
-                        "parameters": {"ef_construction": 512, "m": 16}
-                    }
-                },
-                "page_content": {"type": "text"},
-
-                # Original metadata fields
-
-                ## CSAS Fields
-                "csas_html_year": {"type": "keyword"},
-                "csas_event": {"type": "text"},
-                "csas_html_title": {"type": "text"},
-                "html_url": {"type": "text"},
-
-                ## Extracted/Infered from HTML
-                "pdf_url": {"type": "text"},
-                "html_language": {"type": "keyword"},
-                "html_page_title": {"type": "text"},
-                "html_year": {"type": "keyword"},
-                "html_doc_type": {"type": "keyword"},
-
-                ## New extracted field (New)
-                "document_subject": {"type": "text"},
-                "authors": {"type": "keyword"}, # array of strings
-                
-                ## LLM categorizaton (New)
-                "mandate_categorization": {"type": "keyword"}, # array of strings
-                "topic_categorization": {"type": "keyword"}, # array of strings
-                "derived_topic_categorization": {"type": "keyword"}, # array of strings
-
-                # Additional normalized metadata fields
-                "year": {"type": "keyword"},
-                "doc_title": {"type": "text"},
-                "doc_url": {"type": "text"},
-                "download_url": {"type": "text"},
-                "language": {"type": "keyword"}
-            }
-        }
-    }
-
-    client.indices.create(index=index_name, body=index_settings)
-    print(f"HTML index '{index_name}' created.")
-
 def create_hybrid_search_pipeline(
     client: OpenSearch, pipeline_name: str = "hybridsearch", keyword_weight: float = 0.3, vector_weight: float = 0.7
 ) -> None:
@@ -257,6 +101,166 @@ def create_hybrid_search_pipeline(
     # Create or update the pipeline
     response = client.transport.perform_request("PUT", path, body=payload)
     print(f'Search pipeline "{pipeline_name}" created or updated successfully!')
+    
+
+def create_topic_index(client: OpenSearch, index_name: str, dimension: int = 1024) -> None:
+    """
+    Creates an OpenSearch index for DFO topics with KNN vector search and required metadata fields.
+    
+    Fields:
+      - topic_name: text
+      - topic_description: text
+      - topic_name_and_description: text (used to compute vector embeddings)
+      - related_themes: keyword (list of strings)
+      - chunk_embedding: knn_vector field for embeddings of topic_name_and_description
+    """
+    if client.indices.exists(index=index_name):
+        print(f"Topic index '{index_name}' already exists")
+        return
+
+    index_settings = {
+        "settings": {
+            "index": {
+                "knn": True
+            }
+        },
+        "mappings": {
+            "properties": {
+                "chunk_embedding": {
+                    "type": "knn_vector",
+                    "dimension": dimension,
+                    "method": {
+                        "name": "hnsw",
+                        "space_type": "cosinesimil",
+                        "engine": "nmslib",
+                        "parameters": {"ef_construction": 512, "m": 16}
+                    }
+                },
+                "name": {"type": "text"},
+                "description": {"type": "text"},
+                "name_and_description": {"type": "text"},
+                "type": {"type": "keyword"},
+                "tag": {"type": "keyword"},
+                "parent_tag": {"type": "keyword"},
+                "mandate_tag": {"type": "keyword"}
+            }
+        }
+    }
+
+    client.indices.create(index=index_name, body=index_settings)
+    print(f"Topic index '{index_name}' created.")
+
+
+def create_mandate_index(client: OpenSearch, index_name: str, dimension: int = 1024) -> None:
+    """
+    Creates an OpenSearch index for DFO mandates with KNN vector search and required metadata fields.
+    
+    Fields:
+      - mandate: text
+      - short_description: text
+      - description: text
+      - mandate_and_description: text (used to compute vector embeddings)
+      - chunk_embedding: knn_vector field for embeddings of mandate_and_description
+    """
+    if client.indices.exists(index=index_name):
+        print(f"Mandate index '{index_name}' already exists")
+        return
+
+    index_settings = {
+        "settings": {
+            "index": {"knn": True}
+        },
+        "mappings": {
+            "properties": {
+                "chunk_embedding": {
+                    "type": "knn_vector",
+                    "dimension": dimension,
+                    "method": {
+                        "name": "hnsw",
+                        "space_type": "cosinesimil",
+                        "engine": "nmslib",
+                        "parameters": {"ef_construction": 512, "m": 16}
+                    }
+                },
+                "name": {"type": "text"},
+                "description": {"type": "text"},
+                "name_and_description": {"type": "text"},
+                "tag": {"type": "keyword"}
+            }
+        }
+    }
+    
+    client.indices.create(index=index_name, body=index_settings)
+    print(f"Mandate index '{index_name}' created.")
+
+
+def create_html_index(client: OpenSearch, index_name: str, dimension: int = 1024) -> None:
+    """
+    Creates an OpenSearch index for DFO HTML documents with KNN vector search.
+
+    This mapping includes all the original metadata fields (e.g., csas_html_year,
+    csas_html_title, html_url, pdf_url, html_language, html_page_title, html_year, html_doc_type)
+    and additional normalized metadata fields (year, doc_title, doc_url, download_url, language).
+    """
+    if client.indices.exists(index=index_name):
+        print(f"Index '{index_name}' already exists")
+        return
+
+    index_settings = {
+        "settings": {
+            "index": {"knn": True}
+        },
+        "mappings": {
+            "properties": {
+                "chunk_embedding": {
+                    "type": "knn_vector",
+                    "dimension": dimension,
+                    "method": {
+                        "name": "hnsw",
+                        "space_type": "cosinesimil",
+                        "engine": "nmslib",
+                        "parameters": {"ef_construction": 512, "m": 16}
+                    }
+                },
+                "page_content": {"type": "text"},
+
+                # Original metadata fields
+
+                ## CSAS Fields
+                "csas_html_year": {"type": "keyword"},
+                "csas_event": {"type": "text"},
+                "csas_html_title": {"type": "text"},
+                "html_url": {"type": "text"},
+
+                ## Extracted/Infered from HTML
+                "pdf_url": {"type": "text"},
+                "html_language": {"type": "keyword"},
+                "html_page_title": {"type": "text"},
+                "html_year": {"type": "keyword"},
+                "html_doc_type": {"type": "keyword"},
+
+                ## New extracted field (New)
+                "html_subject": {"type": "text"},
+                "html_authors": {"type": "keyword"}, # array of strings
+                
+                ## LLM categorizaton (New)
+                "mandate_categorization": {"type": "keyword"}, # array of strings
+                "topic_categorization": {"type": "keyword"}, # array of strings
+                "derived_topic_categorization": {"type": "keyword"}, # array of strings
+
+                # Additional normalized metadata fields
+                "year": {"type": "keyword"},
+                "doc_title": {"type": "text"},
+                "doc_url": {"type": "text"},
+                "download_url": {"type": "text"},
+                "language": {"type": "keyword"}
+            }
+        }
+    }
+
+    client.indices.create(index=index_name, body=index_settings)
+    print(f"HTML index '{index_name}' created.")
+
 
 def handler(event, context):
     print("Initializing indices and pipeline…")

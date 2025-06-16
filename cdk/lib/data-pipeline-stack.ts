@@ -174,15 +174,14 @@ export class DataPipelineStack extends cdk.Stack {
         "--extra-py-files": `s3://${this.glueBucket.bucketName}/glue/custom_modules/src-0.1-py3-none-any.whl`,
         "--additional-python-modules": PYTHON_LIBS,
         "library-set": "analytics",
-        "--batch_id": "2025_05_21", // Will be set at runtime
+        "--batch_id": "",  // Will be set at runtime
         "--bucket_name": this.dataUploadBucket.bucketName,
-        "--region_name": "us-west-2",
-        "--html_urls_path":
-          "s3://dfo-datapipeline-dfodatapipelinedatauploadbucket8e-zsfxa89bwwx2/batches/2025_05_21/html_data/CSASDocuments.xlsx", // Will be set at runtime
+        "--region_name": this.region,
+        "--html_urls_path": "",  // Will be set at runtime
         "--embedding_model": "amazon.titan-embed-text-v2:0",
-        "--opensearch_secret": "DFO-OpenSearch-opensearch/admin/credentials", // opensearchStack.userSecret.secretName,
-        "--opensearch_host": "/DFO-OpenSearch/opensearch/host", // opensearchStack.domain.domainEndpoint
-        "--rds_secret": "DFO-Database-DFO/credentials/DbCredential", // databaseStack.secretPathUser.secretName,
+        "--opensearch_secret":  opensearchStack.userSecret.secretName,
+        "--opensearch_host": opensearchStack.domain.domainEndpoint,
+        "--rds_secret": databaseStack.secretPathUser.secretName,
         "--dfo_html_full_index_name": "dfo-html-full-index",
         "--dfo_topic_full_index_name": "dfo-topic-full-index",
         "--dfo_mandate_full_index_name": "dfo-mandate-full-index",
@@ -211,57 +210,58 @@ export class DataPipelineStack extends cdk.Stack {
         maxCapacity: MAX_CAPACITY,
         timeout: TIMEOUT,
         glueVersion: GLUE_VER,
-        defaultArguments: commonArgs,
+        defaultArguments: {
+          ...commonArgs,
+          "--NEXT_JOB_NAME": `${id}-ingest-topics-and-mandates`,
+        },
         connections: {
           connections: [`${id}-glue-vpc-connection`],
         },
       }),
 
-      ingestTopicsAndMandates: new glue.CfnJob(
-        this,
-        "ingest_topics_and_mandates",
-        {
-          name: `${id}-ingest-topics-and-mandates`,
-          role: glueJobRole.roleArn,
-          command: {
-            name: "pythonshell",
-            pythonVersion: PYTHON_VER,
-            scriptLocation: `s3://${this.glueBucket.bucketName}/glue/scripts/ingest_topics_and_mandates.py`,
-          },
-          executionProperty: { maxConcurrentRuns: MAX_CONCURRENT_RUNS },
-          maxRetries: MAX_RETRIES,
-          maxCapacity: MAX_CAPACITY,
-          timeout: TIMEOUT,
-          glueVersion: GLUE_VER,
-          defaultArguments: commonArgs,
-          connections: {
-            connections: [`${id}-glue-vpc-connection`],
-          },
-        }
-      ),
+      ingestTopicsAndMandates: new glue.CfnJob(this, "ingest_topics_and_mandates", {
+        name: `${id}-ingest-topics-and-mandates`,
+        role: glueJobRole.roleArn,
+        command: {
+          name: "pythonshell",
+          pythonVersion: PYTHON_VER,
+          scriptLocation: `s3://${this.glueBucket.bucketName}/glue/scripts/ingest_topics_and_mandates.py`,
+        },
+        executionProperty: { maxConcurrentRuns: MAX_CONCURRENT_RUNS },
+        maxRetries: MAX_RETRIES,
+        maxCapacity: MAX_CAPACITY,
+        timeout: TIMEOUT,
+        glueVersion: GLUE_VER,
+        defaultArguments: {
+          ...commonArgs,
+          "--NEXT_JOB_NAME": `${id}-vector-llm-categorization`,
+        },
+        connections: {
+          connections: [`${id}-glue-vpc-connection`],
+        },
+      }),
 
-      vectorLlmCategorization: new glue.CfnJob(
-        this,
-        "vector_llm_categorization",
-        {
-          name: `${id}-vector-llm-categorization`,
-          role: glueJobRole.roleArn,
-          command: {
-            name: "pythonshell",
-            pythonVersion: PYTHON_VER,
-            scriptLocation: `s3://${this.glueBucket.bucketName}/glue/scripts/vector_llm_categorization.py`,
-          },
-          executionProperty: { maxConcurrentRuns: MAX_CONCURRENT_RUNS },
-          maxRetries: MAX_RETRIES,
-          maxCapacity: MAX_CAPACITY,
-          timeout: TIMEOUT,
-          glueVersion: GLUE_VER,
-          defaultArguments: commonArgs,
-          connections: {
-            connections: [`${id}-glue-vpc-connection`],
-          },
-        }
-      ),
+      vectorLlmCategorization: new glue.CfnJob(this, "vector_llm_categorization", {
+        name: `${id}-vector-llm-categorization`,
+        role: glueJobRole.roleArn,
+        command: {
+          name: "pythonshell",
+          pythonVersion: PYTHON_VER,
+          scriptLocation: `s3://${this.glueBucket.bucketName}/glue/scripts/vector_llm_categorization.py`,
+        },
+        executionProperty: { maxConcurrentRuns: MAX_CONCURRENT_RUNS },
+        maxRetries: MAX_RETRIES,
+        maxCapacity: MAX_CAPACITY,
+        timeout: TIMEOUT,
+        glueVersion: GLUE_VER,
+        defaultArguments: {
+          ...commonArgs,
+          "--NEXT_JOB_NAME": `${id}-sql-ingestion`,
+        },
+        connections: {
+          connections: [`${id}-glue-vpc-connection`],
+        },
+      }),
 
       sqlIngestion: new glue.CfnJob(this, "sql_ingestion", {
         name: `${id}-sql-ingestion`,
@@ -276,7 +276,10 @@ export class DataPipelineStack extends cdk.Stack {
         maxCapacity: MAX_CAPACITY,
         timeout: TIMEOUT,
         glueVersion: GLUE_VER,
-        defaultArguments: commonArgs,
+        defaultArguments: {
+          ...commonArgs,
+          "--NEXT_JOB_NAME": `${id}-topic-modelling`,
+        },
         connections: {
           connections: [`${id}-glue-vpc-connection`],
         },
@@ -302,134 +305,120 @@ export class DataPipelineStack extends cdk.Stack {
       }),
     };
 
-    // Create the workflow with parameters
-    const workflow = new glue.CfnWorkflow(this, "DataPipelineWorkflow", {
-      name: `${id}-data-pipeline-workflow`,
-      description: "Workflow for processing and categorizing documents",
-      defaultRunProperties: {
-        "--batch_id": "",
-        "--html_urls_path": "",
-        "--opensearch_host": "",
-        "--opensearch_secret": "",
-        "--rds_secret": "",
-      },
-    });
+    // // Create the workflow with parameters
+    // const workflow = new glue.CfnWorkflow(this, "DataPipelineWorkflow", {
+    //   name: `${id}-data-pipeline-workflow`,
+    //   description: "Workflow for processing and categorizing documents",
+    //   defaultRunProperties: {
+    //     "--batch_id":  "",
+    //     "--html_urls_path": "",
+    //     "--opensearch_host": "",
+    //     "--opensearch_secret": "",
+    //     "--rds_secret": "",
+    //   }
+    // });
 
-    // Create triggers for the workflow - now fully sequential
-    const startTrigger = new glue.CfnTrigger(this, "StartTrigger", {
-      name: `${id}-start-trigger`,
-      type: "ON_DEMAND",
-      workflowName: workflow.name,
-      actions: [
-        {
-          jobName: jobs.cleanAndIngestHtml.name,
-        },
-      ],
-    });
+    // // Create triggers for the workflow - now fully sequential
+    // const startTrigger = new glue.CfnTrigger(this, "StartTrigger", {
+    //   name: `${id}-start-trigger`,
+    //   type: "ON_DEMAND",
+    //   workflowName: workflow.name,
+    //   actions: [
+    //     {
+    //       jobName: jobs.cleanAndIngestHtml.name,
+    //     },
+    //   ],
+    // });
 
-    const ingestTopicsTrigger = new glue.CfnTrigger(
-      this,
-      "IngestTopicsTrigger",
-      {
-        name: `${id}-ingest-topics-trigger`,
-        type: "CONDITIONAL",
-        workflowName: workflow.name,
-        predicate: {
-          conditions: [
-            {
-              jobName: jobs.cleanAndIngestHtml.name,
-              state: "SUCCEEDED",
-              logicalOperator: "EQUALS",
-            },
-          ],
-        },
-        actions: [
-          {
-            jobName: jobs.ingestTopicsAndMandates.name,
-          },
-        ],
-      }
-    );
+    // const ingestTopicsTrigger = new glue.CfnTrigger(this, "IngestTopicsTrigger", {
+    //   name: `${id}-ingest-topics-trigger`,
+    //   type: "CONDITIONAL",
+    //   workflowName: workflow.name,
+    //   predicate: {
+    //     conditions: [
+    //       {
+    //         jobName: jobs.cleanAndIngestHtml.name,
+    //         state: "SUCCEEDED",
+    //         logicalOperator: "EQUALS",
+    //       },
+    //     ],
+    //   },
+    //   actions: [
+    //     {
+    //       jobName: jobs.ingestTopicsAndMandates.name,
+    //     },
+    //   ],
+    // });
 
-    const vectorLlmTrigger = new glue.CfnTrigger(this, "VectorLlmTrigger", {
-      name: `${id}-vector-llm-trigger`,
-      type: "CONDITIONAL",
-      workflowName: workflow.name,
-      predicate: {
-        conditions: [
-          {
-            jobName: jobs.ingestTopicsAndMandates.name,
-            state: "SUCCEEDED",
-            logicalOperator: "EQUALS",
-          },
-        ],
-      },
-      actions: [
-        {
-          jobName: jobs.vectorLlmCategorization.name,
-        },
-      ],
-    });
+    // const vectorLlmTrigger = new glue.CfnTrigger(this, "VectorLlmTrigger", {
+    //   name: `${id}-vector-llm-trigger`,
+    //   type: "CONDITIONAL",
+    //   workflowName: workflow.name,
+    //   predicate: {
+    //     conditions: [
+    //       {
+    //         jobName: jobs.ingestTopicsAndMandates.name,
+    //         state: "SUCCEEDED",
+    //         logicalOperator: "EQUALS",
+    //       },
+    //     ],
+    //   },
+    //   actions: [
+    //     {
+    //       jobName: jobs.vectorLlmCategorization.name,
+    //     },
+    //   ],
+    // });
 
-    const sqlIngestionTrigger = new glue.CfnTrigger(
-      this,
-      "SqlIngestionTrigger",
-      {
-        name: `${id}-sql-ingestion-trigger`,
-        type: "CONDITIONAL",
-        workflowName: workflow.name,
-        predicate: {
-          conditions: [
-            {
-              jobName: jobs.vectorLlmCategorization.name,
-              state: "SUCCEEDED",
-              logicalOperator: "EQUALS",
-            },
-          ],
-        },
-        actions: [
-          {
-            jobName: jobs.sqlIngestion.name,
-          },
-        ],
-      }
-    );
+    // const sqlIngestionTrigger = new glue.CfnTrigger(this, "SqlIngestionTrigger", {
+    //   name: `${id}-sql-ingestion-trigger`,
+    //   type: "CONDITIONAL",
+    //   workflowName: workflow.name,
+    //   predicate: {
+    //     conditions: [
+    //       {
+    //         jobName: jobs.vectorLlmCategorization.name,
+    //         state: "SUCCEEDED",
+    //         logicalOperator: "EQUALS",
+    //       },
+    //     ],
+    //   },
+    //   actions: [
+    //     {
+    //       jobName: jobs.sqlIngestion.name,
+    //     },
+    //   ],
+    // });
 
-    const topicModellingTrigger = new glue.CfnTrigger(
-      this,
-      "TopicModellingTrigger",
-      {
-        name: `${id}-topic-modelling-trigger`,
-        type: "CONDITIONAL",
-        workflowName: workflow.name,
-        predicate: {
-          conditions: [
-            {
-              jobName: jobs.sqlIngestion.name,
-              state: "SUCCEEDED",
-              logicalOperator: "EQUALS",
-            },
-          ],
-        },
-        actions: [
-          {
-            jobName: jobs.topicModelling.name,
-          },
-        ],
-      }
-    );
+    // const topicModellingTrigger = new glue.CfnTrigger(this, "TopicModellingTrigger", {
+    //   name: `${id}-topic-modelling-trigger`,
+    //   type: "CONDITIONAL",
+    //   workflowName: workflow.name,
+    //   predicate: {
+    //     conditions: [
+    //       {
+    //         jobName: jobs.sqlIngestion.name,
+    //         state: "SUCCEEDED",
+    //         logicalOperator: "EQUALS",
+    //       },
+    //     ],
+    //   },
+    //   actions: [
+    //     {
+    //       jobName: jobs.topicModelling.name,
+    //     },
+    //   ],
+    // });
 
-    // Set dependencies
-    startTrigger.addDependency(workflow);
-    ingestTopicsTrigger.addDependency(workflow);
-    vectorLlmTrigger.addDependency(workflow);
-    sqlIngestionTrigger.addDependency(workflow);
-    topicModellingTrigger.addDependency(workflow);
+    // // Set dependencies
+    // startTrigger.addDependency(workflow);
+    // ingestTopicsTrigger.addDependency(workflow);
+    // vectorLlmTrigger.addDependency(workflow);
+    // sqlIngestionTrigger.addDependency(workflow);
+    // topicModellingTrigger.addDependency(workflow);
 
-    // Apply removal policy to all resources
-    Object.values(jobs).forEach((job) =>
-      job.applyRemovalPolicy(RemovalPolicy.DESTROY)
-    );
-    workflow.applyRemovalPolicy(RemovalPolicy.DESTROY);
+    // // Apply removal policy to all resources
+    // Object.values(jobs).forEach(job => job.applyRemovalPolicy(RemovalPolicy.DESTROY));
+    // workflow.applyRemovalPolicy(RemovalPolicy.DESTROY);
   }
 }

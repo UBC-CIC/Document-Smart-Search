@@ -69,6 +69,7 @@ After making the required changes in the fork created in the [Deployment Guide](
   - Find `bedrockLLMParameter` in api-gateway-stack.ts
   - Change stringValue to the model ID of the model you would like to use. A list of thee available models and their IDs are listed [here](https://docs.aws.amazon.com/bedrock/latest/userguide/models-supported.html)
     For example to change the model to meta llama3 8b instruct, change `bedrockLLMParameter` to:
+
   ```typescript
   const bedrockLLMParameter = new ssm.StringParameter(
     this,
@@ -76,12 +77,15 @@ After making the required changes in the fork created in the [Deployment Guide](
     {
       parameterName: "/DFO/BedrockLLMId",
       description: "Parameter containing the Bedrock LLM ID",
-      stringValue: "meta.llama3-8b-instruct-v1:0",
+      stringValue: "us.meta.llama3-3-70b-instruct-v1:0',
     }
   );
+
   ```
-  - Add permissions to invoke the model selected by finding `bedrockPolicyStatement` and changing the model id. 
-  For example to change the model to meta llama3 8b instruct, change `bedrockPolicyStatement` to:
+
+  - Add permissions to invoke the model selected by finding `bedrockPolicyStatement` and changing the model id.
+    For example to change the model to meta llama3 8b instruct, change `bedrockPolicyStatement` to:
+
   ```typescript
   const bedrockPolicyStatement = new iam.PolicyStatement({
     effect: iam.Effect.ALLOW,
@@ -89,13 +93,14 @@ After making the required changes in the fork created in the [Deployment Guide](
     resources: [
       "arn:aws:bedrock:" +
         this.region +
-        "::foundation-model/meta.llama3-8b-instruct-v1:0",
+        "::foundation-model/us.meta.llama3-3-70b-instruct-v1:0",
       "arn:aws:bedrock:" +
         this.region +
         "::foundation-model/amazon.titan-embed-text-v2:0",
     ],
   });
   ```
+
   - redeploy the application by using the cdk deploy command in the deployment guide.
   - The `system_prompt` in `cdk/text_generation/src/helpers/chat.py` and the prompts in the administrator view may require updates when switching models.
 
