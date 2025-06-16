@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
-import { fetchSimilarDocuments, fetchSimilarDocumentFilterOptions } from "../services/similarDocumentsService";
+import {
+  fetchSimilarDocuments,
+  fetchSimilarDocumentFilterOptions,
+} from "../services/similarDocumentsService";
 
 export function useSimilarDocumentsPopup() {
   const [isPopupOpen, setIsPopupOpen] = useState(false);
@@ -12,26 +15,35 @@ export function useSimilarDocumentsPopup() {
   const [totalCount, setTotalCount] = useState(0);
   const [filters, setFilters] = useState({ years: {}, documentTypes: {} });
   const [sortBy, setSortBy] = useState("semanticScore");
-  const [filterOptions, setFilterOptions] = useState({ years: [], documentTypes: [] });
+  const [filterOptions, setFilterOptions] = useState({
+    years: [],
+    documentTypes: [],
+  });
   const resultsPerPage = 5; // Number of results per page
 
   // Fetch filter options when popup opens
   useEffect(() => {
     if (isPopupOpen) {
       fetchSimilarDocumentFilterOptions()
-        .then(options => {
+        .then((options) => {
           setFilterOptions(options);
           setFilters({
-            years: Object.fromEntries(options.years.map(year => [year, false])),
-            documentTypes: Object.fromEntries(options.documentTypes.map(type => [type, false]))
+            years: Object.fromEntries(
+              options.years.map((year) => [year, false])
+            ),
+            documentTypes: Object.fromEntries(
+              options.documentTypes.map((type) => [type, false])
+            ),
           });
-          
+
           // Load initial documents
           if (documentId) {
             loadDocuments(documentId);
           }
         })
-        .catch(error => console.error("Error fetching filter options:", error));
+        .catch((error) =>
+          console.error("Error fetching filter options:", error)
+        );
     }
   }, [isPopupOpen, documentId]);
 
@@ -40,10 +52,10 @@ export function useSimilarDocumentsPopup() {
     if (allDocuments.length > 0) {
       // Sort documents client-side
       const sortedDocuments = sortDocuments(allDocuments, sortBy);
-      
+
       // Update total pages
       setTotalPages(Math.ceil(sortedDocuments.length / resultsPerPage));
-      
+
       // Apply pagination
       const startIndex = (currentPage - 1) * resultsPerPage;
       const endIndex = startIndex + resultsPerPage;
@@ -73,7 +85,7 @@ export function useSimilarDocumentsPopup() {
       const data = await fetchSimilarDocuments(docId, filters);
       setAllDocuments(data.documents || []);
       setTotalCount(data.totalCount || 0);
-      
+
       if (data.filterOptions) {
         setFilterOptions(data.filterOptions);
       }
@@ -104,13 +116,13 @@ export function useSimilarDocumentsPopup() {
   // Sort documents based on different criteria
   const sortDocuments = (documents, sortByOption) => {
     const docs = [...documents];
-    
+
     switch (sortByOption) {
-      case 'semanticScore':
+      case "semanticScore":
         return docs.sort((a, b) => b.semanticScore - a.semanticScore);
-      case 'yearDesc':
+      case "yearDesc":
         return docs.sort((a, b) => b.year - a.year);
-      case 'yearAsc':
+      case "yearAsc":
         return docs.sort((a, b) => a.year - b.year);
       default:
         // Default is semantic score
@@ -133,6 +145,6 @@ export function useSimilarDocumentsPopup() {
     closePopup,
     handlePageChange,
     handleFilterChange,
-    handleSortChange
+    handleSortChange,
   };
 }

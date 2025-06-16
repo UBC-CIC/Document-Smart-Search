@@ -11,14 +11,16 @@ export function useQuerySummary() {
 
   const fetchSummary = async (userQuery, documentId) => {
     // Return cached summary if available for the same document and query
-    if (querySummaryData && 
-        querySummaryData.documentId === documentId && 
-        querySummaryData.userQuery === userQuery) {
+    if (
+      querySummaryData &&
+      querySummaryData.documentId === documentId &&
+      querySummaryData.userQuery === userQuery
+    ) {
       return querySummaryData;
     }
 
     setQuerySummaryLoading(true);
-    
+
     try {
       const summaryData = await getQuerySummary(userQuery, documentId);
       setQuerySummaryData(summaryData);

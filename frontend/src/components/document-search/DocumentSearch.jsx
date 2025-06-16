@@ -1,29 +1,29 @@
-"use client"
+"use client";
 
-import { useState } from "react"
+import { useState } from "react";
 
 // Components
-import SearchBar from "./components/SearchBar"
-import Filters from "./components/Filters"
-import ResultsList from "./components/ResultsList"
-import QuerySummaryModal from "./components/QuerySummaryModal"
+import SearchBar from "./components/SearchBar";
+import Filters from "./components/Filters";
+import ResultsList from "./components/ResultsList";
+import QuerySummaryModal from "./components/QuerySummaryModal";
 
 // Hooks
-import { useDocumentSearch } from "./hooks/useDocumentSearch"
-import { useQuerySummary } from "./hooks/useQuerySummary"
+import { useDocumentSearch } from "./hooks/useDocumentSearch";
+import { useQuerySummary } from "./hooks/useQuerySummary";
 
 export default function DocumentSearch() {
-  const [activeTab, setActiveTab] = useState("document")
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [isFilterOpen, setIsFilterOpen] = useState(false)
-  
+  const [activeTab, setActiveTab] = useState("document");
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+
   const {
     searchQuery,
     setSearchQuery,
     filteredResults,
     sortBy,
     setSortBy,
-    currentPage, 
+    currentPage,
     setCurrentPage,
     yearFilters,
     setYearFilters,
@@ -43,8 +43,8 @@ export default function DocumentSearch() {
     totalPages,
     isLoading,
     hasSearched,
-  } = useDocumentSearch()
-  
+  } = useDocumentSearch();
+
   const {
     isQuerySummaryOpen,
     selectedDocumentId,
@@ -54,20 +54,20 @@ export default function DocumentSearch() {
     modalRef,
     openQuerySummary,
     closeQuerySummary,
-  } = useQuerySummary()
+  } = useQuerySummary();
 
   // Handle search input
   const handleSearch = (e) => {
-    e.preventDefault()
+    e.preventDefault();
     if (searchQuery.trim()) {
-      applyFilters()
+      applyFilters();
     }
-  }
+  };
 
   // Handle sort change
   const handleSortChange = (sort) => {
-    setSortBy(sort)
-  }
+    setSortBy(sort);
+  };
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900 transition-all duration-300">
@@ -78,10 +78,10 @@ export default function DocumentSearch() {
         </h2>
 
         {/* Search Box */}
-        <SearchBar 
-          searchQuery={searchQuery} 
-          setSearchQuery={setSearchQuery} 
-          handleSearch={handleSearch} 
+        <SearchBar
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          handleSearch={handleSearch}
           isLoading={isLoading}
         />
 
@@ -93,12 +93,30 @@ export default function DocumentSearch() {
           >
             <span className="font-medium dark:text-white">Filters</span>
             {isFilterOpen ? (
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                  clipRule="evenodd"
+                />
               </svg>
             ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                  clipRule="evenodd"
+                />
               </svg>
             )}
           </button>
@@ -107,7 +125,7 @@ export default function DocumentSearch() {
         {/* Filters and Results */}
         <div className="flex flex-col md:flex-row gap-6">
           {/* Filters */}
-          <Filters 
+          <Filters
             isFilterOpen={isFilterOpen}
             yearFilters={yearFilters}
             setYearFilters={setYearFilters}
@@ -126,7 +144,7 @@ export default function DocumentSearch() {
           />
 
           {/* Results */}
-          <ResultsList 
+          <ResultsList
             filteredResults={filteredResults}
             sortBy={sortBy}
             handleSortChange={handleSortChange}
@@ -134,16 +152,18 @@ export default function DocumentSearch() {
             currentPage={currentPage}
             setCurrentPage={setCurrentPage}
             totalPages={totalPages}
-            openQuerySummary={(documentId) => openQuerySummary(documentId, searchQuery)}
+            openQuerySummary={(documentId) =>
+              openQuerySummary(documentId, searchQuery)
+            }
             isLoading={isLoading}
             hasSearched={hasSearched}
             searchQuery={searchQuery}
           />
         </div>
       </main>
-      
+
       {/* Query Summary Modal */}
-      <QuerySummaryModal 
+      <QuerySummaryModal
         isOpen={isQuerySummaryOpen}
         onClose={closeQuerySummary}
         modalRef={modalRef}
@@ -153,5 +173,5 @@ export default function DocumentSearch() {
         summaryData={querySummaryData}
       />
     </div>
-  )
+  );
 }

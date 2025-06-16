@@ -6,7 +6,7 @@ export function useDocumentDetail(documentId) {
   const [relatedDocuments, setRelatedDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+
   // State for expandable sections - all default to true/open now
   const [expandedSections, setExpandedSections] = useState({
     subject: true,
@@ -30,37 +30,38 @@ export function useDocumentDetail(documentId) {
     async function getDocumentDetails() {
       // Clear any previous error
       setError(null);
-      
+
       // Validate document ID
       if (!documentId) {
         setLoading(false);
         setError("No document ID provided");
         return;
       }
-      
+
       setLoading(true);
       try {
         console.log("Fetching document with ID:", documentId);
-        
+
         // Extract ID from path if it's a full URL
         let cleanId = documentId;
-        if (typeof documentId === 'string' && documentId.includes('/')) {
-          cleanId = documentId.split('/').pop();
+        if (typeof documentId === "string" && documentId.includes("/")) {
+          cleanId = documentId.split("/").pop();
         }
-        
+
         const documentData = await fetchDocumentDetail(cleanId);
         console.log("Document data received:", documentData ? "Yes" : "No");
         setDocument(documentData);
-        
+
         // Set related documents directly from the document data
         if (documentData.relatedDocuments) {
           // Filter out invalid documents
-          const validRelatedDocs = documentData.relatedDocuments.filter(doc => 
-            doc.id !== "unknown" && 
-            doc.title !== "Document Not Found" &&
-            doc.id !== cleanId  // Exclude current document
+          const validRelatedDocs = documentData.relatedDocuments.filter(
+            (doc) =>
+              doc.id !== "unknown" &&
+              doc.title !== "Document Not Found" &&
+              doc.id !== cleanId // Exclude current document
           );
-          
+
           setRelatedDocuments(validRelatedDocs);
         } else {
           setRelatedDocuments([]);
@@ -72,7 +73,7 @@ export function useDocumentDetail(documentId) {
         setLoading(false);
       }
     }
-    
+
     getDocumentDetails();
   }, [documentId]);
 
@@ -82,6 +83,6 @@ export function useDocumentDetail(documentId) {
     loading,
     error,
     expandedSections,
-    toggleSection
+    toggleSection,
   };
 }

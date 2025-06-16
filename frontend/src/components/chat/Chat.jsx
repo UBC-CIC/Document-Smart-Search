@@ -113,7 +113,11 @@ export default function Chat() {
       }`}
     >
       {/* Citations Sidebar - z-index set to be below modal but above content */}
-      <div className={`fixed inset-0 z-30 pointer-events-none ${isSidebarOpen ? "visible" : "invisible"}`}>
+      <div
+        className={`fixed inset-0 z-30 pointer-events-none ${
+          isSidebarOpen ? "visible" : "invisible"
+        }`}
+      >
         <div
           className={`absolute top-12 bottom-0 left-0 w-96 bg-white shadow-lg transform transition-transform duration-300 pointer-events-auto ${
             isSidebarOpen ? "translate-x-0" : "-translate-x-full"
@@ -125,7 +129,8 @@ export default function Chat() {
             onClose={() => setIsSidebarOpen(false)}
             toolsUsed={
               messages.length > 0 && currentMessageId
-                ? messages.find((m) => m.id === currentMessageId)?.tools_used || {}
+                ? messages.find((m) => m.id === currentMessageId)?.tools_used ||
+                  {}
                 : {}
             }
             currentMessageId={currentMessageId}
@@ -144,7 +149,9 @@ export default function Chat() {
       {/* Main Content */}
       <main className="max-w-6xl mx-auto px-4 py-6 md:py-8 flex-grow flex flex-col relative z-10">
         <div className="relative mb-1 md:mb-1">
-          <h2 className="text-2xl md:text-3xl font-bold text-center">SmartSearch Assistant</h2>
+          <h2 className="text-2xl md:text-3xl font-bold text-center">
+            SmartSearch Assistant
+          </h2>
         </div>
 
         {/* Chat Messages */}
@@ -162,7 +169,7 @@ export default function Chat() {
           onOpenSidebar={(messageId) => {
             // If we're viewing the same message's sources, toggle the sidebar
             if (currentMessageId === messageId) {
-              setIsSidebarOpen(prev => !prev);
+              setIsSidebarOpen((prev) => !prev);
             } else {
               // If it's a different message, set the current message and open the sidebar
               setCurrentMessageId(messageId);
@@ -210,7 +217,10 @@ export default function Chat() {
       </main>
 
       {/* Disclaimer Modal - z-index set higher than sidebar */}
-      <DisclaimerModal show={showDisclaimer} onClose={() => setShowDisclaimer(false)} />
+      <DisclaimerModal
+        show={showDisclaimer}
+        onClose={() => setShowDisclaimer(false)}
+      />
 
       <ToastContainer
         position="top-center"

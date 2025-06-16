@@ -32,9 +32,12 @@ export default function NavigationHeader() {
   const baseMobileClasses = "font-medium py-2";
 
   return (
-    <header className="border-b shadow-sm sticky top-0 bg-white" style={{ zIndex: 1000 }}>
+    <header
+      className="border-b shadow-sm sticky top-0 bg-white"
+      style={{ zIndex: 1000 }}
+    >
       <div className="max-w-[90%] mx-auto px-4 py-2 flex items-center justify-between">
-      {/* Left side: Logo */}
+        {/* Left side: Logo */}
         <div className="flex items-center">
           <Image
             src={flag || "/placeholder.svg"}
@@ -100,7 +103,11 @@ export default function NavigationHeader() {
             className="md:hidden text-gray-600"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           >
-            {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            {isMobileMenuOpen ? (
+              <X className="h-6 w-6" />
+            ) : (
+              <Menu className="h-6 w-6" />
+            )}
           </button>
         </div>
       </div>

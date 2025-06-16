@@ -18,8 +18,7 @@ export const createRolesAndPolicies = (
     });
   };
 
-  
-  const adminRole = new iam.Role(scope,`${id}-AdminRole`, {
+  const adminRole = new iam.Role(scope, `${id}-AdminRole`, {
     assumedBy: new iam.FederatedPrincipal(
       "cognito-identity.amazonaws.com",
       {

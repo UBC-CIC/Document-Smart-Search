@@ -1,22 +1,22 @@
-import {
-  Stack,
-  StackProps,
-  Duration,
-  RemovalPolicy,
-} from "aws-cdk-lib";
+import { Stack, StackProps, Duration, RemovalPolicy } from "aws-cdk-lib";
 import { Construct } from "constructs";
-import * as ec2        from "aws-cdk-lib/aws-ec2";
+import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as opensearch from "aws-cdk-lib/aws-opensearchservice";
-import * as secrets    from "aws-cdk-lib/aws-secretsmanager";
-import * as ssm        from "aws-cdk-lib/aws-ssm";
-import { VpcStack }    from "./vpc-stack";
+import * as secrets from "aws-cdk-lib/aws-secretsmanager";
+import * as ssm from "aws-cdk-lib/aws-ssm";
+import { VpcStack } from "./vpc-stack";
 
 export class OpenSearchStack extends Stack {
   public readonly domain: opensearch.Domain;
   public readonly adminSecret: secrets.Secret;
-  public readonly userSecret:  secrets.Secret;
+  public readonly userSecret: secrets.Secret;
 
-  constructor(scope: Construct, id: string, vpcStack: VpcStack, props?: StackProps) {
+  constructor(
+    scope: Construct,
+    id: string,
+    vpcStack: VpcStack,
+    props?: StackProps
+  ) {
     super(scope, id, props);
 
     // 1) Admin & User secrets
@@ -60,27 +60,27 @@ export class OpenSearchStack extends Stack {
       vpcSubnets: [{ subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS }],
       securityGroups: [osSg],
       capacity: {
-        dataNodes:                  2,
-        dataNodeInstanceType:       "t3.medium.search",
-        multiAzWithStandbyEnabled:  false,
+        dataNodes: 2,
+        dataNodeInstanceType: "t3.medium.search",
+        multiAzWithStandbyEnabled: false,
       },
       ebs: {
         volumeSize: 100,
         volumeType: ec2.EbsDeviceVolumeType.GP3,
       },
       zoneAwareness: {
-        enabled:               true,
+        enabled: true,
         availabilityZoneCount: 2,
       },
       logging: {
-        appLogEnabled:       true,
-        slowSearchLogEnabled:true,
+        appLogEnabled: true,
+        slowSearchLogEnabled: true,
         slowIndexLogEnabled: true,
       },
       nodeToNodeEncryption: true,
-      encryptionAtRest:     { enabled: true },
-      enforceHttps:         true,
-      removalPolicy:        RemovalPolicy.DESTROY,
+      encryptionAtRest: { enabled: true },
+      enforceHttps: true,
+      removalPolicy: RemovalPolicy.DESTROY,
       // uncomment to enable fine-grained access control with username/password
       // fineGrainedAccessControl: {
       //   masterUserName: this.adminSecret.secretValueFromJson("username").toString(),

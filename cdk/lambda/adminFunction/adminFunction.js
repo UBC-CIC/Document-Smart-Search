@@ -1,91 +1,92 @@
-const { initializeConnection } = require("./libadmin.js")
-const postgres = require('postgres');
+const { initializeConnection } = require("./libadmin.js");
+const postgres = require("postgres");
 const sql = postgres();
 
-const { SM_DB_CREDENTIALS, RDS_PROXY_ENDPOINT } = process.env
+const { SM_DB_CREDENTIALS, RDS_PROXY_ENDPOINT } = process.env;
 
 // SQL conneciton from global variable at libadmin.js
-let sqlConnectionTableCreator = global.sqlConnectionTableCreator
+let sqlConnectionTableCreator = global.sqlConnectionTableCreator;
 
 exports.handler = async (event) => {
   const response = {
     statusCode: 200,
     headers: {
-      "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
+      "Access-Control-Allow-Headers":
+        "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "*",
     },
     body: "",
-  }
+  };
 
   // Initialize the database connection if not already initialized
   if (!sqlConnectionTableCreator) {
-    await initializeConnection(SM_DB_CREDENTIALS, RDS_PROXY_ENDPOINT)
-    sqlConnectionTableCreator = global.sqlConnectionTableCreator
+    await initializeConnection(SM_DB_CREDENTIALS, RDS_PROXY_ENDPOINT);
+    sqlConnectionTableCreator = global.sqlConnectionTableCreator;
   }
 
   // Function to format user full names (lowercase and spaces replaced with "_")
   const formatNames = (name) => {
-    return name.toLowerCase().replace(/\s+/g, "_")
-  }
+    return name.toLowerCase().replace(/\s+/g, "_");
+  };
 
-  let data
+  let data;
   try {
-    const pathData = event.httpMethod + " " + event.resource
+    const pathData = event.httpMethod + " " + event.resource;
     switch (pathData) {
       case "GET /admin/analytics":
         try {
           // Get time frame from query parameters, default to 'month'
-          const timeFrame = event.queryStringParameters?.timeFrame || "month"
+          const timeFrame = event.queryStringParameters?.timeFrame || "month";
 
           // Get current date
-          const currentDate = new Date()
+          const currentDate = new Date();
 
           // Set the start date based on the time frame
-          const startDate = new Date()
+          const startDate = new Date();
 
           switch (timeFrame) {
             case "day":
               // For day view, show the past 7 days
-              startDate.setDate(startDate.getDate() - 7)
-              break
+              startDate.setDate(startDate.getDate() - 7);
+              break;
             case "week":
               // For week view, show the past 3 months (approximately 12-13 weeks)
-              startDate.setMonth(startDate.getMonth() - 3)
-              break
+              startDate.setMonth(startDate.getMonth() - 3);
+              break;
             case "year":
               // For year view, show the past 5 years
-              startDate.setFullYear(startDate.getFullYear() - 5)
-              break
+              startDate.setFullYear(startDate.getFullYear() - 5);
+              break;
             case "month":
             default:
               // For month view, show the past year (12 months)
-              startDate.setFullYear(startDate.getFullYear() - 1)
-              break
+              startDate.setFullYear(startDate.getFullYear() - 1);
+              break;
           }
 
           // Determine the date truncation based on the requested time frame
-          let dateTrunc
-          let interval
+          let dateTrunc;
+          let interval;
 
           switch (timeFrame) {
             case "day":
-              dateTrunc = "day"
-              interval = "1 day"
-              break
+              dateTrunc = "day";
+              interval = "1 day";
+              break;
             case "week":
-              dateTrunc = "week"
-              interval = "1 week"
-              break
+              dateTrunc = "week";
+              interval = "1 week";
+              break;
             case "year":
-              dateTrunc = "year"
-              interval = "1 year"
-              break
+              dateTrunc = "year";
+              interval = "1 year";
+              break;
             case "month":
             default:
-              dateTrunc = "month"
-              interval = "1 month"
-              break
+              dateTrunc = "month";
+              interval = "1 month";
+              break;
           }
 
           // SQL query to get the number of unique users per time period
@@ -105,7 +106,7 @@ exports.handler = async (event) => {
               ON DATE_TRUNC(${dateTrunc}, uel.timestamp) = t.period
             GROUP BY t.period
             ORDER BY t.period;
-          `
+          `;
 
           // SQL query to get the number of messages per time period per user_role
           const messagesPerRolePerTimePeriod = await sqlConnectionTableCreator`
@@ -125,7 +126,7 @@ exports.handler = async (event) => {
               ON DATE_TRUNC(${dateTrunc}, uel.timestamp) = t.period
             GROUP BY t.period, uel.user_role
             ORDER BY t.period, uel.user_role;
-          `
+          `;
 
           // SQL query to get the total average feedback rating for each user_role
           const totalFeedbackAveragePerRole = await sqlConnectionTableCreator`
@@ -136,12 +137,15 @@ exports.handler = async (event) => {
             LEFT JOIN user_engagement_log uel
               ON fb.session_id = uel.session_id
             GROUP BY uel.user_role;
-          `
+          `;
 
           const formattedFeedback = totalFeedbackAveragePerRole.map((role) => ({
             user_role: role.user_role,
-            avg_feedback_rating: role.avg_feedback_rating !== null ? role.avg_feedback_rating : "no feedback yet",
-          }))
+            avg_feedback_rating:
+              role.avg_feedback_rating !== null
+                ? role.avg_feedback_rating
+                : "no feedback yet",
+          }));
 
           // Format the data based on the time frame
           const formattedUniqueUsers = uniqueUsersPerTimePeriod.map((item) => {
@@ -150,44 +154,46 @@ exports.handler = async (event) => {
               return {
                 month: item.time_period.substring(0, 7), // YYYY-MM format
                 unique_users: item.unique_users,
-              }
+              };
             } else if (timeFrame === "year") {
               return {
                 month: item.time_period.substring(0, 4), // YYYY format
                 unique_users: item.unique_users,
-              }
+              };
             } else {
               // For day and week, keep the full date
               return {
                 month: item.time_period, // YYYY-MM-DD format
                 unique_users: item.unique_users,
-              }
+              };
             }
-          })
+          });
 
-          const formattedMessagesPerRole = messagesPerRolePerTimePeriod.map((item) => {
-            // For month and year views, we'll format the date differently
-            if (timeFrame === "month") {
-              return {
-                month: item.time_period.substring(0, 7), // YYYY-MM format
-                user_role: item.user_role,
-                message_count: item.message_count,
-              }
-            } else if (timeFrame === "year") {
-              return {
-                month: item.time_period.substring(0, 4), // YYYY format
-                user_role: item.user_role,
-                message_count: item.message_count,
-              }
-            } else {
-              // For day and week, keep the full date
-              return {
-                month: item.time_period, // YYYY-MM-DD format
-                user_role: item.user_role,
-                message_count: item.message_count,
+          const formattedMessagesPerRole = messagesPerRolePerTimePeriod.map(
+            (item) => {
+              // For month and year views, we'll format the date differently
+              if (timeFrame === "month") {
+                return {
+                  month: item.time_period.substring(0, 7), // YYYY-MM format
+                  user_role: item.user_role,
+                  message_count: item.message_count,
+                };
+              } else if (timeFrame === "year") {
+                return {
+                  month: item.time_period.substring(0, 4), // YYYY format
+                  user_role: item.user_role,
+                  message_count: item.message_count,
+                };
+              } else {
+                // For day and week, keep the full date
+                return {
+                  month: item.time_period, // YYYY-MM-DD format
+                  user_role: item.user_role,
+                  message_count: item.message_count,
+                };
               }
             }
-          })
+          );
 
           // Return the combined data in the response
           response.body = JSON.stringify({
@@ -199,13 +205,13 @@ exports.handler = async (event) => {
               start: startDate.toISOString().split("T")[0],
               end: currentDate.toISOString().split("T")[0],
             },
-          })
+          });
         } catch (err) {
-          response.statusCode = 500
-          console.error(err)
-          response.body = JSON.stringify({ error: "Internal server error" })
+          response.statusCode = 500;
+          console.error(err);
+          response.body = JSON.stringify({ error: "Internal server error" });
         }
-        break
+        break;
       case "PUT /admin/update_metadata":
         if (
           event.queryStringParameters != null &&
@@ -213,10 +219,10 @@ exports.handler = async (event) => {
           event.queryStringParameters.document_name &&
           event.queryStringParameters.document_type
         ) {
-          const categoryId = event.queryStringParameters.category_id
-          const documentName = event.queryStringParameters.document_name
-          const documentType = event.queryStringParameters.document_type
-          const { metadata } = JSON.parse(event.body)
+          const categoryId = event.queryStringParameters.category_id;
+          const documentName = event.queryStringParameters.document_name;
+          const documentType = event.queryStringParameters.document_type;
+          const { metadata } = JSON.parse(event.body);
 
           try {
             // Query to find the document with the given category_id, document_name, and document_type
@@ -225,7 +231,7 @@ exports.handler = async (event) => {
         WHERE category_id = ${categoryId}
         AND document_name = ${documentName}
         AND document_type = ${documentType};
-      `
+      `;
 
             if (existingDocument.length === 0) {
               // If document does not exist, insert a new entry
@@ -233,12 +239,12 @@ exports.handler = async (event) => {
           INSERT INTO documents (document_id, category_id, document_s3_file_path, document_name, document_type, metadata, time_created)
           VALUES (uuid_generate_v4(), ${categoryId}, NULL, ${documentName}, ${documentType}, ${metadata}, CURRENT_TIMESTAMP)
           RETURNING *;
-        `
-              response.statusCode = 201
+        `;
+              response.statusCode = 201;
               response.body = JSON.stringify({
                 message: "Document metadata added successfully",
                 document: result[0],
-              })
+              });
             } else {
               // Update the metadata field for an existing document
               const result = await sqlConnectionTableCreator`
@@ -248,33 +254,33 @@ exports.handler = async (event) => {
           AND document_name = ${documentName}
           AND document_type = ${documentType}
           RETURNING *;
-        `
+        `;
 
               if (result.length > 0) {
-                response.statusCode = 200
+                response.statusCode = 200;
                 response.body = JSON.stringify({
                   message: "Document metadata updated successfully",
                   document: result[0],
-                })
+                });
               } else {
-                response.statusCode = 500
+                response.statusCode = 500;
                 response.body = JSON.stringify({
                   error: "Failed to update metadata.",
-                })
+                });
               }
             }
           } catch (err) {
-            response.statusCode = 500
-            console.error(err)
-            response.body = JSON.stringify({ error: "Internal server error" })
+            response.statusCode = 500;
+            console.error(err);
+            response.body = JSON.stringify({ error: "Internal server error" });
           }
         } else {
-          response.statusCode = 400
+          response.statusCode = 400;
           response.body = JSON.stringify({
             error: "category_id, document_name, and document_type are required",
-          })
+          });
         }
-        break
+        break;
       case "GET /admin/conversation_history_preview":
         try {
           const result = await sqlConnectionTableCreator`
@@ -294,37 +300,42 @@ exports.handler = async (event) => {
               FROM RankedMessages
               WHERE rn <= 10
               ORDER BY user_role, timestamp DESC;
-            `
+            `;
 
           const groupedResults = result.reduce((acc, row) => {
             if (!acc[row.user_role]) {
-              acc[row.user_role] = []
+              acc[row.user_role] = [];
             }
-            acc[row.user_role].push(row)
-            return acc
-          }, {})
+            acc[row.user_role].push(row);
+            return acc;
+          }, {});
 
-          response.body = JSON.stringify(groupedResults)
+          response.body = JSON.stringify(groupedResults);
         } catch (err) {
-          response.statusCode = 500
-          console.error(err)
-          response.body = JSON.stringify({ error: "Internal server error" })
+          response.statusCode = 500;
+          console.error(err);
+          response.body = JSON.stringify({ error: "Internal server error" });
         }
-        break
-        case "GET /admin/conversation_sessions":
-          if (event.queryStringParameters && event.queryStringParameters.user_role) {
-            const userRole = event.queryStringParameters.user_role;
-            const startDate = event.queryStringParameters.start_date || null;
-            const endDate = event.queryStringParameters.end_date || null;
-            const page = parseInt(event.queryStringParameters.page) || 1;
-            const limit = parseInt(event.queryStringParameters.limit) || 10;
-            const offset = (page - 1) * limit;
-        
-            console.log(`Fetching sessions for user_role=${userRole}, start_date=${startDate}, end_date=${endDate}, page=${page}, limit=${limit}`);
-        
-            try {
-              // Fetch the paginated sessions with LIMIT and OFFSET
-              const sessions = await sqlConnectionTableCreator`
+        break;
+      case "GET /admin/conversation_sessions":
+        if (
+          event.queryStringParameters &&
+          event.queryStringParameters.user_role
+        ) {
+          const userRole = event.queryStringParameters.user_role;
+          const startDate = event.queryStringParameters.start_date || null;
+          const endDate = event.queryStringParameters.end_date || null;
+          const page = parseInt(event.queryStringParameters.page) || 1;
+          const limit = parseInt(event.queryStringParameters.limit) || 10;
+          const offset = (page - 1) * limit;
+
+          console.log(
+            `Fetching sessions for user_role=${userRole}, start_date=${startDate}, end_date=${endDate}, page=${page}, limit=${limit}`
+          );
+
+          try {
+            // Fetch the paginated sessions with LIMIT and OFFSET
+            const sessions = await sqlConnectionTableCreator`
                 WITH ranked_messages AS (
                   SELECT 
                     session_id,
@@ -363,9 +374,9 @@ exports.handler = async (event) => {
                 ORDER BY lm.last_message_time DESC
                 LIMIT ${limit} OFFSET ${offset};
               `;
-        
-              // Separate query to count the total number of matching sessions (without fetching the data)
-              const totalCount = await sqlConnectionTableCreator`
+
+            // Separate query to count the total number of matching sessions (without fetching the data)
+            const totalCount = await sqlConnectionTableCreator`
                 WITH ranked_messages AS (
                   SELECT 
                     session_id
@@ -380,32 +391,34 @@ exports.handler = async (event) => {
                 SELECT COUNT(DISTINCT session_id) AS total_count
                 FROM ranked_messages;
               `;
-        
-              // Calculate total pages based on totalCount
-              const totalPages = Math.ceil(totalCount[0].total_count / limit);
-        
-              console.log(`Found ${totalCount[0].total_count} total sessions, with ${totalPages} pages.`);
-        
-              response.body = JSON.stringify({
-                sessions,
-                totalPages,
-                currentPage: page,
-                totalCount: totalCount[0].total_count,
-              });
-              response.statusCode = 200; // OK
-            } catch (err) {
-              console.error("Error fetching sessions:", err);
-              response.statusCode = 500; // Internal Server Error
-              response.body = JSON.stringify({ error: "Internal server error" });
-            }
-          } else {
-            console.error("Missing required parameter: user_role");
-            response.statusCode = 400; // Bad Request
+
+            // Calculate total pages based on totalCount
+            const totalPages = Math.ceil(totalCount[0].total_count / limit);
+
+            console.log(
+              `Found ${totalCount[0].total_count} total sessions, with ${totalPages} pages.`
+            );
+
             response.body = JSON.stringify({
-              error: "Missing required parameter: user_role",
+              sessions,
+              totalPages,
+              currentPage: page,
+              totalCount: totalCount[0].total_count,
             });
+            response.statusCode = 200; // OK
+          } catch (err) {
+            console.error("Error fetching sessions:", err);
+            response.statusCode = 500; // Internal Server Error
+            response.body = JSON.stringify({ error: "Internal server error" });
           }
-          break;
+        } else {
+          console.error("Missing required parameter: user_role");
+          response.statusCode = 400; // Bad Request
+          response.body = JSON.stringify({
+            error: "Missing required parameter: user_role",
+          });
+        }
+        break;
       case "GET /admin/previous_prompts":
         try {
           // Subquery to get the latest non-null time_created for each role
@@ -416,9 +429,14 @@ exports.handler = async (event) => {
         MAX(time_created) FILTER (WHERE policy_maker IS NOT NULL) AS latest_policy_maker,
         MAX(time_created) FILTER (WHERE external_researcher IS NOT NULL) AS latest_external_researcher
       FROM prompts;
-    `
+    `;
 
-          const { latest_public, latest_internal_researcher, latest_policy_maker, latest_external_researcher } = latestTimestamps[0]
+          const {
+            latest_public,
+            latest_internal_researcher,
+            latest_policy_maker,
+            latest_external_researcher,
+          } = latestTimestamps[0];
 
           // Query to get all previous non-null entries for each role after the latest entry
           const previousPrompts = await sqlConnectionTableCreator`
@@ -430,7 +448,7 @@ exports.handler = async (event) => {
         (policy_maker IS NOT NULL AND time_created < ${latest_policy_maker}) OR
         (external_researcher IS NOT NULL AND time_created < ${latest_external_researcher})
       ORDER BY time_created DESC;
-    `
+    `;
 
           // Organize prompts by role and ignore null values
           const organizedPrompts = {
@@ -458,38 +476,49 @@ exports.handler = async (event) => {
                 prompt: entry.external_researcher,
                 time_created: entry.time_created,
               })),
-          }
+          };
 
           // Return the organized prompts by role
-          response.statusCode = 200
-          response.body = JSON.stringify(organizedPrompts)
+          response.statusCode = 200;
+          response.body = JSON.stringify(organizedPrompts);
         } catch (err) {
           // Handle any errors that occur during the query
-          response.statusCode = 500
-          console.error(err)
-          response.body = JSON.stringify({ error: "Internal server error" })
+          response.statusCode = 500;
+          console.error(err);
+          response.body = JSON.stringify({ error: "Internal server error" });
         }
-        break
+        break;
       case "POST /admin/insert_prompt":
         try {
           // Check if the required query parameter and body are provided
-          if (!event.queryStringParameters || !event.queryStringParameters.role || !event.body) {
-            response.statusCode = 400
+          if (
+            !event.queryStringParameters ||
+            !event.queryStringParameters.role ||
+            !event.body
+          ) {
+            response.statusCode = 400;
             response.body = JSON.stringify({
               error: "Missing required parameters",
-            })
-            break
+            });
+            break;
           }
 
           // Get role from query string and prompt from request body
-          const role = event.queryStringParameters.role
-          const { prompt } = JSON.parse(event.body)
+          const role = event.queryStringParameters.role;
+          const { prompt } = JSON.parse(event.body);
 
           // Validate that role is one of the accepted roles
-          if (!["public", "internal_researcher", "policy_maker", "external_researcher"].includes(role)) {
-            response.statusCode = 400
-            response.body = JSON.stringify({ error: "Invalid role provided" })
-            break
+          if (
+            ![
+              "public",
+              "internal_researcher",
+              "policy_maker",
+              "external_researcher",
+            ].includes(role)
+          ) {
+            response.statusCode = 400;
+            response.body = JSON.stringify({ error: "Invalid role provided" });
+            break;
           }
 
           // Prepare the prompt data with null values for other roles
@@ -499,26 +528,26 @@ exports.handler = async (event) => {
             policy_maker: role === "policy_maker" ? prompt : null,
             external_researcher: role === "external_researcher" ? prompt : null,
             time_created: new Date(), // Current timestamp
-          }
+          };
 
           // Insert into the prompts table
           await sqlConnectionTableCreator`
       INSERT INTO prompts (public, internal_researcher, policy_maker, external_researcher, time_created)
       VALUES (${promptData.public}, ${promptData.internal_researcher}, ${promptData.policy_maker}, ${promptData.external_researcher}, ${promptData.time_created});
-    `
+    `;
 
           // Return success response
-          response.statusCode = 201
+          response.statusCode = 201;
           response.body = JSON.stringify({
             message: "Prompt inserted successfully",
-          })
+          });
         } catch (err) {
           // Handle any errors that occur during the insert
-          response.statusCode = 500
-          console.error(err)
-          response.body = JSON.stringify({ error: "Internal server error" })
+          response.statusCode = 500;
+          console.error(err);
+          response.body = JSON.stringify({ error: "Internal server error" });
         }
-        break
+        break;
       case "GET /admin/latest_prompt":
         try {
           const latestPrompts = await sqlConnectionTableCreator`
@@ -570,50 +599,58 @@ exports.handler = async (event) => {
 
       case "GET /admin/get_feedback":
         try {
-          if (!event.queryStringParameters || !event.queryStringParameters.session_id) {
-            response.statusCode = 400
+          if (
+            !event.queryStringParameters ||
+            !event.queryStringParameters.session_id
+          ) {
+            response.statusCode = 400;
             response.body = JSON.stringify({
               error: "Missing required parameter: session_id",
-            })
-            break
+            });
+            break;
           }
 
-          const session_id = event.queryStringParameters.session_id
+          const session_id = event.queryStringParameters.session_id;
           const feedbackEntries = await sqlConnectionTableCreator`
         SELECT feedback_id, session_id, feedback_rating, feedback_description, timestamp
         FROM feedback
         WHERE session_id = ${session_id}
         ORDER BY timestamp DESC;
-        `
+        `;
           if (feedbackEntries.length === 0) {
-            response.statusCode = 404
+            response.statusCode = 404;
             response.body = JSON.stringify({
               error: "No feedback found for the given session_id",
-            })
+            });
           } else {
-            response.statusCode = 200
-            response.body = JSON.stringify(feedbackEntries)
+            response.statusCode = 200;
+            response.body = JSON.stringify(feedbackEntries);
           }
         } catch (err) {
-          response.statusCode = 500
-          console.error(err)
-          response.body = JSON.stringify({ error: "Internal server error" })
+          response.statusCode = 500;
+          console.error(err);
+          response.body = JSON.stringify({ error: "Internal server error" });
         }
-        break
-        case "GET /admin/feedback_by_role":
-          if (event.queryStringParameters && event.queryStringParameters.user_role) {
-            const userRole = event.queryStringParameters.user_role;
-            const page = parseInt(event.queryStringParameters.page) || 1;
-            const limit = parseInt(event.queryStringParameters.limit) || 10;
-            const offset = (page - 1) * limit;
-            const startDate = event.queryStringParameters.start_date || null;
-            const endDate = event.queryStringParameters.end_date || null;
+        break;
+      case "GET /admin/feedback_by_role":
+        if (
+          event.queryStringParameters &&
+          event.queryStringParameters.user_role
+        ) {
+          const userRole = event.queryStringParameters.user_role;
+          const page = parseInt(event.queryStringParameters.page) || 1;
+          const limit = parseInt(event.queryStringParameters.limit) || 10;
+          const offset = (page - 1) * limit;
+          const startDate = event.queryStringParameters.start_date || null;
+          const endDate = event.queryStringParameters.end_date || null;
 
-            console.log(`Fetching feedback for user_role=${userRole}, page=${page}, limit=${limit}, start_date=${startDate}, end_date=${endDate}`);
+          console.log(
+            `Fetching feedback for user_role=${userRole}, page=${page}, limit=${limit}, start_date=${startDate}, end_date=${endDate}`
+          );
 
-            try {
-              // Fetch paginated feedback for the specified role
-              const feedbackDetails = await sqlConnectionTableCreator`
+          try {
+            // Fetch paginated feedback for the specified role
+            const feedbackDetails = await sqlConnectionTableCreator`
                 WITH feedback_with_roles AS (
                   SELECT DISTINCT
                     f.feedback_id,
@@ -640,7 +677,7 @@ exports.handler = async (event) => {
                 LIMIT ${limit} OFFSET ${offset};
               `;
 
-              const totalCountResult = await sqlConnectionTableCreator`
+            const totalCountResult = await sqlConnectionTableCreator`
                 SELECT COUNT(*) AS total_count
                 FROM (
                   SELECT DISTINCT f.feedback_id
@@ -653,7 +690,7 @@ exports.handler = async (event) => {
                 ) AS count_table;
               `;
 
-              const averageRatingResult = await sqlConnectionTableCreator`
+            const averageRatingResult = await sqlConnectionTableCreator`
                 SELECT 
                   AVG(f.feedback_rating) AS average_rating
                 FROM feedback f
@@ -664,40 +701,43 @@ exports.handler = async (event) => {
                 ${endDate ? sql`AND f.timestamp <= ${endDate}` : sql``};
               `;
 
-              const totalCount = parseInt(totalCountResult[0].total_count, 10);
-              const totalPages = Math.ceil(totalCount / limit);
-              const averageRating = parseFloat(averageRatingResult[0].average_rating || 0).toFixed(1);
+            const totalCount = parseInt(totalCountResult[0].total_count, 10);
+            const totalPages = Math.ceil(totalCount / limit);
+            const averageRating = parseFloat(
+              averageRatingResult[0].average_rating || 0
+            ).toFixed(1);
 
-              response.body = JSON.stringify({
-                user_role: userRole,
-                feedback_count: totalCount,
-                average_rating: averageRating,
-                feedback_details: feedbackDetails,
-                totalPages,
-                currentPage: page,
-              });
+            response.body = JSON.stringify({
+              user_role: userRole,
+              feedback_count: totalCount,
+              average_rating: averageRating,
+              feedback_details: feedbackDetails,
+              totalPages,
+              currentPage: page,
+            });
 
-              response.statusCode = 200;
-            } catch (err) {
-              console.error("Error fetching feedback:", err);
-              response.statusCode = 500;
-              response.body = JSON.stringify({ error: "Internal server error" });
-            }
-          } else {
-            console.error("Missing required parameter: user_role");
-            response.statusCode = 400;
-            response.body = JSON.stringify({ error: "Missing required parameter: user_role" });
+            response.statusCode = 200;
+          } catch (err) {
+            console.error("Error fetching feedback:", err);
+            response.statusCode = 500;
+            response.body = JSON.stringify({ error: "Internal server error" });
           }
-          break;
+        } else {
+          console.error("Missing required parameter: user_role");
+          response.statusCode = 400;
+          response.body = JSON.stringify({
+            error: "Missing required parameter: user_role",
+          });
+        }
+        break;
       default:
-        throw new Error(`Unsupported route: "${pathData}"`)
+        throw new Error(`Unsupported route: "${pathData}"`);
     }
   } catch (error) {
-    response.statusCode = 400
-    console.log(error)
-    response.body = JSON.stringify(error.message)
+    response.statusCode = 400;
+    console.log(error);
+    response.body = JSON.stringify(error.message);
   }
-  console.log(response)
-  return response
-}
-
+  console.log(response);
+  return response;
+};

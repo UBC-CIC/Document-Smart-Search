@@ -5,7 +5,9 @@ export async function getUserToken() {
   const now = Date.now();
 
   try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/publicToken`);
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_ENDPOINT}user/publicToken`
+    );
     if (!res.ok) throw new Error("Failed to fetch token");
 
     const data = await res.json();

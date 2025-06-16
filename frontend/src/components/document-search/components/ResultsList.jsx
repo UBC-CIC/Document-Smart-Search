@@ -1,28 +1,32 @@
-import ResultItem from "./ResultItem"
-import Pagination from "./Pagination"
-import { Search } from "lucide-react"
+import ResultItem from "./ResultItem";
+import Pagination from "./Pagination";
+import { Search } from "lucide-react";
 
-export default function ResultsList({ 
-  filteredResults, 
-  sortBy, 
-  handleSortChange, 
-  totalResults, 
+export default function ResultsList({
+  filteredResults,
+  sortBy,
+  handleSortChange,
+  totalResults,
   currentPage,
   setCurrentPage,
   openQuerySummary,
   isLoading,
   hasSearched,
-  totalPages
+  totalPages,
 }) {
   return (
     <div className="flex-1">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
         <div className="flex items-center">
-          <span className="text-sm text-gray-600 dark:text-gray-400">Sort by:</span>
+          <span className="text-sm text-gray-600 dark:text-gray-400">
+            Sort by:
+          </span>
           <div className="ml-2 flex items-center bg-gray-200 dark:bg-gray-700 rounded-full p-1">
             <button
               className={`px-3 py-1 rounded-full text-sm font-medium ${
-                sortBy === "relevance" ? "bg-white dark:bg-gray-600 shadow-sm" : "dark:text-gray-300"
+                sortBy === "relevance"
+                  ? "bg-white dark:bg-gray-600 shadow-sm"
+                  : "dark:text-gray-300"
               }`}
               onClick={() => handleSortChange("relevance")}
               disabled={isLoading || !hasSearched}
@@ -31,7 +35,9 @@ export default function ResultsList({
             </button>
             <button
               className={`px-3 py-1 rounded-full text-sm font-medium ${
-                sortBy === "recent" ? "bg-white dark:bg-gray-600 shadow-sm" : "dark:text-gray-300"
+                sortBy === "recent"
+                  ? "bg-white dark:bg-gray-600 shadow-sm"
+                  : "dark:text-gray-300"
               }`}
               onClick={() => handleSortChange("recent")}
               disabled={isLoading || !hasSearched}
@@ -40,7 +46,9 @@ export default function ResultsList({
             </button>
             <button
               className={`px-3 py-1 rounded-full text-sm font-medium ${
-                sortBy === "oldest" ? "bg-white dark:bg-gray-600 shadow-sm" : "dark:text-gray-300"
+                sortBy === "oldest"
+                  ? "bg-white dark:bg-gray-600 shadow-sm"
+                  : "dark:text-gray-300"
               }`}
               onClick={() => handleSortChange("oldest")}
               disabled={isLoading || !hasSearched}
@@ -49,7 +57,9 @@ export default function ResultsList({
             </button>
             <button
               className={`px-3 py-1 rounded-full text-sm font-medium ${
-                sortBy === "a-z" ? "bg-white dark:bg-gray-600 shadow-sm" : "dark:text-gray-300"
+                sortBy === "a-z"
+                  ? "bg-white dark:bg-gray-600 shadow-sm"
+                  : "dark:text-gray-300"
               }`}
               onClick={() => handleSortChange("a-z")}
               disabled={isLoading || !hasSearched}
@@ -59,7 +69,9 @@ export default function ResultsList({
           </div>
         </div>
         {hasSearched && (
-          <span className="text-sm text-gray-600 dark:text-gray-400">{totalResults} results</span>
+          <span className="text-sm text-gray-600 dark:text-gray-400">
+            {totalResults} results
+          </span>
         )}
       </div>
 
@@ -69,10 +81,18 @@ export default function ResultsList({
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 text-center">
             <div className="flex justify-center items-center space-x-2">
               <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce"></div>
-              <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></div>
-              <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: "0.4s" }}></div>
+              <div
+                className="w-3 h-3 bg-blue-500 rounded-full animate-bounce"
+                style={{ animationDelay: "0.2s" }}
+              ></div>
+              <div
+                className="w-3 h-3 bg-blue-500 rounded-full animate-bounce"
+                style={{ animationDelay: "0.4s" }}
+              ></div>
             </div>
-            <p className="mt-3 text-gray-600 dark:text-gray-400">Loading results...</p>
+            <p className="mt-3 text-gray-600 dark:text-gray-400">
+              Loading results...
+            </p>
           </div>
         ) : !hasSearched ? (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center">
@@ -83,33 +103,35 @@ export default function ResultsList({
               Search for Documents
             </h3>
             <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto">
-              Enter keywords in the search box above and press the search button to find relevant documents. 
-              Use filters to narrow your results.
+              Enter keywords in the search box above and press the search button
+              to find relevant documents. Use filters to narrow your results.
             </p>
           </div>
         ) : filteredResults.length > 0 ? (
           filteredResults.map((result) => (
-            <ResultItem 
-              key={result.id} 
-              result={result} 
-              openQuerySummary={openQuerySummary} 
+            <ResultItem
+              key={result.id}
+              result={result}
+              openQuerySummary={openQuerySummary}
             />
           ))
         ) : (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
-            <p className="text-gray-600 dark:text-gray-400">No documents found matching your search criteria.</p>
+            <p className="text-gray-600 dark:text-gray-400">
+              No documents found matching your search criteria.
+            </p>
           </div>
         )}
       </div>
 
       {/* Pagination - only show when not loading and total results exist */}
       {!isLoading && hasSearched && totalResults > 0 && (
-        <Pagination 
-          currentPage={currentPage} 
-          totalPages={totalPages} 
-          setCurrentPage={setCurrentPage} 
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          setCurrentPage={setCurrentPage}
         />
       )}
     </div>
-  )
+  );
 }

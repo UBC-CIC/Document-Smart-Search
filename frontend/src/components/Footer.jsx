@@ -23,8 +23,9 @@ const Footer = () => {
             </DialogHeader>
             <div className="space-y-4">
               <p className="text-gray-700">
-                DFO Smart Search is an AI-powered tool designed to help people quickly find and explore Fisheries and
-                Oceans Canada (DFO) documents, science advice, and research.
+                DFO Smart Search is an AI-powered tool designed to help people
+                quickly find and explore Fisheries and Oceans Canada (DFO)
+                documents, science advice, and research.
               </p>
               <p className="text-gray-700">
                 Our platform provides user-friendly search functionality,
@@ -35,9 +36,10 @@ const Footer = () => {
               <p className="text-gray-700">
                 Created with the goal of making science advice more accessible
                 and transparent, DFO Smart Search serves as your guide to
-                fisheries, marine ecosystems, and oceans research. We continually
-                refine and improve our search capabilities to keep you informed
-                about the latest developments in fisheries and oceans science.
+                fisheries, marine ecosystems, and oceans research. We
+                continually refine and improve our search capabilities to keep
+                you informed about the latest developments in fisheries and
+                oceans science.
               </p>
             </div>
           </DialogContent>

@@ -3,7 +3,7 @@ import { toast } from "react-toastify";
 import { sendChatMessage } from "../services/chatService";
 
 // Message template
-const ROLE_SELECTION_RESPONSE = 
+const ROLE_SELECTION_RESPONSE =
   "Thank you for selecting your role. How can I help you with your questions about Fisheries and Oceans Canada today?";
 
 export function useChatMessages(session, fingerprint, messages, setMessages) {
@@ -13,10 +13,16 @@ export function useChatMessages(session, fingerprint, messages, setMessages) {
 
   // Helper to determine user role from message history
   const getUserRole = (messageHistory) => {
-    const firstHumanMessage = messageHistory.find((msg) => msg.role === "user" || msg.Type === "human");
+    const firstHumanMessage = messageHistory.find(
+      (msg) => msg.role === "user" || msg.Type === "human"
+    );
     if (!firstHumanMessage) return "";
 
-    const content = (firstHumanMessage.content || firstHumanMessage.Content || "").toLowerCase();
+    const content = (
+      firstHumanMessage.content ||
+      firstHumanMessage.Content ||
+      ""
+    ).toLowerCase();
     if (content.includes("public")) return "public";
     if (content.includes("internal researcher")) return "internal_researcher";
     if (content.includes("policy maker")) return "policy_maker";
@@ -96,9 +102,14 @@ export function useChatMessages(session, fingerprint, messages, setMessages) {
     try {
       // Check if this is a role selection message (first message and is one of the role options)
       const isRoleSelection =
-        currentMessages.length === 1 && 
-        isOption && 
-        ["General Public", "Internal Researcher", "Policy Maker", "External Researcher"].includes(content);
+        currentMessages.length === 1 &&
+        isOption &&
+        [
+          "General Public",
+          "Internal Researcher",
+          "Policy Maker",
+          "External Researcher",
+        ].includes(content);
 
       // Handle role selection directly in the frontend without calling the backend
       if (isRoleSelection) {
@@ -119,7 +130,12 @@ export function useChatMessages(session, fingerprint, messages, setMessages) {
       setMessages((prev) => [...prev, userMessage]);
 
       // Send to backend for LLM processing
-      const data = await sendChatMessage(session, fingerprint, content, userRole || "public");
+      const data = await sendChatMessage(
+        session,
+        fingerprint,
+        content,
+        userRole || "public"
+      );
       const messageId = Date.now() + 1;
 
       // Update current message ID for sources display but don't open sidebar automatically
@@ -145,8 +161,9 @@ export function useChatMessages(session, fingerprint, messages, setMessages) {
         },
       ]);
 
-      return { hasTools: data.tools_used && Object.keys(data.tools_used).length > 0 };
-
+      return {
+        hasTools: data.tools_used && Object.keys(data.tools_used).length > 0,
+      };
     } catch (error) {
       console.error("Error sending message:", error);
       toast.error(error.message || "Failed to send message. Please try again.");
@@ -157,12 +174,13 @@ export function useChatMessages(session, fingerprint, messages, setMessages) {
         {
           id: (Date.now() + 1).toString(),
           role: "assistant",
-          content: "I apologize, but I encountered an error processing your request. Please try again.",
+          content:
+            "I apologize, but I encountered an error processing your request. Please try again.",
           feedback: null,
           submittedFeedback: false,
         },
       ]);
-      
+
       return { hasTools: false };
     } finally {
       setIsLoading(false);

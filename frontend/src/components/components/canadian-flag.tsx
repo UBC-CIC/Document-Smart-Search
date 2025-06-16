@@ -1,7 +1,13 @@
-import React from "react"
+import React from "react";
 
 export const CanadianFlag: React.FC = () => (
-  <svg width="30" height="30" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <svg
+    width="30"
+    height="30"
+    viewBox="0 0 30 30"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
     <rect width="30" height="30" fill="white" />
     <rect x="7.5" width="15" height="30" fill="#FF0000" />
     <path
@@ -9,7 +15,6 @@ export const CanadianFlag: React.FC = () => (
       fill="#FF0000"
     />
   </svg>
-)
+);
 
-export default CanadianFlag
-
+export default CanadianFlag;

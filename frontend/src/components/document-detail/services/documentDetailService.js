@@ -1,4 +1,4 @@
-import { mockDocumentDetails } from "../data/documentDetailData"
+import { mockDocumentDetails } from "../data/documentDetailData";
 
 // Always enable mock data for now to ensure it works
 export const USE_MOCK_DATA = false;
@@ -8,16 +8,17 @@ export const USE_MOCK_DATA = false;
  */
 export async function fetchDocumentDetail(documentId) {
   console.log("Fetching document details for ID:", documentId);
-  
-  // Use mock data 
+
+  // Use mock data
   if (USE_MOCK_DATA) {
     console.log("Using mock data");
     // Add a small delay to simulate network request
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    const mockData = mockDocumentDetails[documentId] || mockDocumentDetails.default;
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    const mockData =
+      mockDocumentDetails[documentId] || mockDocumentDetails.default;
     console.log("Mock data found:", mockData ? "Yes" : "No");
-    
+
     // Include related documents directly in the response
     // They are now part of the document object from the mockDocumentDetails
     return mockData;
@@ -26,13 +27,18 @@ export async function fetchDocumentDetail(documentId) {
   try {
     // In the real API implementation, we expect related documents to be included in the response
     const token = await getUserToken();
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}user/document-details?document_id=${encodeURIComponent(documentId)}`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`,
-      },
-    });
+    const response = await fetch(
+      `${
+        process.env.NEXT_PUBLIC_API_ENDPOINT
+      }user/document-details?document_id=${encodeURIComponent(documentId)}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -54,7 +60,6 @@ export async function fetchDocumentDetail(documentId) {
     //     document_id: documentId
     //   }),
     // })
-
   } catch (error) {
     console.error("Error fetching document details:", error);
     // Fallback to mock data on error

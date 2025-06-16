@@ -131,7 +131,6 @@ export class DatabaseStack extends Stack {
       );
     });
 
-
     const rdsProxyRole = new iam.Role(this, `DBProxyRoleRDS`, {
       assumedBy: new iam.ServicePrincipal("rds.amazonaws.com"),
     });
@@ -176,7 +175,6 @@ export class DatabaseStack extends Stack {
       requireTLS: false,
     });
 
-
     // Workaround for bug where TargetGroupName is not set but required
     let targetGroup = rdsProxy.node.children.find((child: any) => {
       return child instanceof rds.CfnDBProxyTargetGroup;
@@ -197,10 +195,7 @@ export class DatabaseStack extends Stack {
     this.rdsProxyEndpoint = rdsProxy.endpoint;
     this.rdsProxyEndpointTableCreator = rdsProxyTableCreator.endpoint;
 
-
     targetGroup.addPropertyOverride("TargetGroupName", "default");
-
-
 
     this.rdsProxyEndpointAdmin = rdsProxyAdmin.endpoint;
   }

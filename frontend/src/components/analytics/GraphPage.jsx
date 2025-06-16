@@ -23,7 +23,12 @@ const topics = [
 ];
 
 const documents = [
-  { id: "d1", label: "Document X", parentIds: ["t1", "t2"], url: "/documents/d1" },
+  {
+    id: "d1",
+    label: "Document X",
+    parentIds: ["t1", "t2"],
+    url: "/documents/d1",
+  },
   { id: "d2", label: "Document Y", parentIds: ["t2"], url: "/documents/d2" },
   { id: "d3", label: "Document Z", parentIds: ["t3"], url: "/documents/d3" },
 ];
@@ -42,11 +47,10 @@ export default function GraphPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const cyRef = useRef(null);
 
-    if (typeof window === "undefined") {
+  if (typeof window === "undefined") {
     // Avoid SSR entirely
     return null;
   }
-
 
   const {
     yearFilters = [],
@@ -62,11 +66,13 @@ export default function GraphPage() {
     resetFilters = () => {},
   } = useDocumentSearch() || {};
 
-
-
   const elements = useMemo(() => {
-    const selectedMandateIds = new Set(Array.isArray(mandateFilters) ? mandateFilters : []);
-    const selectedTopicIds = new Set(Array.isArray(topicFilters) ? topicFilters : []);
+    const selectedMandateIds = new Set(
+      Array.isArray(mandateFilters) ? mandateFilters : []
+    );
+    const selectedTopicIds = new Set(
+      Array.isArray(topicFilters) ? topicFilters : []
+    );
 
     let filteredMandates = mandates;
     let filteredTopics = topics;
@@ -86,7 +92,9 @@ export default function GraphPage() {
     }
 
     const filteredCsasEvents = csasEvents.filter((e) =>
-      e.parentIds.some((pid) => filteredDocuments.map((d) => d.id).includes(pid))
+      e.parentIds.some((pid) =>
+        filteredDocuments.map((d) => d.id).includes(pid)
+      )
     );
     const filteredGeneratedTopics = generatedTopics.filter((g) =>
       filteredDocuments.map((d) => d.id).includes(g.parentId)
@@ -99,15 +107,21 @@ export default function GraphPage() {
       ...filteredDocuments.map((d) => ({
         data: { id: d.id, label: d.label, url: d.url },
       })),
-      ...filteredCsasEvents.map((e) => ({ data: { id: e.id, label: e.label } })),
+      ...filteredCsasEvents.map((e) => ({
+        data: { id: e.id, label: e.label },
+      })),
       ...filteredGeneratedTopics.map((g) => ({
         data: { id: g.id, label: g.label },
       })),
     ];
 
     const edges = [
-      ...filteredMandates.map((m) => ({ data: { source: "DFO", target: m.id } })),
-      ...filteredTopics.map((t) => ({ data: { source: t.parentId, target: t.id } })),
+      ...filteredMandates.map((m) => ({
+        data: { source: "DFO", target: m.id },
+      })),
+      ...filteredTopics.map((t) => ({
+        data: { source: t.parentId, target: t.id },
+      })),
       ...filteredDocuments.flatMap((d) =>
         d.parentIds.map((pid) => ({ data: { source: pid, target: d.id } }))
       ),
@@ -126,8 +140,10 @@ export default function GraphPage() {
     const nodeData = event.target.data();
     if (nodeData.id.startsWith("d") && nodeData.url) {
       // window.open(nodeData.url, "_blank");
-      window.open("https://www.dfo-mpo.gc.ca/csas-sccs/Publications/SAR-AS/2023/2023_042-eng.html", "_blank");
-      
+      window.open(
+        "https://www.dfo-mpo.gc.ca/csas-sccs/Publications/SAR-AS/2023/2023_042-eng.html",
+        "_blank"
+      );
     }
   };
 
@@ -196,12 +212,39 @@ export default function GraphPage() {
           randomize: false,
         }}
         stylesheet={[
-          { selector: 'node[id = "DFO"]', style: { backgroundColor: "#4F46E5", color: "#fff", fontWeight: "bold", borderWidth: 3 } },
-          { selector: 'node[id ^= "m"]', style: { backgroundColor: "#10B981", color: "#fff" } },
-          { selector: 'node[id ^= "t"]', style: { backgroundColor: "#FACC15" } },
-          { selector: 'node[id ^= "d"]', style: { backgroundColor: "#EF4444", color: "#fff", cursor: "pointer" } },
-          { selector: 'node[id ^= "e"]', style: { backgroundColor: "#8B5CF6", color: "#fff" } },
-          { selector: 'node[id ^= "g"]', style: { backgroundColor: "#0EA5E9", color: "#fff" } },
+          {
+            selector: 'node[id = "DFO"]',
+            style: {
+              backgroundColor: "#4F46E5",
+              color: "#fff",
+              fontWeight: "bold",
+              borderWidth: 3,
+            },
+          },
+          {
+            selector: 'node[id ^= "m"]',
+            style: { backgroundColor: "#10B981", color: "#fff" },
+          },
+          {
+            selector: 'node[id ^= "t"]',
+            style: { backgroundColor: "#FACC15" },
+          },
+          {
+            selector: 'node[id ^= "d"]',
+            style: {
+              backgroundColor: "#EF4444",
+              color: "#fff",
+              cursor: "pointer",
+            },
+          },
+          {
+            selector: 'node[id ^= "e"]',
+            style: { backgroundColor: "#8B5CF6", color: "#fff" },
+          },
+          {
+            selector: 'node[id ^= "g"]',
+            style: { backgroundColor: "#0EA5E9", color: "#fff" },
+          },
           {
             selector: "node",
             style: {

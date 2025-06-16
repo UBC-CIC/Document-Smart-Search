@@ -20,7 +20,12 @@ export function useChatSession() {
       id: "initial",
       role: "assistant",
       content: INITIAL_GREETING,
-      options: ["General Public", "Internal Researcher", "Policy Maker", "External Researcher"],
+      options: [
+        "General Public",
+        "Internal Researcher",
+        "Policy Maker",
+        "External Researcher",
+      ],
       user_role: "",
     },
   ]);
@@ -69,7 +74,7 @@ export function useChatSession() {
 
     setIsCreatingSession(true);
     setShowDisclaimer(true); // Keep disclaimer visible for new sessions
-    
+
     try {
       const sessionData = await createChatSession(currentFingerprint);
       setSession(sessionData);
@@ -82,7 +87,12 @@ export function useChatSession() {
           id: "initial",
           role: "assistant",
           content: INITIAL_GREETING,
-          options: ["General Public", "Internal Researcher", "Policy Maker", "External Researcher"],
+          options: [
+            "General Public",
+            "Internal Researcher",
+            "Policy Maker",
+            "External Researcher",
+          ],
           user_role: "",
         },
       ]);
@@ -99,18 +109,21 @@ export function useChatSession() {
   // Extract user role from messages
   const extractUserRoleFromMessages = (messages) => {
     // First check for explicit user_role property
-    const messageWithRole = messages.find(msg => msg.user_role && msg.user_role !== '');
+    const messageWithRole = messages.find(
+      (msg) => msg.user_role && msg.user_role !== ""
+    );
     if (messageWithRole) {
       return messageWithRole.user_role;
     }
-    
+
     // If no explicit role, try to infer from content of first user message
-    const firstUserMessage = messages.find(msg => 
-      (msg.role === "user" || msg.Type === "human") && 
-      msg.content && 
-      msg.content.length > 0
+    const firstUserMessage = messages.find(
+      (msg) =>
+        (msg.role === "user" || msg.Type === "human") &&
+        msg.content &&
+        msg.content.length > 0
     );
-    
+
     if (firstUserMessage) {
       const content = firstUserMessage.content.toLowerCase();
       if (content.includes("general public")) return "public";
@@ -118,7 +131,7 @@ export function useChatSession() {
       if (content.includes("policy maker")) return "policy_maker";
       if (content.includes("external researcher")) return "external_researcher";
     }
-    
+
     return "";
   };
 
@@ -150,7 +163,7 @@ export function useChatSession() {
       const userRole = extractUserRoleFromMessages(convertedMessages);
       if (userRole) {
         // Ensure all assistant messages have the user_role
-        convertedMessages.forEach(msg => {
+        convertedMessages.forEach((msg) => {
           if (msg.role === "assistant" && !msg.user_role) {
             msg.user_role = userRole;
           }
@@ -160,14 +173,21 @@ export function useChatSession() {
       const hasInitialMessage =
         convertedMessages.length > 0 &&
         convertedMessages[0].role === "assistant" &&
-        convertedMessages[0].content.includes("I am a Smart Agent specialized in Fisheries and Oceans Canada");
+        convertedMessages[0].content.includes(
+          "I am a Smart Agent specialized in Fisheries and Oceans Canada"
+        );
 
       if (!hasInitialMessage) {
         convertedMessages.unshift({
           id: "initial",
           role: "assistant",
           content: INITIAL_GREETING,
-          options: ["General Public", "Internal Researcher", "Policy Maker", "External Researcher"],
+          options: [
+            "General Public",
+            "Internal Researcher",
+            "Policy Maker",
+            "External Researcher",
+          ],
           user_role: userRole || "",
         });
       }
@@ -175,8 +195,10 @@ export function useChatSession() {
       setMessages(convertedMessages);
 
       // Check if there are any user messages (actual conversation history)
-      const hasUserMessages = convertedMessages.some(msg => msg.role === "user");
-      
+      const hasUserMessages = convertedMessages.some(
+        (msg) => msg.role === "user"
+      );
+
       // Only hide the disclaimer when there's actual conversation history
       // Otherwise show disclaimer even for existing sessions with no conversation
       if (!isNewSession && hasUserMessages) {
@@ -191,7 +213,12 @@ export function useChatSession() {
           id: "initial",
           role: "assistant",
           content: INITIAL_GREETING,
-          options: ["General Public", "Internal Researcher", "Policy Maker", "External Researcher"],
+          options: [
+            "General Public",
+            "Internal Researcher",
+            "Policy Maker",
+            "External Researcher",
+          ],
           user_role: "",
         },
       ]);
@@ -209,7 +236,12 @@ export function useChatSession() {
         id: "initial",
         role: "assistant",
         content: INITIAL_GREETING,
-        options: ["General Public", "Internal Researcher", "Policy Maker", "External Researcher"],
+        options: [
+          "General Public",
+          "Internal Researcher",
+          "Policy Maker",
+          "External Researcher",
+        ],
         user_role: "",
       },
     ]);

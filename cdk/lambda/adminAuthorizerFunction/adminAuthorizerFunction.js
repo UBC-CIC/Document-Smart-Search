@@ -1,4 +1,7 @@
-const { SecretsManagerClient, GetSecretValueCommand } = require("@aws-sdk/client-secrets-manager");
+const {
+  SecretsManagerClient,
+  GetSecretValueCommand,
+} = require("@aws-sdk/client-secrets-manager");
 const { CognitoJwtVerifier } = require("aws-jwt-verify");
 
 // Create a Secrets Manager client
@@ -8,12 +11,12 @@ let { SM_COGNITO_CREDENTIALS } = process.env;
 
 // Return response
 const responseStruct = {
-  "principalId": "yyyyyyyy", // The principal user identification associated with the token sent by the client.
-  "policyDocument": {
-    "Version": "2012-10-17",
-    "Statement": []
+  principalId: "yyyyyyyy", // The principal user identification associated with the token sent by the client.
+  policyDocument: {
+    Version: "2012-10-17",
+    Statement: [],
   },
-  "context": {}
+  context: {},
 };
 
 // Create the verifier outside the Lambda handler (= during cold start),
@@ -24,7 +27,9 @@ let jwtVerifier;
 async function initializeConnection() {
   try {
     // Retrieve the secret from AWS Secrets Manager
-    const getSecretValueCommand = new GetSecretValueCommand({ SecretId: SM_COGNITO_CREDENTIALS });
+    const getSecretValueCommand = new GetSecretValueCommand({
+      SecretId: SM_COGNITO_CREDENTIALS,
+    });
     const secretResponse = await secretsManager.send(getSecretValueCommand);
 
     const credentials = JSON.parse(secretResponse.SecretString);
@@ -32,7 +37,7 @@ async function initializeConnection() {
     jwtVerifier = CognitoJwtVerifier.create({
       userPoolId: credentials.VITE_COGNITO_USER_POOL_ID,
       tokenUse: "id",
-      groups: 'admin',
+      groups: "admin",
       clientId: credentials.VITE_COGNITO_USER_POOL_CLIENT_ID,
     });
   } catch (error) {
@@ -51,19 +56,19 @@ exports.handler = async (event) => {
 
   try {
     payload = await jwtVerifier.verify(accessToken);
-    
+
     // Modify the response output
-    const parts = event.methodArn.split('/');
-    const resource = parts.slice(0, 2).join('/') + '*';
+    const parts = event.methodArn.split("/");
+    const resource = parts.slice(0, 2).join("/") + "*";
 
     responseStruct["principalId"] = payload.sub;
     responseStruct["policyDocument"]["Statement"].push({
-      "Action": "execute-api:Invoke",
-      "Effect": "Allow",
-      "Resource": resource
+      Action: "execute-api:Invoke",
+      Effect: "Allow",
+      Resource: resource,
     });
     responseStruct["context"] = {
-      "userId": payload.sub
+      userId: payload.sub,
     };
 
     return responseStruct;
