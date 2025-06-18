@@ -111,10 +111,8 @@ aws secretsmanager create-secret \
     --name DFOSecrets \
     --secret-string '{\"DB_Username\":\"DFOSecrets\"}'\
     --profile <your-profile-name>
-Note: No special characters are allowed in the secret value.
-
 ```
-
+Note: No special characters are allowed in the secret value.
 
 Finally, in order to restrict user sign up to specific email domains, you will need to upload a comma separated list of allowed email domains to Amazon SSM Parameter Store. You can do so by running the following command. Make sure you replace `<YOUR-ALLOWED-EMAIL-DOMAIN-LIST>` and `<YOUR-PROFILE-NAME>` with your actual list and the appropriate AWS profile name.
 
