@@ -1,6 +1,12 @@
-import { Stack, StackProps, RemovalPolicy, SecretValue } from "aws-cdk-lib";
+import {
+  Stack,
+  StackProps,
+  RemovalPolicy,
+  SecretValue,
+  Duration,
+  CfnOutput,
+} from "aws-cdk-lib";
 import { Construct } from "constructs";
-import { Duration } from "aws-cdk-lib";
 
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as rds from "aws-cdk-lib/aws-rds";
@@ -30,30 +36,25 @@ export class DatabaseStack extends Stack {
     super(scope, id, props);
 
     this.databaseID = id;
-    /**
-     *
-     * Retrive a secrete from Secret Manager
-     * aws secretsmanager create-secret --name DFOSecrets --secret-string '{\"DB_Username\":\"DB-USERNAME\"}' --profile <your-profile-name>
-     */
+
+    const stackPrefix = this.node.tryGetContext("StackPrefix") || "";
+
     const secret = secretmanager.Secret.fromSecretNameV2(
       this,
       "ImportedSecrets",
       "DFOSecrets"
     );
-    /**
-     *
-     * Create Empty Secret Manager
-     * Secrets will be populate at initalization of data
-     */
-    this.secretPathAdminName = `${id}-DFO/credentials/DbCredential`; // Name in the Secret Manager to store DB credentials
+
+    this.secretPathAdminName = `${id}-DFO/credentials/DbCredential`;
     const secretPathUserName = `${id}-DFO/userCredentials/DbCredential`;
+
     this.secretPathUser = new secretsmanager.Secret(this, secretPathUserName, {
       secretName: secretPathUserName,
       description: "Secrets for clients to connect to RDS",
       removalPolicy: RemovalPolicy.DESTROY,
       secretObjectValue: {
-        username: SecretValue.unsafePlainText("applicationUsername"), // this will change later at runtime
-        password: SecretValue.unsafePlainText("applicationPassword"), // in the initializer
+        username: SecretValue.unsafePlainText("applicationUsername"),
+        password: SecretValue.unsafePlainText("applicationPassword"),
       },
     });
 
@@ -66,30 +67,25 @@ export class DatabaseStack extends Stack {
         description: "Secrets for TableCreator to connect to RDS",
         removalPolicy: RemovalPolicy.DESTROY,
         secretObjectValue: {
-          username: SecretValue.unsafePlainText("applicationUsername"), // this will change later at runtime
-          password: SecretValue.unsafePlainText("applicationPassword"), // in the initializer
+          username: SecretValue.unsafePlainText("applicationUsername"),
+          password: SecretValue.unsafePlainText("applicationPassword"),
         },
       }
     );
+
     const parameterGroup = new rds.ParameterGroup(this, `rdsParameterGroup`, {
       engine: rds.DatabaseInstanceEngine.postgres({
         version: rds.PostgresEngineVersion.VER_16_3,
       }),
-      description: "Empty parameter group", // Might need to change this later
+      description: "Empty parameter group",
       parameters: {
         "rds.force_ssl": "0",
       },
     });
 
-    /**
-     *
-     * Create an RDS with Postgres database in an isolated subnet
-     */
     this.dbInstance = new rds.DatabaseInstance(this, `database`, {
       vpc: vpcStack.vpc,
-      vpcSubnets: {
-        subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
-      },
+      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
       engine: rds.DatabaseInstanceEngine.postgres({
         version: rds.PostgresEngineVersion.VER_16_3,
       }),
@@ -120,10 +116,7 @@ export class DatabaseStack extends Stack {
       parameterGroup: parameterGroup,
     });
 
-    this.dbInstance.connections.securityGroups.forEach(function (
-      securityGroup
-    ) {
-      // 10.0.0.0/16 match the cidr range in vpc stack
+    this.dbInstance.connections.securityGroups.forEach((securityGroup) => {
       securityGroup.addIngressRule(
         ec2.Peer.ipv4("10.0.0.0/16"),
         ec2.Port.tcp(5432),
@@ -142,19 +135,16 @@ export class DatabaseStack extends Stack {
       })
     );
 
-    // /**
-    //  *
-    //  * Create an RDS proxy that sit between lambda and RDS
-    //  */
     const rdsProxy = this.dbInstance.addProxy(id + "-proxy", {
-      secrets: [this.secretPathUser!],
+      secrets: [this.secretPathUser],
       vpc: vpcStack.vpc,
       role: rdsProxyRole,
       securityGroups: this.dbInstance.connections.securityGroups,
       requireTLS: false,
     });
+
     const rdsProxyTableCreator = this.dbInstance.addProxy(id + "+proxy", {
-      secrets: [this.secretPathTableCreator!],
+      secrets: [this.secretPathTableCreator],
       vpc: vpcStack.vpc,
       role: rdsProxyRole,
       securityGroups: this.dbInstance.connections.securityGroups,
@@ -175,28 +165,36 @@ export class DatabaseStack extends Stack {
       requireTLS: false,
     });
 
-    // Workaround for bug where TargetGroupName is not set but required
-    let targetGroup = rdsProxy.node.children.find((child: any) => {
-      return child instanceof rds.CfnDBProxyTargetGroup;
-    }) as rds.CfnDBProxyTargetGroup;
+    const targetGroup = rdsProxy.node.children.find(
+      (child: any) => child instanceof rds.CfnDBProxyTargetGroup
+    ) as rds.CfnDBProxyTargetGroup;
 
-    targetGroup.addPropertyOverride("TargetGroupName", "default");
-
-    let targetGroupTableCreator = rdsProxyTableCreator.node.children.find(
-      (child: any) => {
-        return child instanceof rds.CfnDBProxyTargetGroup;
-      }
+    const targetGroupTableCreator = rdsProxyTableCreator.node.children.find(
+      (child: any) => child instanceof rds.CfnDBProxyTargetGroup
     ) as rds.CfnDBProxyTargetGroup;
 
     targetGroup.addPropertyOverride("TargetGroupName", "default");
     targetGroupTableCreator.addPropertyOverride("TargetGroupName", "default");
 
     this.dbInstance.grantConnect(rdsProxyRole);
+
     this.rdsProxyEndpoint = rdsProxy.endpoint;
     this.rdsProxyEndpointTableCreator = rdsProxyTableCreator.endpoint;
-
-    targetGroup.addPropertyOverride("TargetGroupName", "default");
-
     this.rdsProxyEndpointAdmin = rdsProxyAdmin.endpoint;
+
+    new CfnOutput(this, "RDSProxyEndpointExport", {
+      value: this.rdsProxyEndpoint,
+      exportName: `${stackPrefix}-Database-ProxyEndpoint`,
+    });
+
+    new CfnOutput(this, "RDSProxyEndpointTableCreatorExport", {
+      value: this.rdsProxyEndpointTableCreator,
+      exportName: `${stackPrefix}-Database-TableCreatorProxyEndpoint`,
+    });
+
+    new CfnOutput(this, "RDSProxyEndpointAdminExport", {
+      value: this.rdsProxyEndpointAdmin,
+      exportName: `${stackPrefix}-Database-AdminProxyEndpoint`,
+    });
   }
 }
