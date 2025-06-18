@@ -10,4 +10,4 @@ psycopg[binary,pool]
 psycopg2-binary
 python-dotenv
 opensearch-py
-aws-requests-auth==0.4.3
+requests-aws4auth

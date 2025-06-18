@@ -9,7 +9,7 @@ from opensearchpy import OpenSearch, RequestsHttpConnection
 import psycopg
 from langchain_aws import BedrockEmbeddings
 import time
-from aws_requests_auth.aws_auth import AWSRequestsAuth
+from requests_aws4auth import AWS4Auth
 
 # Import helpers
 # from helpers.db import get_rds_connection
@@ -392,14 +392,15 @@ def handler(event, context):
     try:
         # Initialize OpenSearch, DB, and get configuration values
         # secrets = get_secret(OPENSEARCH_SEC)
-        credentials = boto3.Session().get_credentials().get_frozen_credentials()
-        auth = AWSRequestsAuth(
-            aws_access_key=credentials.access_key,
-            aws_secret_access_key=credentials.secret_key,
-            aws_token=credentials.token,
-            aws_host=OPENSEARCH_HOST,
-            aws_region=REGION,
-            aws_service='es'
+        session = boto3.Session()
+        credentials = session.get_credentials().get_frozen_credentials()
+
+        auth = AWS4Auth(
+            credentials.access_key,
+            credentials.secret_key,
+            REGION,
+            'es',
+            session_token=credentials.token
         )
         opensearch_host = OPENSEARCH_HOST
         opensearch_client = OpenSearch(
