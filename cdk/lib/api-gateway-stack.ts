@@ -29,6 +29,7 @@ import { createRolesAndPolicies } from "./api-gateway-helpers/roles";
 import { DockerImageAsset, Platform } from "aws-cdk-lib/aws-ecr-assets";
 import * as wafv2 from "aws-cdk-lib/aws-wafv2";
 import { table } from "console";
+import * as logs from "aws-cdk-lib/aws-logs";
 
 export class ApiGatewayStack extends cdk.Stack {
   private readonly api: apigateway.SpecRestApi;
@@ -710,6 +711,7 @@ export class ApiGatewayStack extends cdk.Stack {
         timeout: cdk.Duration.seconds(300),
         vpc: vpcStack.vpc, // Pass the VPC
         functionName: `${id}-TextGenFunction`,
+        logRetention: logs.RetentionDays.THREE_MONTHS,
         environment: {
           SM_DB_CREDENTIALS: db.secretPathUser.secretName,
           RDS_PROXY_ENDPOINT: db.rdsProxyEndpoint,
