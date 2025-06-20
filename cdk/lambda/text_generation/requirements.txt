@@ -5,9 +5,8 @@ langchain-aws
 langchain-core
 langchain-community
 langchain-postgres
-pymupdf
 psycopg[binary,pool]
 psycopg2-binary
 python-dotenv
 opensearch-py
-requests-aws4auth
+aws-requests-auth

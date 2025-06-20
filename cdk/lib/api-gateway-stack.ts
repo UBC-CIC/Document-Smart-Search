@@ -29,6 +29,7 @@ import { createRolesAndPolicies } from "./api-gateway-helpers/roles";
 import { DockerImageAsset, Platform } from "aws-cdk-lib/aws-ecr-assets";
 import * as wafv2 from "aws-cdk-lib/aws-wafv2";
 import { table } from "console";
+import * as logs from "aws-cdk-lib/aws-logs";
 
 export class ApiGatewayStack extends cdk.Stack {
   private readonly api: apigateway.SpecRestApi;
@@ -55,9 +56,6 @@ export class ApiGatewayStack extends cdk.Stack {
     props?: cdk.StackProps
   ) {
     super(scope, id, props);
-
-
-
 
     const osEndpoint = ssm.StringParameter.valueForStringParameter(
       this,
@@ -634,6 +632,16 @@ export class ApiGatewayStack extends cdk.Stack {
       }
     );
 
+    const opensearchSecretParamName = new ssm.StringParameter(
+      this,
+      "OpensearchSecretParamName",
+      {
+        parameterName: `/${id}/DFO/OpensearchSecretParamName`,
+        description: "Opensearch secret parameter name",
+        stringValue: osStack.userSecret.secretArn,
+      }
+    );
+
     const indexNameParameter = new ssm.StringParameter(
       this,
       "IndexNameParameter",
@@ -707,6 +715,7 @@ export class ApiGatewayStack extends cdk.Stack {
         timeout: cdk.Duration.seconds(300),
         vpc: vpcStack.vpc, // Pass the VPC
         functionName: `${id}-TextGenFunction`,
+        logRetention: logs.RetentionDays.THREE_MONTHS,
         environment: {
           SM_DB_CREDENTIALS: db.secretPathUser.secretName,
           RDS_PROXY_ENDPOINT: db.rdsProxyEndpoint,
@@ -715,6 +724,7 @@ export class ApiGatewayStack extends cdk.Stack {
           EMBEDDING_MODEL_PARAM: embeddingModelParameter.parameterName,
           TABLE_NAME_PARAM: tableNameParameter.parameterName,
           OPENSEARCH_HOST: opensearchHostParameter.parameterName,
+          OPENSEARCH_SEC: opensearchSecretParamName.parameterName,
           OPENSEARCH_INDEX_NAME: indexNameParameter.parameterName,
           RDS_SEC: rdsSecParameter.parameterName,
           DFO_HTML_FULL_INDEX_NAME: dfoHtmlFullIndexNameParameter.parameterName,
@@ -804,7 +814,7 @@ export class ApiGatewayStack extends cdk.Stack {
         resources: ["arn:aws:ssm:*:*:parameter/*"],
       })
     );
-    
+
     // TODO: Restrict this later!
     textGenFunc.addToRolePolicy(
       new iam.PolicyStatement({
@@ -813,7 +823,7 @@ export class ApiGatewayStack extends cdk.Stack {
         resources: ["*"],
       })
     );
-    
+
     // Grant access to Secret Manager
     textGenFunc.addToRolePolicy(
       new iam.PolicyStatement({
@@ -1332,6 +1342,5 @@ export class ApiGatewayStack extends cdk.Stack {
       action: "lambda:InvokeFunction",
       sourceArn: `arn:aws:execute-api:${this.region}:${this.account}:${this.api.restApiId}/*/*/get_messages`,
     });
-
   }
 }
