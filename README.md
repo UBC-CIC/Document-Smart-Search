@@ -17,7 +17,7 @@ This system explores how Large Language Models (LLMs) and vector embeddings can 
 
 The following architecture diagram illustrates the various AWS components utilized to deliver the solution. For an in-depth explanation of the frontend and backend stacks, please look at the [Architecture Guide](docs/architectureDeepDive.md).
 
-![Alt text](docs/images/architecture.png)
+![Alt text](docs/images/architecture.drawio.png)
 
 ## Deployment Guide
 
@@ -32,8 +32,6 @@ Please refer to the [Web App User Guide](./docs/userGuide.md) for instructions o
 ```
 ├── cdk/                           # AWS CDK infrastructure code
 │   ├── bin/                       # CDK app entry point
-│   ├── data_ingestion/           # Data ingestion components
-│   ├── file_search/              # File search functionality
 │   ├── glue/                     # AWS Glue jobs and scripts
 │   │   ├── scripts/              # Glue job scripts
 │   │   └── custom_modules/       # Shared Python modules
@@ -70,8 +68,6 @@ Please refer to the [Web App User Guide](./docs/userGuide.md) for instructions o
 
 1. `/cdk`: Contains the AWS CDK infrastructure code
    - `/bin`: CDK app entry point and stack instantiation
-   - `/data_ingestion`: Data ingestion pipeline components
-   - `/file_search`: File search and indexing functionality
    - `/glue`: AWS Glue jobs for data processing
      - `/scripts`: Glue job Python scripts
      - `/custom_modules`: Shared Python modules
