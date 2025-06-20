@@ -17,7 +17,7 @@ This system explores how Large Language Models (LLMs) and vector embeddings can 
 
 The following architecture diagram illustrates the various AWS components utilized to deliver the solution. For an in-depth explanation of the frontend and backend stacks, please look at the [Architecture Guide](docs/architectureDeepDive.md).
 
-![Alt text](docs/images/architecture.drawio.png)
+![Alt text](docs/images/architecture/architecture.drawio.png)
 
 ## Deployment Guide
 
