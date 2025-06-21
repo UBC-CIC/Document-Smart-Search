@@ -102,6 +102,12 @@ export function useDocumentSearch() {
       // Apply sorting in the frontend
       const sortedResults = sortResults(results, sortBy);
       setFilteredResults(sortedResults);
+
+      // Save search query and results in sessionStorage
+      sessionStorage.setItem("searchQuery", searchQuery);
+      sessionStorage.setItem("searchResults", JSON.stringify(sortedResults));
+      sessionStorage.setItem("totalResults", results.length.toString()); // if you use total count
+      sessionStorage.setItem("hasSearched", "true");
     } catch (error) {
       console.error("Error applying filters:", error);
       setFilteredResults([]);
@@ -197,6 +203,7 @@ export function useDocumentSearch() {
     searchQuery,
     setSearchQuery,
     filteredResults: paginatedResults, // Return only current page results
+    setFilteredResults,
     sortBy,
     setSortBy,
     currentPage,
@@ -216,6 +223,7 @@ export function useDocumentSearch() {
     resetFilters,
     applyFilters,
     totalResults: filteredResults.length, // Total, not just current page
+    setHasSearched,
     totalPages,
     isLoading,
     hasSearched,
