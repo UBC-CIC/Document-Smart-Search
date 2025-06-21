@@ -82,10 +82,10 @@ export class OpenSearchStack extends Stack {
       enforceHttps: true,
       removalPolicy: RemovalPolicy.DESTROY,
       // uncomment to enable fine-grained access control with username/password
-      // fineGrainedAccessControl: {
-      //   masterUserName: this.adminSecret.secretValueFromJson("username").toString(),
-      //   masterUserPassword: this.adminSecret.secretValueFromJson("password")
-      // },
+      fineGrainedAccessControl: {
+        masterUserName: this.adminSecret.secretValueFromJson("username").toString(),
+        masterUserPassword: this.adminSecret.secretValueFromJson("password")
+      },
     });
 
     // 4) Persist endpoint & secret ARNs into SSM (namespaced by stack id)
