@@ -1,3 +1,4 @@
+import { fi } from "date-fns/locale";
 import { useEffect, useState } from "react";
 import AsyncSelect from "react-select/async";
 
@@ -16,7 +17,7 @@ export default function AsyncFilterSelect({
       .filter(([_, isActive]) => isActive)
       .map(([value]) => ({ label: value, value }));
     setSelectedOptions(initialSelected);
-  }, []);
+  }, [filters]);
 
   // Convert option format for react-select
   const availableOptions = Object.keys(filters).map((item) => ({

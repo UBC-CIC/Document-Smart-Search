@@ -32,31 +32,42 @@ export function useDocumentSearch() {
         const options = await fetchFilterOptions();
         setFilterOptions(options);
 
-        // Initialize filter states based on fetched options
+        // Initialize filters
         setYearFilters(
-          Object.fromEntries(options.years.map((year) => [year, false]))
+          Object.fromEntries(options.years.map((y) => [y, false]))
         );
         setTopicFilters(
-          Object.fromEntries(options.topics.map((topic) => [topic, false]))
+          Object.fromEntries(options.topics.map((t) => [t, false]))
         );
         setDerivedTopicFilters(
           Object.fromEntries(
-            (options.derivedTopics || []).map((topic) => [topic, false])
+            (options.derivedTopics || []).map((t) => [t, false])
           )
         );
         setMandateFilters(
-          Object.fromEntries(
-            options.mandates.map((mandate) => [mandate, false])
-          )
+          Object.fromEntries(options.mandates.map((m) => [m, false]))
         );
         setAuthorFilters(
-          Object.fromEntries(options.authors.map((author) => [author, false]))
+          Object.fromEntries(options.authors.map((a) => [a, false]))
         );
         setDocumentTypeFilters(
           Object.fromEntries(
-            (options.documentTypes || []).map((type) => [type, false])
+            (options.documentTypes || []).map((t) => [t, false])
           )
         );
+
+        const savedFilters = sessionStorage.getItem("filters");
+        if (savedFilters) {
+          const parsed = JSON.parse(savedFilters);
+          if (parsed.yearFilters) setYearFilters(parsed.yearFilters);
+          if (parsed.topicFilters) setTopicFilters(parsed.topicFilters);
+          if (parsed.derivedTopicFilters)
+            setDerivedTopicFilters(parsed.derivedTopicFilters);
+          if (parsed.mandateFilters) setMandateFilters(parsed.mandateFilters);
+          if (parsed.authorFilters) setAuthorFilters(parsed.authorFilters);
+          if (parsed.documentTypeFilters)
+            setDocumentTypeFilters(parsed.documentTypeFilters);
+        }
       } catch (error) {
         console.error("Error getting filter options:", error);
       } finally {
@@ -102,6 +113,23 @@ export function useDocumentSearch() {
       // Apply sorting in the frontend
       const sortedResults = sortResults(results, sortBy);
       setFilteredResults(sortedResults);
+
+      // Save search query and results in sessionStorage
+      sessionStorage.setItem("searchQuery", searchQuery);
+      sessionStorage.setItem("searchResults", JSON.stringify(sortedResults));
+      sessionStorage.setItem("totalResults", results.length.toString()); // if you use total count
+      sessionStorage.setItem("hasSearched", "true");
+      sessionStorage.setItem(
+        "filters",
+        JSON.stringify({
+          yearFilters,
+          topicFilters,
+          derivedTopicFilters,
+          mandateFilters,
+          authorFilters,
+          documentTypeFilters,
+        })
+      );
     } catch (error) {
       console.error("Error applying filters:", error);
       setFilteredResults([]);
@@ -197,6 +225,7 @@ export function useDocumentSearch() {
     searchQuery,
     setSearchQuery,
     filteredResults: paginatedResults, // Return only current page results
+    setFilteredResults,
     sortBy,
     setSortBy,
     currentPage,
@@ -216,6 +245,7 @@ export function useDocumentSearch() {
     resetFilters,
     applyFilters,
     totalResults: filteredResults.length, // Total, not just current page
+    setHasSearched,
     totalPages,
     isLoading,
     hasSearched,

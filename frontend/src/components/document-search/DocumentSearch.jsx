@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 // Components
 import SearchBar from "./components/SearchBar";
@@ -21,6 +21,7 @@ export default function DocumentSearch() {
     searchQuery,
     setSearchQuery,
     filteredResults,
+    setFilteredResults,
     sortBy,
     setSortBy,
     currentPage,
@@ -43,6 +44,7 @@ export default function DocumentSearch() {
     totalPages,
     isLoading,
     hasSearched,
+    setHasSearched,
   } = useDocumentSearch();
 
   const {
@@ -64,6 +66,16 @@ export default function DocumentSearch() {
     }
   };
 
+  // reloads session search query
+  useEffect(() => {
+    const savedSearchQuery = sessionStorage.getItem("searchQuery");
+    const savedResults = sessionStorage.getItem("searchResults");
+    const savedHasSearched = sessionStorage.getItem("hasSearched");
+
+    if (savedSearchQuery) setSearchQuery(savedSearchQuery);
+    if (savedResults) setFilteredResults(JSON.parse(savedResults));
+    if (savedHasSearched === "true") setHasSearched(true);
+  }, []);
   // Handle sort change
   const handleSortChange = (sort) => {
     setSortBy(sort);
