@@ -11,7 +11,6 @@
     - [3. Subcategories CSV (`new_subcategories.csv`)](#3-subcategories-csv-new_subcategoriescsv)
   - [Processing Steps](#processing-steps)
   - [Output](#output)
-  - [Usage](#usage)
   - [Dependencies](#dependencies)
   - [Notes](#notes)
 
@@ -109,16 +108,6 @@ The script creates/updates three OpenSearch indices:
 3. **Subcategories Index**
    - Contains subcategory information and embeddings
    - Used for hierarchical topic organization
-
-## Usage
-
-```bash
-python ingest_topics_and_mandates.py \
-    --batch_id YYYY-MM-DD \
-    --topics_file new_topics.csv \
-    --mandates_file new_mandates.csv \
-    --subcategories_file new_subcategories.csv
-```
 
 ## Dependencies
 
