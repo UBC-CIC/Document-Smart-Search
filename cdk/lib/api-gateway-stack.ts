@@ -762,20 +762,6 @@ export class ApiGatewayStack extends cdk.Stack {
       sourceArn: `arn:aws:execute-api:${this.region}:${this.account}:${this.api.restApiId}/*/*/user*`,
     });
 
-    textGenFunc.addToRolePolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: [
-          "es:ESHttpGet",
-          "es:ESHttpPut",
-          "es:ESHttpPost",
-          "es:ESHttpDelete",
-          "es:ESHttpHead",
-        ],
-        resources: ["*"],
-      })
-    );
-
     // Custom policy statement for Bedrock access
     const bedrockPolicyStatement = new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
