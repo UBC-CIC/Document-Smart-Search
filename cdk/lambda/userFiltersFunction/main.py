@@ -4,6 +4,7 @@ import boto3
 import logging
 from opensearchpy import OpenSearch
 import psycopg
+import os
 
 # Set up basic logging
 logging.basicConfig(level=logging.INFO)
@@ -11,10 +12,10 @@ logger = logging.getLogger()
 
 # Environment variables
 # Hardcoded constants (for now)
-OPENSEARCH_SEC = "opensearch-masteruser-test-glue"
-OPENSEARCH_HOST = "opensearch-host-test-glue"
-RDS_SEC = "rds/dfo-db-glue-test"
-REGION_NAME = "us-west-2"
+OPENSEARCH_SEC = os.environ["OPENSEARCH_SEC"]
+OPENSEARCH_HOST = os.environ["OPENSEARCH_HOST"]
+RDS_SEC = os.environ["RDS_SEC"]
+REGION_NAME = os.environ["REGION"]
 
 # AWS Clients
 secrets_manager_client = boto3.client("secretsmanager", region_name=REGION_NAME)

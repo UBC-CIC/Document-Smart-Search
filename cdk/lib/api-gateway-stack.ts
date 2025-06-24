@@ -1230,9 +1230,19 @@ export class ApiGatewayStack extends cdk.Stack {
           BEDROCK_LLM_PARAM: bedrockLLMParameter.parameterName,
           EMBEDDING_MODEL_PARAM: embeddingModelParameter.parameterName,
           TABLE_NAME_PARAM: tableNameParameter.parameterName,
+          OPENSEARCH_HOST: opensearchHostParameter.parameterName,
+          OPENSEARCH_SEC: opensearchSecretParamName.parameterName,
+          RDS_SEC: db.secretPathAdminName,
         },
       }
     );
+
+    bedrockLLMParameter.grantRead(userFiltersFunction);
+    embeddingModelParameter.grantRead(userFiltersFunction);
+    tableNameParameter.grantRead(userFiltersFunction);
+    opensearchHostParameter.grantRead(userFiltersFunction);
+    opensearchSecretParamName.grantRead(userFiltersFunction);
+
     const cfnUserFiltersFunc = userFiltersFunction.node
       .defaultChild as lambda.CfnFunction;
     cfnUserFiltersFunc.overrideLogicalId("userFiltersDockerFunction");
