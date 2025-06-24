@@ -845,9 +845,10 @@ def trigger_next_job(job_name: str, job_args: dict) -> None:
     """
     glue_client = session.client('glue')
     try:
+        formatted_args = {f"--{k}": v for k, v in job_args.items()}
         response = glue_client.start_job_run(
             JobName=job_name,
-            Arguments=job_args
+            Arguments=formatted_args
         )
         print(f"Successfully triggered job {job_name} with run ID: {response['JobRunId']}")
     except Exception as e:

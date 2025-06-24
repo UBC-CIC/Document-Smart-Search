@@ -11,6 +11,7 @@ export class OpenSearchStack extends Stack {
   public readonly domain: opensearch.Domain;
   public readonly adminSecret: secrets.Secret;
   public readonly userSecret: secrets.Secret;
+  public readonly osHostParam: ssm.StringParameter;
 
   constructor(
     scope: Construct,
@@ -100,7 +101,7 @@ export class OpenSearchStack extends Stack {
     );
 
     // 4) Persist endpoint & secret ARNs into SSM (namespaced by stack id)
-    new ssm.StringParameter(this, "OSHostParam", {
+    this.osHostParam = new ssm.StringParameter(this, "OSHostParam", {
       parameterName: `/${id}/opensearch/host`,
       stringValue: this.domain.domainEndpoint,
     });
