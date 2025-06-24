@@ -1288,9 +1288,20 @@ export class ApiGatewayStack extends cdk.Stack {
           BEDROCK_LLM_PARAM: bedrockLLMParameter.parameterName,
           EMBEDDING_MODEL_PARAM: embeddingModelParameter.parameterName,
           TABLE_NAME_PARAM: tableNameParameter.parameterName,
+          INDEX_NAME: indexNameParameter.parameterName,
+          OPENSEARCH_HOST: opensearchHostParameter.parameterName,
+          OPENSEARCH_SEC: opensearchSecretParamName.parameterName,
         },
       }
     );
+
+    bedrockLLMParameter.grantRead(llmAnalysisFunction);
+    embeddingModelParameter.grantRead(llmAnalysisFunction);
+    tableNameParameter.grantRead(llmAnalysisFunction);
+    opensearchHostParameter.grantRead(llmAnalysisFunction);
+    opensearchSecretParamName.grantRead(llmAnalysisFunction);
+    indexNameParameter.grantRead(llmAnalysisFunction);
+
     const cfnLlmAnalysisFunc = llmAnalysisFunction.node
       .defaultChild as lambda.CfnFunction;
     cfnLlmAnalysisFunc.overrideLogicalId("ExpertAnalysisDockerFunction");

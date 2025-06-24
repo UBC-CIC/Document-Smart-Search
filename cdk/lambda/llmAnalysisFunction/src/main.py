@@ -3,6 +3,7 @@ import json
 import boto3
 import logging
 from typing import Dict, List, Any
+import os
 
 from opensearchpy import OpenSearch
 
@@ -10,13 +11,12 @@ from opensearchpy import OpenSearch
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
 
-# Hardcoded constants (for now)
-OPENSEARCH_SEC = "opensearch-masteruser-test-glue"
-OPENSEARCH_HOST = "opensearch-host-test-glue"
-REGION_NAME = "us-west-2"
-INDEX_NAME = "dfo-html-full-index"
-EMBEDDING_MODEL_PARAM = "amazon.titan-embed-text-v2:0"
-BEDROCK_MODEL_PARAM = "us.meta.llama3-3-70b-instruct-v1:0"
+OPENSEARCH_SEC = os.environ.get("OPENSEARCH_SEC")
+OPENSEARCH_HOST = os.environ.get("OPENSEARCH_HOST")
+REGION_NAME = os.environ.get("REGION")
+INDEX_NAME = os.environ.get("INDEX_NAME")
+EMBEDDING_MODEL_PARAM = os.environ.get("EMBEDDING_MODEL_PARAM")
+BEDROCK_MODEL_PARAM = os.environ.get("BEDROCK_MODEL_PARAM")
 
 # AWS Clients
 secrets_manager_client = boto3.client("secretsmanager", region_name=REGION_NAME)
