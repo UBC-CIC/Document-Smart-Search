@@ -638,7 +638,7 @@ export class ApiGatewayStack extends cdk.Stack {
       {
         parameterName: `/${id}/DFO/OpensearchSecretParamName`,
         description: "Opensearch secret parameter name",
-        stringValue: osStack.userSecret.secretArn,
+        stringValue: osStack.adminSecret.secretArn,
       }
     );
 
@@ -661,12 +661,6 @@ export class ApiGatewayStack extends cdk.Stack {
         stringValue: "dfo-mandate-full-index",
       }
     );
-
-    const rdsSecParameter = new ssm.StringParameter(this, "RdsSecParameter", {
-      parameterName: `/${id}/DFO/RdsSec`,
-      description: "RDS security credentials",
-      stringValue: "rds/dfo-db-glue-test",
-    });
 
     const dfoHtmlFullIndexNameParameter = new ssm.StringParameter(
       this,
@@ -726,7 +720,7 @@ export class ApiGatewayStack extends cdk.Stack {
           OPENSEARCH_HOST: opensearchHostParameter.parameterName,
           OPENSEARCH_SEC: opensearchSecretParamName.parameterName,
           OPENSEARCH_INDEX_NAME: indexNameParameter.parameterName,
-          RDS_SEC: rdsSecParameter.parameterName,
+          RDS_SEC: db.secretPathAdminName,
           DFO_HTML_FULL_INDEX_NAME: dfoHtmlFullIndexNameParameter.parameterName,
           DFO_MANDATE_FULL_INDEX_NAME:
             dfoMandateFullIndexNameParameter.parameterName,
@@ -744,7 +738,6 @@ export class ApiGatewayStack extends cdk.Stack {
     tableNameParameter.grantRead(textGenFunc);
     opensearchHostParameter.grantRead(textGenFunc);
     indexNameParameter.grantRead(textGenFunc);
-    rdsSecParameter.grantRead(textGenFunc);
     dfoHtmlFullIndexNameParameter.grantRead(textGenFunc);
     dfoMandateFullIndexNameParameter.grantRead(textGenFunc);
     bedrockInferenceProfileParameter.grantRead(textGenFunc);
@@ -891,9 +884,33 @@ export class ApiGatewayStack extends cdk.Stack {
           BEDROCK_LLM_PARAM: bedrockLLMParameter.parameterName,
           EMBEDDING_MODEL_PARAM: embeddingModelParameter.parameterName,
           TABLE_NAME_PARAM: tableNameParameter.parameterName,
+          OPENSEARCH_HOST: opensearchHostParameter.parameterName,
+          OPENSEARCH_SEC: opensearchSecretParamName.parameterName,
+          OPENSEARCH_INDEX_NAME: indexNameParameter.parameterName,
+          RDS_SEC: db.secretPathAdminName,
+          DFO_HTML_FULL_INDEX_NAME: dfoHtmlFullIndexNameParameter.parameterName,
+          DFO_MANDATE_FULL_INDEX_NAME:
+            dfoMandateFullIndexNameParameter.parameterName,
+          BEDROCK_INFERENCE_PROFILE:
+            bedrockInferenceProfileParameter.parameterName,
+          INDEX_NAME: indexNameParameter.parameterName,
+          DFO_TOPIC_FULL_INDEX_NAME:
+            dfoTopicFullIndexNameParameter.parameterName,
         },
       }
     );
+
+    bedrockLLMParameter.grantRead(docDetailViewFunction);
+    embeddingModelParameter.grantRead(docDetailViewFunction);
+    tableNameParameter.grantRead(docDetailViewFunction);
+    opensearchHostParameter.grantRead(docDetailViewFunction);
+    opensearchSecretParamName.grantRead(docDetailViewFunction);
+    indexNameParameter.grantRead(docDetailViewFunction);
+    dfoHtmlFullIndexNameParameter.grantRead(docDetailViewFunction);
+    dfoMandateFullIndexNameParameter.grantRead(docDetailViewFunction);
+    bedrockInferenceProfileParameter.grantRead(docDetailViewFunction);
+    dfoTopicFullIndexNameParameter.grantRead(docDetailViewFunction);
+
     const cfnDocDetailViewFunc = docDetailViewFunction.node
       .defaultChild as lambda.CfnFunction;
     cfnDocDetailViewFunc.overrideLogicalId("DocDetailDockerFunction");
@@ -939,9 +956,20 @@ export class ApiGatewayStack extends cdk.Stack {
           BEDROCK_LLM_PARAM: bedrockLLMParameter.parameterName,
           EMBEDDING_MODEL_PARAM: embeddingModelParameter.parameterName,
           TABLE_NAME_PARAM: tableNameParameter.parameterName,
+          OPENSEARCH_HOST: opensearchHostParameter.parameterName,
+          OPENSEARCH_SEC: opensearchSecretParamName.parameterName,
+          OPENSEARCH_INDEX_NAME: indexNameParameter.parameterName,
         },
       }
     );
+
+    bedrockLLMParameter.grantRead(hybridSearchFunction);
+    embeddingModelParameter.grantRead(hybridSearchFunction);
+    tableNameParameter.grantRead(hybridSearchFunction);
+    opensearchHostParameter.grantRead(hybridSearchFunction);
+    opensearchSecretParamName.grantRead(hybridSearchFunction);
+    indexNameParameter.grantRead(hybridSearchFunction);
+
     const cfnHybridSearchFunc = hybridSearchFunction.node
       .defaultChild as lambda.CfnFunction;
     cfnHybridSearchFunc.overrideLogicalId("HybridSearchLambdaDockerFunction");
@@ -987,9 +1015,32 @@ export class ApiGatewayStack extends cdk.Stack {
           BEDROCK_LLM_PARAM: bedrockLLMParameter.parameterName,
           EMBEDDING_MODEL_PARAM: embeddingModelParameter.parameterName,
           TABLE_NAME_PARAM: tableNameParameter.parameterName,
+          OPENSEARCH_HOST: opensearchHostParameter.parameterName,
+          OPENSEARCH_SEC: opensearchSecretParamName.parameterName,
+          OPENSEARCH_INDEX_NAME: indexNameParameter.parameterName,
+          DFO_HTML_FULL_INDEX_NAME: dfoHtmlFullIndexNameParameter.parameterName,
+          DFO_MANDATE_FULL_INDEX_NAME:
+            dfoMandateFullIndexNameParameter.parameterName,
+          BEDROCK_INFERENCE_PROFILE:
+            bedrockInferenceProfileParameter.parameterName,
+          INDEX_NAME: indexNameParameter.parameterName,
+          DFO_TOPIC_FULL_INDEX_NAME:
+            dfoTopicFullIndexNameParameter.parameterName,
         },
       }
     );
+
+    bedrockLLMParameter.grantRead(openSearchQueryFunction);
+    embeddingModelParameter.grantRead(openSearchQueryFunction);
+    tableNameParameter.grantRead(openSearchQueryFunction);
+    opensearchHostParameter.grantRead(openSearchQueryFunction);
+    opensearchSecretParamName.grantRead(openSearchQueryFunction);
+    indexNameParameter.grantRead(openSearchQueryFunction);
+    dfoHtmlFullIndexNameParameter.grantRead(openSearchQueryFunction);
+    dfoMandateFullIndexNameParameter.grantRead(openSearchQueryFunction);
+    bedrockInferenceProfileParameter.grantRead(openSearchQueryFunction);
+    dfoTopicFullIndexNameParameter.grantRead(openSearchQueryFunction);
+
     const cfnOpenSearchQueryFunc = openSearchQueryFunction.node
       .defaultChild as lambda.CfnFunction;
     cfnOpenSearchQueryFunc.overrideLogicalId("OpenSearchLambdaDockerFunction");

@@ -18,9 +18,9 @@ import src.opensearch_utils as op
 with open(Path("configs.json"), "r") as f:
     configs = json.load(f)
 
-REGION_NAME = configs['aws']['region_name']
-OPENSEARCH_SEC = configs['aws']['secrets']['opensearch']
-INDEX_NAME = "dfo-langchain-vector-index"
+REGION_NAME = os.environ.get("REGION")
+OPENSEARCH_SEC = os.environ.get("OPENSEARCH_SEC")
+INDEX_NAME = os.environ.get("INDEX_NAME")
 BUCKET_NAME = "dfo-documents"
 FOLDER_NAME = "documents"
 LOCAL_DIR = "s3_data"

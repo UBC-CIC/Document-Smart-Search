@@ -4,14 +4,15 @@ import logging
 from typing import Dict, List, Tuple
 import psycopg
 import re
+import os
 
 # Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
 
 # Constants
-REGION_NAME = "us-west-2"
-RDS_SEC = "rds/dfo-db-glue-test"
+REGION_NAME = os.environ["REGION"]
+RDS_SEC = os.environ['SM_DB_CREDENTIALS']
 
 # AWS Clients
 secrets_manager_client = boto3.client("secretsmanager", region_name=REGION_NAME)

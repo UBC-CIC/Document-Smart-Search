@@ -85,7 +85,7 @@ def init_constants():
     logger.info(f"OpenSearch Host: {OPENSEARCH_HOST}")
     logger.info(f"OpenSearch Sec Name: {OPENSEARCH_SEC}")
     INDEX_NAME = get_parameter(os.environ["OPENSEARCH_INDEX_NAME"])
-    RDS_SEC = get_parameter(os.environ["RDS_SEC"])
+    RDS_SEC = os.environ["RDS_SEC"]
     DFO_HTML_FULL_INDEX_NAME = get_parameter(os.environ["DFO_HTML_FULL_INDEX_NAME"])
     DFO_MANDATE_FULL_INDEX_NAME = get_parameter(os.environ["DFO_MANDATE_FULL_INDEX_NAME"])
     DFO_TOPIC_FULL_INDEX_NAME = get_parameter(os.environ["DFO_TOPIC_FULL_INDEX_NAME"])

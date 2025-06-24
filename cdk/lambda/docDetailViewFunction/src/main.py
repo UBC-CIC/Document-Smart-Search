@@ -5,18 +5,19 @@ import logging
 from typing import Dict, List, Any, Tuple
 from opensearchpy import OpenSearch
 import psycopg
+import os
 
 # Set up basic logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
 
-# Hardcoded constants (for now)
-OPENSEARCH_SEC = "opensearch-masteruser-test-glue"
-OPENSEARCH_HOST = "opensearch-host-test-glue"
-REGION_NAME = "us-west-2"
-INDEX_NAME = "dfo-html-full-index"
-EMBEDDING_MODEL_PARAM = "amazon.titan-embed-text-v2:0"
-RDS_SEC = "rds/dfo-db-glue-test"
+
+OPENSEARCH_SEC = os.environ.get("OPENSEARCH_SEC")
+OPENSEARCH_HOST = os.environ.get("OPENSEARCH_HOST")
+REGION_NAME = os.environ.get("REGION")
+INDEX_NAME = os.environ.get("INDEX_NAME")
+EMBEDDING_MODEL_PARAM = os.environ.get("EMBEDDING_MODEL_PARAM")
+RDS_SEC = os.environ.get("SM_DB_CREDENTIALS")
 
 # Map of frontend filter names to OpenSearch field names
 FILTER_FIELD_MAPPING = {
