@@ -24,7 +24,12 @@
 - [Conceptual Implementation for Our Project](#conceptual-implementation-for-our-project)
   - [1. Zero-Shot Topic Modeling with Pre-Computed Embeddings](#1-zero-shot-topic-modeling-with-pre-computed-embeddings)
   - [2. Zero-Shot Topic Modeling with Pretrained Embedding Model (sentence-transformers/all-MiniLM-L6-v2)](#2-zero-shot-topic-modeling-with-pretrained-embedding-model-sentence-transformersall-minilm-l6-v2)
-- [Strategic Advantages for Our System](#strategic-advantages-for-our-system)
+  - [Specific changes in the codebase](#specific-changes-in-the-codebase)
+    - [Key Changes Needed:](#key-changes-needed)
+- [Integrating Zero-Shot Topic Modeling with BERTopic](#integrating-zero-shot-topic-modeling-with-bertopic)
+  - [Pseudocode for Modification](#pseudocode-for-modification)
+  - [Explanation of the Approach](#explanation-of-the-approach)
+    - [Strategic Advantages for Our System](#strategic-advantages-for-our-system)
 - [Further Reading](#further-reading)
 
 ## Topic Modeling Architecture: A Deep Dive
@@ -220,12 +225,221 @@ topics, probabilities = topic_model.fit_transform(docs)
 # topic_model.get_topic_info()
 ```
 
-## Strategic Advantages for Our System
+### Specific changes in the codebase
+
+This section will describe the specific changes made to the codebase to implement the zero-shot topic modeling. Please note that this is all hypothetical, as we have not yet implemented the zero-shot topic modeling in the codebase ourselves, so there might be other necessary changes that are not mentioned to make the zero-shot topic modeling work for the entire system as a whole. Thus, all code provided below will be in the form of pseudo-code.
+
+#### Key Changes Needed:
+
+## Integrating Zero-Shot Topic Modeling with BERTopic
+
+To incorporate zero-shot topic modeling into your existing BERTopic pipeline while retaining the original logic, we will primarily modify the `train_custom_topic_model` function and how parameters are passed to it. This approach allows for predefined topics to be identified alongside newly discovered topics from clustering.
+
+### Pseudocode for Modification
+
+Here's a detailed pseudocode representation of the changes, maintaining your script's structure and variable names:
+
+```python
+# ... (rest of imports and initializations) ...
+
+# New: Add arguments for zero-shot topic list and similarity threshold
+args = getResolvedOptions(sys.argv, [
+    # ... (existing args) ...
+    'zeroshot_topic_list', # New argument for a JSON string of predefined topics
+    'zeroshot_min_similarity' # New argument for similarity threshold
+])
+
+# ... (rest of global variables and init_opensearch_client) ...
+
+# New: Parse zero-shot topics and similarity from arguments
+# We use a default empty list and a default similarity of 0.7 if not provided.
+ZERO_SHOT_TOPIC_LIST = json.loads(args.get('zeroshot_topic_list', '[]'))
+ZERO_SHOT_MIN_SIMILARITY = float(args.get('zeroshot_min_similarity', 0.7))
+
+# or fetch a file containing the zero-shot topics from s3 directly
+s3_bucket_name = "my-bucket"
+s3_key = "zeroshot_topics.json"
+ZERO_SHOT_TOPIC_LIST = fetch_zero_shot_topics_from_s3(s3_bucket_name, s3_key)
+
+
+def train_custom_topic_model(
+    documents,
+    embeddings,
+    seed=42,
+    min_df=2,
+    max_df=0.5,
+    ngram_range=(1, 2),
+    min_topic_size=5,
+    top_n_words=15,
+    rep_diversity=0.5,
+    rep_top_n_words=5,
+    n_neighbors=15,
+    n_components=7,
+    min_dist=0.0,
+    # New parameters for zero-shot:
+    zeroshot_topic_list=None,
+    zeroshot_min_similarity=None
+):
+    """
+    This function trains a BERTopic model with custom components, now supporting zero-shot topic modeling.
+    It returns the trained model and topic distributions.
+    """
+    
+    # ... (existing representation_model, vectorizer_model, ctfidf_model, umap_model, hdbscan_model remain unchanged) ...
+
+    # Initialize BERTopic model
+    topic_model = BERTopic(
+        language="english",
+        calculate_probabilities=True,
+        top_n_words=top_n_words,
+        nr_topics="auto", # This parameter dynamically adjusts when zero-shot topics are used
+        vectorizer_model=vectorizer_model,
+        ctfidf_model=ctfidf_model,
+        umap_model=umap_model,
+        hdbscan_model=hdbscan_model,
+        representation_model=representation_model,
+        # NEW: Pass zero-shot parameters directly to the BERTopic constructor
+        zeroshot_topic_list=zeroshot_topic_list,
+        zeroshot_min_similarity=zeroshot_min_similarity
+    )
+
+    # Fit the model. BERTopic will automatically manage zero-shot assignment before clustering
+    # if `zeroshot_topic_list` is provided.
+    topic_model = topic_model.fit(documents, embeddings)
+    
+    # Approximate distribution remains the same
+    topic_distributions, _ = topic_model.approximate_distribution(documents, batch_size=100)
+    
+    return topic_model, topic_distributions
+
+
+# ... (rest of generate_topic_labels, generate_diagnostic_plots, fetch_and_prepare_documents functions) ...
+
+
+def train_and_label_main_topics(docs_df):
+    """
+    This function trains BERTopic (now with potential zero-shot capability) and uses an LLM to generate human-readable labels.
+    """
+
+    docs = docs_df.query("html_doc_type != 'Proceedings'")
+    print("# of All English docs except Proceedings:", len(docs))
+
+    contents = docs['page_content'].tolist()
+    embeddings = np.array(docs['chunk_embedding'].tolist())
+    
+    print("Starting initial topic modeling (potentially with zero-shot topics)...")
+    
+    topic_model, topic_distributions = train_custom_topic_model(
+        documents=contents,
+        embeddings=embeddings,
+        seed=17,
+        min_df=2,
+        max_df=0.7,
+        min_topic_size=5,
+        top_n_words=15,
+        n_neighbors=15,
+        n_components=7,
+        min_dist=0.0,
+        # NEW: Pass the globally defined zero-shot arguments to the training function
+        zeroshot_topic_list=ZERO_SHOT_TOPIC_LIST,
+        zeroshot_min_similarity=ZERO_SHOT_MIN_SIMILARITY
+    )
+
+    # ... (rest of the function for handling zero-sum distributions and initial topic info) ...
+
+    # Handle topic information and LLM labeling
+    topic_infos = topic_model.get_topic_info()
+
+    # Generate LLM labels only for newly discovered topics (excluding the outlier topic -1).
+    # This assumes that zero-shot topics either have their final labels from `zeroshot_topic_list`
+    # or will be handled appropriately by subsequent logic if LLM-enhanced labels are still desired for them.
+    llm_topics = generate_topic_labels(
+        topic_infos.query("Topic != -1"), topic_model
+    )
+    
+    # Initialize 'llm_enhanced_topic' with the 'Name' provided by BERTopic (which will include zero-shot names).
+    topic_infos['llm_enhanced_topic'] = topic_infos['Name'] 
+    
+    # Overwrite with LLM-generated labels for the relevant topics.
+    for topic_id, label in llm_topics.items():
+        if topic_id != -1: 
+            topic_infos.loc[topic_infos['Topic'] == topic_id, 'llm_enhanced_topic'] = label
+
+    # Special handling for the miscellaneous topic (-1)
+    topic_infos.loc[topic_infos['Topic'] == -1, 'llm_enhanced_topic'] = "Miscellaneous"
+    
+    docs['topic_id'] = topic_model.topics_
+    # ... (rest of `train_and_label_main_topics` remains unchanged) ...
+
+
+def handle_outliers(docs, topic_model):
+    """
+    This function trains a BERTopic model for outliers from the initial batch to generate additional labels.
+    Typically, this processes "true" outliers (-1) from the HDBSCAN step, not documents unassigned by zero-shot.
+    """
+    # ... (existing logic remains largely the same) ...
+    # If the outlier model also needs zero-shot capability, `train_custom_topic_model` call here
+    # would also require `zeroshot_topic_list` and `zeroshot_min_similarity` parameters.
+    # We assume for now only the main model uses it.
+
+
+def label_proceedings(docs_df, topic_model, outlier_model, topic_infos, outlier_topic_infos):
+    """
+    This function assigns topics to Proceedings documents using the trained models.
+    """
+    # ... (existing logic for `transform` remains the same) ...
+    # The `transform` method will automatically leverage the zero-shot definitions
+    # if the `topic_model` was trained with them.
+
+
+# ... (rest of fetch_topics_from_db, prepare_data_to_insert, fetch_specific_documents_by_urls, fetch_new_documents functions) ...
+
+
+def main(dryrun=False, debug=False):
+    # ... (existing pipeline mode check) ...
+
+    if args['topic_modelling_mode'] == 'retrain':
+        # ... (existing purge logic) ...
+        
+        # Fetch all documents and train a new model
+        docs_df = fetch_and_prepare_documents()
+
+        # The `train_and_label_main_topics` function now includes the zero-shot parameters.
+        topic_model, docs, topic_infos = train_and_label_main_topics(docs_df)
+        
+        # ... (rest of retrain mode logic including handle_outliers, label_proceedings,
+        #       prepare_data_to_insert, saving models to S3) ...
+
+    else:  # predict mode
+        # ... (existing predict mode logic) ...
+        # Loading and using the models remains unchanged. The `transform` method
+        # of the loaded BERTopic model will inherently apply the zero-shot logic
+        # if the model was trained with it.
+        pass
+
+# ... (if __name__ == "__main__":) ...
+```
+
+### Explanation of the Approach
+
+1.  **Parameter Introduction**: We introduced two new command-line arguments: `zeroshot_topic_list` (a JSON string representing a Python list of topic labels) and `zeroshot_min_similarity` (a float). These arguments enable dynamic configuration of your predefined topics and the assignment threshold when running the script. Default values are provided for robustness.
+
+2.  **`train_custom_topic_model` Augmentation**: The `train_custom_topic_model` function now accepts these two new parameters. Crucially, these parameters are directly passed to the `BERTopic` constructor. BERTopic is designed to internally handle the zero-shot logic: it will first attempt to assign documents to your predefined topics based on semantic similarity. Documents that do not meet the `zeroshot_min_similarity` threshold for any predefined topic are then passed through the standard UMAP and HDBSCAN pipeline for the discovery of new, emergent topics.
+
+3.  **`train_and_label_main_topics` Integration**: The global variables `ZERO_SHOT_TOPIC_LIST` and `ZERO_SHOT_MIN_SIMILARITY` are passed to `train_custom_topic_model` when it is called within `train_and_label_main_topics`. This ensures the zero-shot functionality is applied during the primary topic modeling phase.
+
+4.  **Topic ID and Labeling Considerations**: When zero-shot topics are utilized, `topic_model.get_topic_info()` will include entries for your predefined topics. These topics typically have distinct IDs and their `Name` field will be populated with the labels you provided in `zeroshot_topic_list`. The pseudocode includes an adjustment to the `llm_enhanced_topic` assignment logic within `train_and_label_main_topics`. It generates LLM labels only for topics *not* identified as outliers (`-1`). For zero-shot topics, it assumes the names provided in your `zeroshot_topic_list` are sufficient for `llm_enhanced_topic`, ensuring they are not redundantly relabeled by the LLM unless specifically desired.
+
+5.  **Preservation of Original Logic**:
+
+  * **Component Models**: All your custom components (e.g., `CountVectorizer`, `UMAP`, `HDBSCAN`) remain in place and continue to function as intended for the discovery of new topics.
+  * **Outlier Handling**: The `handle_outliers` function will process documents that are true outliers from the HDBSCAN clustering step, regardless of whether zero-shot was applied initially.
+  * **Prediction (`transform`)**: The `transform` method, used in "predict" mode and for processing "Proceedings" documents, will automatically apply the zero-shot logic if the `BERTopic` model was originally trained with it.
+  * **Database Operations**: The `prepare_data_to_insert` function and subsequent database insertion logic should handle the combined set of zero-shot and newly clustered topics, as `get_topic_info()` provides comprehensive information for all topics.
+
+#### Strategic Advantages for Our System
 
 Integrating this zero-shot methodology offers significant advantages over purely unsupervised or simpler guided methods:
-
-- **Alignment with Strategic Mandates**
-  Allows us to directly track and quantify documentation related to legislated responsibilities (like the *Fisheries Act* or *SARA*) and specific departmental priorities.
 
 - **Retention of Exploratory Power**
   The system remains a powerful tool for horizon scanning. We do not limit our analysis to preconceived notions, ensuring that emergent environmental threats or scientific breakthroughs are still discovered.

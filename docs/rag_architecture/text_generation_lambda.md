@@ -11,10 +11,9 @@ The core value of this system is its ability to go beyond simple keyword matchin
 To understand the system, it's best to follow the journey of a single user request. This process follows a logical and repeatable sequence, designed for clarity and reliability.
 
 1.  **Initialization and Validation:** When invoked, the Lambda function first loads its configuration and establishes connections to necessary services. The incoming user request is immediately validated to ensure its integrity before any processing begins.
-2.  **Session Management:** The system retrieves the user's session history from DynamoDB. This step is essential for maintaining conversational context, allowing the system to understand follow-up questions and references to previous turns in the conversation.
-3.  **Tool-Based Context Retrieval:** Based on the user's query, the agent's reasoning engine selects the most appropriate tool from its toolkit. The chosen tool then executes a search across the relevant data indices. The retrieved results are ranked and filtered to assemble the most relevant context for the language model.
-4.  **Prompt Construction and Generation:** A detailed prompt is carefully constructed. It combines the original user query, the conversational history, and the newly retrieved context. This rich prompt is then sent to AWS Bedrock to generate a draft response.
-5.  **Safety Validation and Delivery:** The generated response is immediately passed through AWS Guardrails for a final safety check. Once cleared, the final, formatted response is sent back to the user. Simultaneously, the session state is updated in DynamoDB, and key engagement metrics are logged for analytics.
+2.  **Tool-Based Context Retrieval:** Based on the user's query, the agent's reasoning engine selects the most appropriate tool from its toolkit. The chosen tool then executes a search across the relevant data indices. The retrieved results are ranked and filtered to assemble the most relevant context for the language model.
+3.  **Prompt Construction and Generation:** A detailed prompt is carefully constructed. It combines the original user query, the conversational history, and the newly retrieved context. This rich prompt is then sent to AWS Bedrock to generate a draft response.
+4.  **Safety Validation and Delivery:** The generated response is immediately passed through AWS Guardrails for a final safety check. Once cleared, the final, formatted response is sent back to the user. Simultaneously, the session state is updated in DynamoDB, and key engagement metrics are logged for analytics.
 
 ## 3. System Architecture: The Core Engine
 
