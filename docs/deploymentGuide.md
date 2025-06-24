@@ -12,8 +12,9 @@
     - [Step 2: Upload Secrets](#step-2-upload-secrets)
     - [Step 3: CDK Deployment](#step-3-cdk-deployment)
   - [Post-Deployment](#post-deployment)
-    - [Step 1: Build AWS Amplify App](#step-1-build-aws-amplify-app)
-    - [Step 2: Visit Web App](#step-2-visit-web-app)
+    - [Step 1: Upload the files for the data pipeline](#step-1-upload-the-files-for-the-data-pipeline)
+    - [Step 2: Build AWS Amplify App](#step-2-build-aws-amplify-app)
+    - [Step 3: Visit Web App](#step-3-visit-web-app)
   - [Cleanup](#cleanup)
     - [Taking down the deployed stack](#taking-down-the-deployed-stack)
 
@@ -167,7 +168,12 @@ cdk deploy --all --parameters DFOSmartSearch-Amplify:githubRepoName=DFO-Smart-Se
 ```
 
 ## Post-Deployment
-### Step 1: Build AWS Amplify App
+
+### Step 1: Upload the files for the data pipeline
+
+You will need to upload the files for the data pipeline to the S3 bucket. It will contain `dataupload` in its name
+
+### Step 2: Build AWS Amplify App
 
 1. Log in to AWS console, and navigate to **AWS Amplify**. You can do so by typing `Amplify` in the search bar at the top.
 2. From `All apps`, click `<stack-prefix>-Amplify-admin`.
@@ -178,7 +184,8 @@ cdk deploy --all --parameters DFOSmartSearch-Amplify:githubRepoName=DFO-Smart-Se
 ![](./images/DFO-Amplify-admin.png)
 ![](./images/DFO-Amplify-admin-run-job.png)
 ![](./images/DFO-Amplify-no-deploy.png)
-### Step 2: Visit Web App
+
+### Step 3: Visit Web App
 You can now navigate to the web app URL to see your application in action.
 
 ## Cleanup

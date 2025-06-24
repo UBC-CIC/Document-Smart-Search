@@ -166,7 +166,9 @@ export class DataPipelineStack extends cdk.Stack {
     const MAX_CAPACITY = 1;
     const TIMEOUT = 170;
     const PYTHON_LIBS =
-      "psycopg[binary]==3.2.6,boto3==1.38.1,langchain==0.3.12,langchain-community==0.3.12,langchain-aws==0.2.21,opensearch-py==2.5.0,pandas==2.2.3,openpyxl==3.1.5,numpy==1.26.4,scikit-learn==1.6.1,aiohttp==3.11.10,beautifulsoup4==4.12.3,bertopic==0.16.2,langdetect==1.0.9";
+    "psycopg[binary]==3.2.6,boto3==1.38.1,langchain==0.3.12,langchain-community==0.3.12,langchain-aws==0.2.21,opensearch-py==2.5.0,pandas==2.2.3,openpyxl==3.1.5,numpy==1.26.4,scikit-learn==1.6.1,aiohttp==3.11.10,beautifulsoup4==4.12.3,bertopic==0.16.2,langdetect==1.0.9";
+    // const PYTHON_LIBS = "boto3,langchain==0.3.12,langchain-community==0.3.12,langchain-aws==0.2.21,opensearch-py==2.5.0,openpyxl,pandas,numpy==1.26.4,scikit-learn,aiohttp==3.11.10,beautifulsoup4==4.12.3,bertopic==0.16.2,langdetect==1.0.9,psycopg[binary]==3.2.6,awswrangler";
+
 
     // Function to get common job arguments
     const getCommonJobArguments = (): GlueJobArguments => {
@@ -179,8 +181,8 @@ export class DataPipelineStack extends cdk.Stack {
         "--region_name": this.region,
         "--html_urls_path": "",  // Will be set at runtime
         "--embedding_model": "amazon.titan-embed-text-v2:0",
-        "--opensearch_secret":  opensearchStack.userSecret.secretName,
-        "--opensearch_host": opensearchStack.domain.domainEndpoint,
+        "--opensearch_secret":  opensearchStack.adminSecret.secretName,
+        "--opensearch_host": opensearchStack.osHostParam.parameterName,
         "--rds_secret": databaseStack.secretPathUser.secretName,
         "--dfo_html_full_index_name": "dfo-html-full-index",
         "--dfo_topic_full_index_name": "dfo-topic-full-index",
