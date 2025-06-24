@@ -16,6 +16,7 @@ from helpers.tools.tool_wrapper import get_tool_calls_summary, reset_all_tool_wr
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 # Define the welcome message after role selection
 ROLE_SELECTION_RESPONSE = "Thank you for selecting your role. How can I help you with your questions about Fisheries and Oceans Canada today?"
@@ -45,13 +46,13 @@ def create_dynamodb_history_table(table_name: str, region_name: str):
         TableName=table_name,
         KeySchema=[
             {
-                'AttributeName': 'session_id',
+                'AttributeName': 'SessionId',
                 'KeyType': 'HASH'
             }
         ],
         AttributeDefinitions=[
             {
-                'AttributeName': 'session_id',
+                'AttributeName': 'SessionId',
                 'AttributeType': 'S'
             }
         ],
@@ -290,8 +291,10 @@ def no_existing_messages(table_name: str, session_id: str) -> bool:
     # Creates the dynamoDB chat history client
     chat_history = DynamoDBChatMessageHistory(
         table_name=table_name,
-        session_id=session_id
+        session_id=session_id,
     )
+
+    logger.info(f"Checking if chat history is empty for session {session_id} in table {table_name}.")
     
     return len(chat_history.messages) == 0
 

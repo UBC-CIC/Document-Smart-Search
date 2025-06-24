@@ -28,6 +28,7 @@ from helpers.tools.setup import initialize_tools
 # Set up basic logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 # Constants
 SEARCH_PIPELINE_NAME = "hybridsearch" # Default name set by openSearch
@@ -78,9 +79,11 @@ def init_constants():
     # Load and resolve SSM parameters
     BEDROCK_LLM_PARAM = os.environ["BEDROCK_LLM_PARAM"]
     EMBEDDING_MODEL_PARAM = os.environ["EMBEDDING_MODEL_PARAM"]
-    TABLE_NAME_PARAM = os.environ["TABLE_NAME_PARAM"]
+    TABLE_NAME_PARAM = get_parameter(os.environ["TABLE_NAME_PARAM"])
     OPENSEARCH_HOST = get_parameter(os.environ["OPENSEARCH_HOST"])
     OPENSEARCH_SEC = get_parameter(os.environ["OPENSEARCH_SEC"])
+    logger.info(f"OpenSearch Host: {OPENSEARCH_HOST}")
+    logger.info(f"OpenSearch Sec Name: {OPENSEARCH_SEC}")
     INDEX_NAME = get_parameter(os.environ["OPENSEARCH_INDEX_NAME"])
     RDS_SEC = get_parameter(os.environ["RDS_SEC"])
     DFO_HTML_FULL_INDEX_NAME = get_parameter(os.environ["DFO_HTML_FULL_INDEX_NAME"])
@@ -320,7 +323,8 @@ def handler(event, context):
     user_role = body.get("user_role", "")
     
     # Create DynamoDB table if it doesn't exist
-    dynamodb_table_name = get_parameter(TABLE_NAME_PARAM)
+    dynamodb_table_name = TABLE_NAME_PARAM
+    logger.info(f"DynamoDB Table Name: {dynamodb_table_name}")
     create_dynamodb_history_table(dynamodb_table_name, REGION)
 
     # If no question, return error
@@ -394,7 +398,8 @@ def handler(event, context):
     try:
         # Initialize OpenSearch, DB, and get configuration values
         # secrets = get_secret(OPENSEARCH_SEC)
-        secrets = OPENSEARCH_SEC
+        secrets = get_secret(OPENSEARCH_SEC)
+        logger.info(f"OpenSearch Secrets: {secrets}")
         opensearch_host = OPENSEARCH_HOST
         opensearch_client = OpenSearch(
             hosts=[{'host': opensearch_host, 'port': 443}],

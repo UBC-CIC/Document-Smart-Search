@@ -4,6 +4,7 @@ import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as opensearch from "aws-cdk-lib/aws-opensearchservice";
 import * as secrets from "aws-cdk-lib/aws-secretsmanager";
 import * as ssm from "aws-cdk-lib/aws-ssm";
+import * as iam from "aws-cdk-lib/aws-iam";
 import { VpcStack } from "./vpc-stack";
 
 export class OpenSearchStack extends Stack {
@@ -25,7 +26,7 @@ export class OpenSearchStack extends Stack {
       generateSecretString: {
         secretStringTemplate: JSON.stringify({ username: "admin" }),
         generateStringKey: "password",
-        excludePunctuation: true,
+        // excludePunctuation: true,
         passwordLength: 16,
       },
       removalPolicy: RemovalPolicy.DESTROY,
@@ -35,7 +36,7 @@ export class OpenSearchStack extends Stack {
       generateSecretString: {
         secretStringTemplate: JSON.stringify({ username: "dfouser" }),
         generateStringKey: "password",
-        excludePunctuation: true,
+        // excludePunctuation: true,
         passwordLength: 16,
       },
       removalPolicy: RemovalPolicy.DESTROY,
@@ -83,10 +84,20 @@ export class OpenSearchStack extends Stack {
       removalPolicy: RemovalPolicy.DESTROY,
       // uncomment to enable fine-grained access control with username/password
       fineGrainedAccessControl: {
-        masterUserName: this.adminSecret.secretValueFromJson("username").toString(),
-        masterUserPassword: this.adminSecret.secretValueFromJson("password")
+        masterUserName: "admin", // this.adminSecret.secretValueFromJson("username").toString(),
+        masterUserPassword: this.adminSecret.secretValueFromJson("password"),
       },
     });
+
+    // ✅ Add access policy AFTER domain creation
+    this.domain.addAccessPolicies(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        principals: [new iam.AnyPrincipal()],
+        actions: ["es:*"],
+        resources: [`${this.domain.domainArn}/*`],
+      })
+    );
 
     // 4) Persist endpoint & secret ARNs into SSM (namespaced by stack id)
     new ssm.StringParameter(this, "OSHostParam", {
