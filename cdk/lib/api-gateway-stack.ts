@@ -1017,7 +1017,7 @@ export class ApiGatewayStack extends cdk.Stack {
           EMBEDDING_MODEL_PARAM: embeddingModelParameter.parameterName,
           TABLE_NAME_PARAM: tableNameParameter.parameterName,
           OPENSEARCH_HOST: opensearchHostParameter.parameterName,
-          OPENSEARCH_SEC: opensearchSecretParamName.parameterName,
+          OPENSEARCH_SEC: osStack.adminSecret.secretArn,
           OPENSEARCH_INDEX_NAME: indexNameParameter.parameterName,
         },
       }

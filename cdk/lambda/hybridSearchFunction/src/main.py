@@ -11,12 +11,14 @@ import helpers.opensearch_utils as op
 # Set up basic logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
-OPENSEARCH_SEC = os.environ.get("OPENSEARCH_SEC")
-OPENSEARCH_HOST = os.environ.get("OPENSEARCH_HOST")
-REGION_NAME = os.environ.get("REGION")
-INDEX_NAME = os.environ.get("OPENSEARCH_INDEX_NAME")
-EMBEDDING_MODEL_PARAM = os.environ.get("EMBEDDING_MODEL_PARAM")
+OPENSEARCH_SEC = None
+OPENSEARCH_HOST = None
+REGION_NAME = None
+INDEX_NAME = None
+EMBEDDING_MODEL_PARAM = None
+
 
 # Map of frontend filter names to OpenSearch field names
 FILTER_FIELD_MAPPING = {
@@ -51,6 +53,16 @@ def get_secret(secret_name: str) -> Dict:
     except Exception as e:
         logger.error(f"Error fetching secret {secret_name}: {e}")
         raise
+
+def init_constants():
+    """Initialize constants from environment variables."""
+    global OPENSEARCH_SEC, OPENSEARCH_HOST, REGION_NAME, INDEX_NAME, EMBEDDING_MODEL_PARAM
+    OPENSEARCH_SEC = os.environ.get("OPENSEARCH_SEC")
+    OPENSEARCH_HOST = os.environ.get("OPENSEARCH_HOST")
+    REGION_NAME = os.environ.get("REGION")
+    INDEX_NAME = get_parameter(os.environ.get("OPENSEARCH_INDEX_NAME"))
+    EMBEDDING_MODEL_PARAM = get_parameter(os.environ.get("EMBEDDING_MODEL_PARAM"))
+    logger.info(f"embedding model param: {EMBEDDING_MODEL_PARAM}")
 
 def rename_result_fields(results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Rename fields in search results to match frontend expectations."""
@@ -102,10 +114,13 @@ def _build_post_filter(filters: dict | None) -> dict | None:
 
 def handler(event, context):
     try:
+        # Initialize constants from environment variables
+        init_constants()
         body = {} if event.get("body") is None else json.loads(event.get("body"))
         query = body.get("user_query", "")
         filters = body.get("filters", {})
 
+        logger.info(f"Opensearch sec: {OPENSEARCH_SEC}")
         secrets = get_secret(OPENSEARCH_SEC)
         opensearch_host = get_parameter(OPENSEARCH_HOST)
         op_client = OpenSearch(
