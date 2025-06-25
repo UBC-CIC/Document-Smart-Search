@@ -12,9 +12,10 @@
     - [Step 2: Upload Secrets](#step-2-upload-secrets)
     - [Step 3: CDK Deployment](#step-3-cdk-deployment)
   - [Post-Deployment](#post-deployment)
-    - [Step 1: Upload the files for the data pipeline](#step-1-upload-the-files-for-the-data-pipeline)
-    - [Step 2: Build AWS Amplify App](#step-2-build-aws-amplify-app)
-    - [Step 3: Visit Web App](#step-3-visit-web-app)
+    - [Task 1:Upload the files for the data pipeline](#task-1upload-the-files-for-the-data-pipeline)
+      - [Before you start](#before-you-start)
+      - [Please note](#please-note)
+    - [Task 2: Build AWS Amplify App](#task-2-build-aws-amplify-app)
   - [Cleanup](#cleanup)
     - [Taking down the deployed stack](#taking-down-the-deployed-stack)
 
@@ -169,11 +170,78 @@ cdk deploy --all --parameters DFOSmartSearch-Amplify:githubRepoName=DFO-Smart-Se
 
 ## Post-Deployment
 
-### Step 1: Upload the files for the data pipeline
+### Task 1:Upload the files for the data pipeline
 
-You will need to upload the files for the data pipeline to the S3 bucket. It will contain `dataupload` in its name
+#### Before you start
 
-### Step 2: Build AWS Amplify App
+You will need to upload 4 different files to the S3 bucket for the data pipeline to ingest, for first time deployment.
+
+- An `xlsx` file that contains the html urls
+- 3 `csv` files that contains the topics, mandates, and subcategories data
+
+For more information on the files, please refer to the [Data Pipeline](./dataPreparation.md) documentation.
+
+1. You will need to upload the files for the data pipeline to the S3 bucket. It will contain `dataupload` in its name.
+
+![alt text](./images/datapipeline/s3-dataupload.png)
+
+2. Navigate into the `batches` folder
+ 
+![alt text](./images/datapipeline/s3-root.png)
+
+3. Create a new folder for the batch you want to upload. The subfolder name can be anything, as long as it is unique. We highly recommend using the date of the batch as the subfolder name for easier tracking. For example, let's use `2025_05_21` as the subfolder name.
+
+![alt text](./images/datapipeline/s3-createfolder.png)
+
+4. Navigate into the `2025_05_21` folder and create 2 subfolders: `html_data` and `topics_mandates_data`
+
+![alt text](./images/datapipeline/s3-subfolders.png)
+
+5. Navigate into the `html_data` folder and upload the `xlsx` file that contains the html urls. The file name can be anything. **You must also note down the s3 URI of the file** by selecting the file and clicking on the `Copy S3 URI` button.
+
+![alt text](./images/datapipeline/s3-htmlupload.png)
+
+6. Navigate into the `topics_mandates_data` folder and upload the `csv` files that contains the topics and mandates data. The file name must be `new_topics.cvs`, `new_mandates.csv`, and `new_subcategories.csv`. You do not need to note down the s3 URI of the files.
+
+![alt text](./images/datapipeline/s3-topicupload.png)
+
+7. Run this command to trigger the data pipeline, using the AWS CLI:
+
+```bash
+aws glue start-job-run \
+    --job-name 'DFO-DataPipeline-clean-and-ingest-html' \
+    --arguments '{"--batch_id": "<your-batch-id>", "--html_urls_path": "<your-html-data-s3-uri>", "--pipeline_mode": "full_update"}' \
+    --profile <your-aws-profile-name>
+```
+
+Please remember to replace `<your-html-data-s3-uri>` , with the actual s3 URI of the files, and `<your-batch-id>` with the actual batch id that you used to name the batch folder earlier. For `pipeline_mode`, you can choose between `full_update`, `html_only` or `topics_only`. For first time deployment, you must use `full_update`.
+
+Example:
+
+```bash
+aws glue start-job-run \
+    --job-name 'DFO-DataPipeline-clean-and-ingest-html' \
+    --arguments '{"--batch_id": "2025_05_21", "--html_urls_path": "s3://smartsearch-dataupload/batches/2025_05_21/html_data/new_html_urls.xlsx", "--pipeline_mode": "full_update"}' \
+    --profile myprofile
+```
+
+The data pipeline will take a while to run, so you can go ahead and build the AWS Amplify app while you wait.
+
+#### Please note
+
+For future runs of the data pipeline, you can choose between:
+
+- `html_only` if you only upload new html urls `xlsx` file, which means you only want to update the html data
+- `topics_only` if you only upload new topics or mandates `csv` files, which means you only want to update the topics or mandates data
+- `full_update` if you have new html urls and topics or mandates to ingest, which means you want to update both the html data and the topics or mandates data
+
+For example, if you only have new html urls to ingest for batch `2025_06_01`, you just need to upload the new `xlsx` file to the `html_data` folder.
+
+Similarly, if you only have new topics or mandates to ingest for batch `2025_06_01`, you just need to upload the new `csv` files to the `topics_mandates_data` folder. Y
+
+If you have **BOTH** new html urls and topics or mandates to ingest for batch `2025_06_01`, do it as if it is a fresh deployment (`full_update`).
+
+### Task 2: Build AWS Amplify App
 
 1. Log in to AWS console, and navigate to **AWS Amplify**. You can do so by typing `Amplify` in the search bar at the top.
 2. From `All apps`, click `<stack-prefix>-Amplify-admin`.
@@ -185,11 +253,12 @@ You will need to upload the files for the data pipeline to the S3 bucket. It wil
 ![](./images/DFO-Amplify-admin-run-job.png)
 ![](./images/DFO-Amplify-no-deploy.png)
 
-### Step 3: Visit Web App
 You can now navigate to the web app URL to see your application in action.
 
 ## Cleanup
+
 ### Taking down the deployed stack
+
 To take down the deployed stack for a fresh redeployment in the future, navigate to AWS Cloudformation on the AWS Console, click on the stack and hit Delete.
 
 Please wait for the stacks in each step to be properly deleted before deleting the stack downstream.
