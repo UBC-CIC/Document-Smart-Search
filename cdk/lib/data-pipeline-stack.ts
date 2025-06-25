@@ -170,7 +170,7 @@ export class DataPipelineStack extends cdk.Stack {
     // const PYTHON_LIBS = "boto3,langchain==0.3.12,langchain-community==0.3.12,langchain-aws==0.2.21,opensearch-py==2.5.0,openpyxl,pandas,numpy==1.26.4,scikit-learn,aiohttp==3.11.10,beautifulsoup4==4.12.3,bertopic==0.16.2,langdetect==1.0.9,psycopg[binary]==3.2.6,awswrangler";
 
     // Not being used yet, please ignore
-    const opensearch_user_secret = opensearchStack.adminSecret.secretName;
+    const opensearch_user_secret = opensearchStack.userSecret.secretName;
     const opensearch_host = opensearchStack.domain.domainEndpoint;
     // Function to get common job arguments
     const getCommonJobArguments = (): GlueJobArguments => {
