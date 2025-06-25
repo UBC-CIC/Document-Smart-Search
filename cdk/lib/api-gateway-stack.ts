@@ -143,6 +143,64 @@ export class ApiGatewayStack extends cdk.Stack {
     this.stageARN_APIGW = this.api.deploymentStage.stageArn;
     this.apiGW_basedURL = this.api.urlForPath();
 
+    // Waf Firewall
+    const waf = new wafv2.CfnWebACL(this, `${id}-waf`, {
+      description: "waf for DFO",
+      scope: "REGIONAL",
+      defaultAction: { allow: {} },
+      visibilityConfig: {
+        sampledRequestsEnabled: true,
+        cloudWatchMetricsEnabled: true,
+        metricName: "DFO-firewall",
+      },
+      rules: [
+        {
+          name: "AWS-AWSManagedRulesCommonRuleSet",
+          priority: 1,
+          statement: {
+            managedRuleGroupStatement: {
+              vendorName: "AWS",
+              name: "AWSManagedRulesCommonRuleSet",
+            },
+          },
+          overrideAction: { none: {} },
+          visibilityConfig: {
+            sampledRequestsEnabled: true,
+            cloudWatchMetricsEnabled: true,
+            metricName: "AWS-AWSManagedRulesCommonRuleSet",
+          },
+        },
+        {
+          name: "LimitRequests1000",
+          priority: 2,
+          action: {
+            block: {},
+          },
+          statement: {
+            rateBasedStatement: {
+              limit: 1000,
+              aggregateKeyType: "IP",
+            },
+          },
+          visibilityConfig: {
+            sampledRequestsEnabled: true,
+            cloudWatchMetricsEnabled: true,
+            metricName: "LimitRequests1000",
+          },
+        },
+      ],
+    });
+    const wafAssociation = new wafv2.CfnWebACLAssociation(
+      this,
+      `${id}-waf-association`,
+      {
+        resourceArn: `arn:aws:apigateway:${this.region}::/restapis/${this.api.restApiId}/stages/${this.api.deploymentStage.stageName}`,
+        webAclArn: waf.attrArn,
+      }
+    );
+
+    wafAssociation.node.addDependency(this.api.deploymentStage);
+
     const { adminRole, unauthenticatedRole } = createRolesAndPolicies(
       this,
       id,
@@ -877,6 +935,7 @@ export class ApiGatewayStack extends cdk.Stack {
         timeout: cdk.Duration.seconds(300),
         vpc: vpcStack.vpc,
         functionName: `${id}-DocDetailViewFunction`,
+        logRetention: logs.RetentionDays.THREE_MONTHS,
         environment: {
           SM_DB_CREDENTIALS: db.secretPathUser.secretName,
           RDS_PROXY_ENDPOINT: db.rdsProxyEndpoint,
@@ -949,6 +1008,7 @@ export class ApiGatewayStack extends cdk.Stack {
         timeout: cdk.Duration.seconds(300),
         vpc: vpcStack.vpc,
         functionName: `${id}-HybridSearchFunction`,
+        logRetention: logs.RetentionDays.THREE_MONTHS,
         environment: {
           SM_DB_CREDENTIALS: db.secretPathUser.secretName,
           RDS_PROXY_ENDPOINT: db.rdsProxyEndpoint,
@@ -1008,6 +1068,7 @@ export class ApiGatewayStack extends cdk.Stack {
         timeout: cdk.Duration.seconds(300),
         vpc: vpcStack.vpc,
         functionName: `${id}-OpenSearchQueryFunction`,
+        logRetention: logs.RetentionDays.THREE_MONTHS,
         environment: {
           SM_DB_CREDENTIALS: db.secretPathUser.secretName,
           RDS_PROXY_ENDPOINT: db.rdsProxyEndpoint,
@@ -1079,6 +1140,7 @@ export class ApiGatewayStack extends cdk.Stack {
         timeout: cdk.Duration.seconds(300),
         vpc: vpcStack.vpc,
         functionName: `${id}-SimilaritySearchFunction`,
+        logRetention: logs.RetentionDays.THREE_MONTHS,
         environment: {
           SM_DB_CREDENTIALS: db.secretPathUser.secretName,
           RDS_PROXY_ENDPOINT: db.rdsProxyEndpoint,
@@ -1138,6 +1200,7 @@ export class ApiGatewayStack extends cdk.Stack {
         timeout: cdk.Duration.seconds(300),
         vpc: vpcStack.vpc,
         functionName: `${id}-ChartAnalyticsFunction`,
+        logRetention: logs.RetentionDays.THREE_MONTHS,
         environment: {
           SM_DB_CREDENTIALS: db.secretPathUser.secretName,
           RDS_PROXY_ENDPOINT: db.rdsProxyEndpoint,
@@ -1145,6 +1208,7 @@ export class ApiGatewayStack extends cdk.Stack {
           BEDROCK_LLM_PARAM: bedrockLLMParameter.parameterName,
           EMBEDDING_MODEL_PARAM: embeddingModelParameter.parameterName,
           TABLE_NAME_PARAM: tableNameParameter.parameterName,
+          RDS_SEC: opensearchSecretParamName.parameterName,
         },
       }
     );
@@ -1186,6 +1250,7 @@ export class ApiGatewayStack extends cdk.Stack {
         timeout: cdk.Duration.seconds(300),
         vpc: vpcStack.vpc,
         functionName: `${id}-TopicsFunction`,
+        logRetention: logs.RetentionDays.THREE_MONTHS,
         environment: {
           SM_DB_CREDENTIALS: db.secretPathUser.secretName,
           RDS_PROXY_ENDPOINT: db.rdsProxyEndpoint,
@@ -1234,6 +1299,7 @@ export class ApiGatewayStack extends cdk.Stack {
         timeout: cdk.Duration.seconds(300),
         vpc: vpcStack.vpc,
         functionName: `${id}-UserFiltersFunction`,
+        logRetention: logs.RetentionDays.THREE_MONTHS,
         environment: {
           SM_DB_CREDENTIALS: db.secretPathUser.secretName,
           RDS_PROXY_ENDPOINT: db.rdsProxyEndpoint,
@@ -1292,6 +1358,7 @@ export class ApiGatewayStack extends cdk.Stack {
         timeout: cdk.Duration.seconds(300),
         vpc: vpcStack.vpc,
         functionName: `${id}-LlmAnalysisFunction`,
+        logRetention: logs.RetentionDays.THREE_MONTHS,
         environment: {
           SM_DB_CREDENTIALS: db.secretPathUser.secretName,
           RDS_PROXY_ENDPOINT: db.rdsProxyEndpoint,
@@ -1355,6 +1422,7 @@ export class ApiGatewayStack extends cdk.Stack {
           REGION: this.region,
         },
         functionName: `${id}-GetMessagesFunction`,
+        logRetention: logs.RetentionDays.THREE_MONTHS,
         layers: [psycopgLayer, powertoolsLayer], // Add layers if needed
         role: coglambdaRole, // Ensure the role has the necessary permissions for DynamoDB
       }
