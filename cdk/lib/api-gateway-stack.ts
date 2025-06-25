@@ -1086,9 +1086,20 @@ export class ApiGatewayStack extends cdk.Stack {
           BEDROCK_LLM_PARAM: bedrockLLMParameter.parameterName,
           EMBEDDING_MODEL_PARAM: embeddingModelParameter.parameterName,
           TABLE_NAME_PARAM: tableNameParameter.parameterName,
+          OPENSEARCH_HOST: opensearchHostParameter.parameterName,
+          OPENSEARCH_SEC: opensearchSecretParamName.parameterName,
+          INDEX_NAME: indexNameParameter.parameterName,
         },
       }
     );
+
+    bedrockLLMParameter.grantRead(similaritySearchFunction);
+    embeddingModelParameter.grantRead(similaritySearchFunction);
+    tableNameParameter.grantRead(similaritySearchFunction);
+    opensearchHostParameter.grantRead(similaritySearchFunction);
+    opensearchSecretParamName.grantRead(similaritySearchFunction);
+    indexNameParameter.grantRead(similaritySearchFunction);
+
     const cfnSimilaritySearchFunc = similaritySearchFunction.node
       .defaultChild as lambda.CfnFunction;
     cfnSimilaritySearchFunc.overrideLogicalId("SimilaritySearchDockerFunction");
@@ -1230,9 +1241,19 @@ export class ApiGatewayStack extends cdk.Stack {
           BEDROCK_LLM_PARAM: bedrockLLMParameter.parameterName,
           EMBEDDING_MODEL_PARAM: embeddingModelParameter.parameterName,
           TABLE_NAME_PARAM: tableNameParameter.parameterName,
+          OPENSEARCH_HOST: opensearchHostParameter.parameterName,
+          OPENSEARCH_SEC: opensearchSecretParamName.parameterName,
+          RDS_SEC: db.secretPathAdminName,
         },
       }
     );
+
+    bedrockLLMParameter.grantRead(userFiltersFunction);
+    embeddingModelParameter.grantRead(userFiltersFunction);
+    tableNameParameter.grantRead(userFiltersFunction);
+    opensearchHostParameter.grantRead(userFiltersFunction);
+    opensearchSecretParamName.grantRead(userFiltersFunction);
+
     const cfnUserFiltersFunc = userFiltersFunction.node
       .defaultChild as lambda.CfnFunction;
     cfnUserFiltersFunc.overrideLogicalId("userFiltersDockerFunction");
@@ -1278,9 +1299,20 @@ export class ApiGatewayStack extends cdk.Stack {
           BEDROCK_LLM_PARAM: bedrockLLMParameter.parameterName,
           EMBEDDING_MODEL_PARAM: embeddingModelParameter.parameterName,
           TABLE_NAME_PARAM: tableNameParameter.parameterName,
+          INDEX_NAME: indexNameParameter.parameterName,
+          OPENSEARCH_HOST: opensearchHostParameter.parameterName,
+          OPENSEARCH_SEC: opensearchSecretParamName.parameterName,
         },
       }
     );
+
+    bedrockLLMParameter.grantRead(llmAnalysisFunction);
+    embeddingModelParameter.grantRead(llmAnalysisFunction);
+    tableNameParameter.grantRead(llmAnalysisFunction);
+    opensearchHostParameter.grantRead(llmAnalysisFunction);
+    opensearchSecretParamName.grantRead(llmAnalysisFunction);
+    indexNameParameter.grantRead(llmAnalysisFunction);
+
     const cfnLlmAnalysisFunc = llmAnalysisFunction.node
       .defaultChild as lambda.CfnFunction;
     cfnLlmAnalysisFunc.overrideLogicalId("ExpertAnalysisDockerFunction");

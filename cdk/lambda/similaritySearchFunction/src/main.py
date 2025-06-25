@@ -4,6 +4,7 @@ import logging
 from typing import Dict, List, Any
 from langchain_aws.embeddings import BedrockEmbeddings
 from opensearchpy import OpenSearch
+import os
 
 import helpers.opensearch_utils as op
 
@@ -11,12 +12,11 @@ import helpers.opensearch_utils as op
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
 
-# Hardcoded constants (for now)
-OPENSEARCH_SEC = "opensearch-masteruser-test-glue"
-OPENSEARCH_HOST = "opensearch-host-test-glue"
-REGION_NAME = "us-west-2"
-INDEX_NAME = "dfo-html-full-index"
-EMBEDDING_MODEL_PARAM = "amazon.titan-embed-text-v2:0"
+OPENSEARCH_SEC = os.environ.get("OPENSEARCH_SEC")
+OPENSEARCH_HOST = os.environ.get("OPENSEARCH_HOST")
+REGION_NAME = os.environ.get("REGION")
+INDEX_NAME = os.environ.get("INDEX_NAME")
+EMBEDDING_MODEL_PARAM = os.environ.get("EMBEDDING_MODEL_PARAM")
 
 # Map of frontend filter names to OpenSearch field names
 FILTER_FIELD_MAPPING = {
