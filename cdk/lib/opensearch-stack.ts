@@ -1,4 +1,4 @@
-import { Stack, StackProps, Duration, RemovalPolicy } from "aws-cdk-lib";
+import { Stack, StackProps, Duration, RemovalPolicy, CfnOutput } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as opensearch from "aws-cdk-lib/aws-opensearchservice";
@@ -115,5 +115,12 @@ export class OpenSearchStack extends Stack {
       parameterName: `/${id}/opensearch/user/secretArn`,
       stringValue: this.userSecret.secretArn,
     });
+
+    // // temporary workaround to still retain the cloudformation output
+    // const temp_output = new CfnOutput(this, "will-be-removed-soon", {
+    //   value: `arn:aws:secretsmanager:${this.region}:${this.account}:secret:DFO-OpenSearch-opensearch/user/credentials-BDQmoA`,
+    //   exportName: `DFO-OpenSearch:ExportsOutputRefOSUserSecretE72D1A391AA26852`
+    // });
+    // temp_output.overrideLogicalId("ExportsOutputRefOSUserSecretE72D1A391AA26852");
   }
 }

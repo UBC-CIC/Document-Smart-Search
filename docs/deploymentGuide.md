@@ -210,7 +210,8 @@ For more information on the files, please refer to the [Data Pipeline](./dataPre
 ```bash
 aws glue start-job-run \
     --job-name 'DFO-DataPipeline-clean-and-ingest-html' \
-    --arguments '{"--batch_id": "<your-batch-id>", "--html_urls_path": "<your-html-data-s3-uri>", "--pipeline_mode": "full_update"}' \
+    --arguments '{"--batch_id": "<your-batch-id>", "--html_urls_path": "<your-html-data-s3-uri>", "--pipeline_mode": "full_update", 
+    "--topic_modelling_mode": "retrain"}' \
     --profile <your-aws-profile-name>
 ```
 
@@ -221,7 +222,7 @@ Example:
 ```bash
 aws glue start-job-run \
     --job-name 'DFO-DataPipeline-clean-and-ingest-html' \
-    --arguments '{"--batch_id": "2025_05_21", "--html_urls_path": "s3://smartsearch-dataupload/batches/2025_05_21/html_data/new_html_urls.xlsx", "--pipeline_mode": "full_update"}' \
+    --arguments '{"--batch_id": "2025_05_21", "--html_urls_path": "s3://smartsearch-dataupload/batches/2025_05_21/html_data/new_html_urls.xlsx", "--pipeline_mode": "full_update", "--topic_modelling_mode": "retrain"}' \
     --profile myprofile
 ```
 
@@ -240,6 +241,10 @@ For example, if you only have new html urls to ingest for batch `2025_06_01`, yo
 Similarly, if you only have new topics or mandates to ingest for batch `2025_06_01`, you just need to upload the new `csv` files to the `topics_mandates_data` folder. Y
 
 If you have **BOTH** new html urls and topics or mandates to ingest for batch `2025_06_01`, do it as if it is a fresh deployment (`full_update`).
+
+**Note for the Topic Modelling mode**:
+
+By default, the data pipeline will use `retrain` for the `topic_modelling_mode`  to signify that you want to retrain the BERTopic model every time you run the data pipeline. You can also choose to use `predict` to use the existing BERTopic model and just classify new documents. For first time deployment, you must use `retrain`. For more information on the topic modelling mode, please refer to the [Topic Modelling](./deepdive/topicModelling.md) documentation.
 
 ### Task 2: Build AWS Amplify App
 

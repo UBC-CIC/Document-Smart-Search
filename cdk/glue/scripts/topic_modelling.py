@@ -44,7 +44,9 @@ args = getResolvedOptions(sys.argv, [
     'dfo_topic_full_index_name',
     'dfo_mandate_full_index_name',
     'pipeline_mode',
-    'llm_model'
+    'llm_model',
+    'sm_method',
+    'topic_model_mode'
 ])
 
 REGION_NAME = args['region_name']
@@ -248,9 +250,11 @@ def generate_topic_labels(
             continue
 
         top_words = [word for word, _ in topic_model.get_topic(topic_id)[:num_words]]
+        top_words = ", ".join(top_words)
         docs = topic_model.get_representative_docs(topic_id)[:num_docs]
-
-        prompt = f"""
+        docs = "\n\n".join(docs)
+        
+        prompt = """
         <|begin_of_text|><|start_header_id|>system<|end_header_id|>
         You are labeling research topics for Fisheries and Oceans Canada using BERTopic clusters.
 
@@ -273,13 +277,13 @@ def generate_topic_labels(
         - “Fisheries Bycatch in Atlantic Canada”
 
         Data for this topic:
-        - Top words: {', '.join(top_words)}
+        - Top words: {top_words}
         - Representative documents:
-        {"\n\n".join(docs)}
+        {docs}
 
         Respond with the **topic label only** — no explanations.
         <|eot_id|><|start_header_id|>assistant<|end_header_id|>
-        """
+        """.format(top_words=top_words, docs=docs)
 
         body = json.dumps({
             "prompt": prompt,

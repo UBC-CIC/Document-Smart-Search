@@ -45,7 +45,9 @@ args = getResolvedOptions(sys.argv, [
     'pipeline_mode'
     'sm_method',
     'topic_modelling_mode',
-    'llm_model'
+    'llm_model',
+    'sm_method',
+    'topic_modelling_mode'
 ])
 
 # Index Names
@@ -450,6 +452,7 @@ def trigger_next_job(job_name: str, job_args: dict) -> None:
     glue_client = session.client('glue')
     try:
         formatted_args = {f"--{k}": v for k, v in job_args.items()}
+        del formatted_args['--NEXT_JOB_NAME'] # this arg is handled via CDK, so we don't want to retrigger the same job
         response = glue_client.start_job_run(
             JobName=job_name,
             Arguments=formatted_args

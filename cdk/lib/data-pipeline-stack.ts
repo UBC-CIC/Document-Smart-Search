@@ -47,6 +47,7 @@ export class DataPipelineStack extends cdk.Stack {
         s3deploy.Source.data("bertopic_models/.ignore", ""),
       ],
       destinationBucket: this.dataUploadBucket,
+      prune: false
     });
 
     // Create S3 bucket for Glue scripts and custom modules
@@ -57,7 +58,7 @@ export class DataPipelineStack extends cdk.Stack {
     });
 
     // Upload existing Glue scripts to the scripts bucket
-    new s3deploy.BucketDeployment(this, "DeployGlueScripts", {
+    new s3deploy.BucketDeployment(this, "DeployGlueJobScripts", {
       sources: [s3deploy.Source.asset("./glue/scripts/")],
       destinationBucket: this.glueBucket,
       destinationKeyPrefix: "glue/scripts",
@@ -169,9 +170,6 @@ export class DataPipelineStack extends cdk.Stack {
     "psycopg[binary]==3.2.6,boto3==1.38.1,langchain==0.3.12,langchain-community==0.3.12,langchain-aws==0.2.21,opensearch-py==2.5.0,pandas==2.2.3,openpyxl==3.1.5,numpy==1.26.4,scikit-learn==1.6.1,aiohttp==3.11.10,beautifulsoup4==4.12.3,bertopic==0.16.2,langdetect==1.0.9";
     // const PYTHON_LIBS = "boto3,langchain==0.3.12,langchain-community==0.3.12,langchain-aws==0.2.21,opensearch-py==2.5.0,openpyxl,pandas,numpy==1.26.4,scikit-learn,aiohttp==3.11.10,beautifulsoup4==4.12.3,bertopic==0.16.2,langdetect==1.0.9,psycopg[binary]==3.2.6,awswrangler";
 
-    // Not being used yet, please ignore
-    const opensearch_user_secret = opensearchStack.userSecret.secretName;
-    const opensearch_host = opensearchStack.domain.domainEndpoint;
     // Function to get common job arguments
     const getCommonJobArguments = (): GlueJobArguments => {
       return {
@@ -185,7 +183,7 @@ export class DataPipelineStack extends cdk.Stack {
         "--embedding_model": "amazon.titan-embed-text-v2:0",
         "--opensearch_secret":  opensearchStack.adminSecret.secretName,
         "--opensearch_host": opensearchStack.osHostParam.parameterName,
-        "--rds_secret": databaseStack.secretPathUser.secretName,
+        "--rds_secret": databaseStack.secretPathAdminName,
         "--dfo_html_full_index_name": "dfo-html-full-index",
         "--dfo_topic_full_index_name": "dfo-topic-full-index",
         "--dfo_mandate_full_index_name": "dfo-mandate-full-index",
