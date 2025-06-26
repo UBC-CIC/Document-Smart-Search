@@ -1208,7 +1208,7 @@ export class ApiGatewayStack extends cdk.Stack {
           BEDROCK_LLM_PARAM: bedrockLLMParameter.parameterName,
           EMBEDDING_MODEL_PARAM: embeddingModelParameter.parameterName,
           TABLE_NAME_PARAM: tableNameParameter.parameterName,
-          RDS_SEC: opensearchSecretParamName.parameterName,
+          RDS_SEC: db.secretPathAdminName,
         },
       }
     );

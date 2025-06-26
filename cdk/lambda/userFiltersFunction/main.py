@@ -70,7 +70,8 @@ def handler(event, context):
         # Initialize empty results dictionary
         filters = {}
 
-        secrets = get_secret(OPENSEARCH_SEC)
+        opensearch_sec_name = get_parameter(OPENSEARCH_SEC)
+        secrets = get_secret(opensearch_sec_name)
         opensearch_host = get_parameter(OPENSEARCH_HOST)
         op_client = OpenSearch(
             hosts=[{'host': opensearch_host, 'port': 443}],
