@@ -12,7 +12,7 @@ logger = logging.getLogger()
 
 # Constants
 REGION_NAME = os.environ["REGION"]
-RDS_SEC = os.environ['SM_DB_CREDENTIALS']
+RDS_SEC = os.environ['RDS_SEC']
 
 # AWS Clients
 secrets_manager_client = boto3.client("secretsmanager", region_name=REGION_NAME)
