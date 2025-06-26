@@ -12,12 +12,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
 
 
-OPENSEARCH_SEC = os.environ.get("OPENSEARCH_SEC")
-OPENSEARCH_HOST = os.environ.get("OPENSEARCH_HOST")
-REGION_NAME = os.environ.get("REGION")
-INDEX_NAME = os.environ.get("INDEX_NAME")
-EMBEDDING_MODEL_PARAM = os.environ.get("EMBEDDING_MODEL_PARAM")
-RDS_SEC = os.environ.get("SM_DB_CREDENTIALS")
+OPENSEARCH_SEC = None
+OPENSEARCH_HOST = None
+REGION_NAME = None
+INDEX_NAME = None
+EMBEDDING_MODEL_PARAM = None
+RDS_SEC = None
 
 # Map of frontend filter names to OpenSearch field names
 FILTER_FIELD_MAPPING = {
@@ -51,6 +51,20 @@ def get_secret(secret_name: str) -> Dict:
     except Exception as e:
         logger.error(f"Error fetching secret {secret_name}: {e}")
         raise
+
+def init_constants():
+    """Initialize constants from environment variables."""
+    global OPENSEARCH_SEC, OPENSEARCH_HOST, REGION_NAME, INDEX_NAME, EMBEDDING_MODEL_PARAM, RDS_SEC
+    
+    try:
+        OPENSEARCH_SEC = get_parameter(os.environ.get("OPENSEARCH_SEC"))
+        OPENSEARCH_HOST = os.environ.get("OPENSEARCH_HOST")
+        REGION_NAME = os.environ.get("REGION")     
+        INDEX_NAME = get_parameter(os.environ.get("INDEX_NAME"))
+        EMBEDDING_MODEL_PARAM = get_parameter(os.environ.get("EMBEDDING_MODEL_PARAM"))
+        RDS_SEC = os.environ.get("RDS_SEC")
+    except Exception as e:
+        logger.error(f"Error initializing constants: {e}")
 
 def rename_result_fields(results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Rename fields in search results to match frontend expectations."""
@@ -321,6 +335,7 @@ def format_document_for_frontend(doc_id: str, doc_data: Dict[str, Any]) -> Dict[
 
 def handler(event, context):
     try:
+        init_constants()
         query_params = event.get("queryStringParameters", {}) or {}
 
         # Fetch the document ID from query parameters

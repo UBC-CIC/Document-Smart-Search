@@ -82,6 +82,8 @@ export default function SimilarDocumentsPopup({ isOpen, onClose, documentId }) {
         // Using updated service function - only pass documentId and filters
         const data = await fetchSimilarDocuments(documentId, filters);
 
+        console.log("Fetched similar documents:", data);
+
         setAllDocuments(data.documents || []);
         setTotalDocuments(data.totalCount || 0);
 
@@ -94,14 +96,13 @@ export default function SimilarDocumentsPopup({ isOpen, onClose, documentId }) {
         }
       } catch (err) {
         console.error("Failed to fetch similar documents:", err);
-        setError("Failed to load similar documents. Please try again.");
       } finally {
         setLoading(false);
       }
     }
 
     fetchData();
-  }, [isOpen, documentId, filters]);
+  }, [filters, documentId]);
 
   // Apply sorting and pagination to documents
   const displayedDocuments = useMemo(() => {

@@ -4,6 +4,7 @@ import {
   defaultSimilarDocuments,
   similarDocumentFilterOptions as defaultFilterOptions,
 } from "../data/similarDocumentsData";
+import { getUserToken } from "../../../lib/getUserToken";
 
 /**
  * Fetch available filter options for similar documents

@@ -1,4 +1,5 @@
 import { mockDocumentDetails } from "../data/documentDetailData";
+import { getUserToken } from "../../../lib/getUserToken";
 
 // Always enable mock data for now to ensure it works
 export const USE_MOCK_DATA = false;

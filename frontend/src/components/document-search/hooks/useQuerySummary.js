@@ -23,6 +23,7 @@ export function useQuerySummary() {
 
     try {
       const summaryData = await getQuerySummary(userQuery, documentId);
+      console.log("Fetched summary data:", summaryData);
       setQuerySummaryData(summaryData);
       return summaryData;
     } finally {

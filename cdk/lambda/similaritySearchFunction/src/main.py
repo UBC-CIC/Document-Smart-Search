@@ -12,11 +12,12 @@ import helpers.opensearch_utils as op
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
 
-OPENSEARCH_SEC = os.environ.get("OPENSEARCH_SEC")
-OPENSEARCH_HOST = os.environ.get("OPENSEARCH_HOST")
-REGION_NAME = os.environ.get("REGION")
-INDEX_NAME = os.environ.get("INDEX_NAME")
-EMBEDDING_MODEL_PARAM = os.environ.get("EMBEDDING_MODEL_PARAM")
+
+REGION_NAME = None
+INDEX_NAME = None
+EMBEDDING_MODEL_PARAM = None
+OPENSEARCH_SEC = None
+OPENSEARCH_HOST = None
 
 # Map of frontend filter names to OpenSearch field names
 FILTER_FIELD_MAPPING = {
@@ -50,6 +51,16 @@ def get_secret(secret_name: str) -> Dict:
     except Exception as e:
         logger.error(f"Error fetching secret {secret_name}: {e}")
         raise
+
+def init_constants():
+    """Initialize constants for OpenSearch and embedding model."""
+    global INDEX_NAME, EMBEDDING_MODEL_PARAM, OPENSEARCH_SEC, OPENSEARCH_HOST, REGION_NAME
+    INDEX_NAME = get_parameter(os.environ.get("INDEX_NAME"))
+    EMBEDDING_MODEL_PARAM = get_parameter(os.environ.get("EMBEDDING_MODEL_PARAM"))
+    OPENSEARCH_SEC = get_parameter(os.environ.get("OPENSEARCH_SEC"))
+    OPENSEARCH_HOST = os.environ.get("OPENSEARCH_HOST")
+    REGION_NAME = os.environ.get("REGION")
+
 
 def rename_result_fields(results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Rename fields in search results to match frontend expectations."""
@@ -156,6 +167,8 @@ def format_results_for_frontend(results: List[Dict[str, Any]]) -> List[Dict[str,
 
 def handler(event, context):
     try:
+        # Initialize constants from environment variables
+        init_constants()
         body = {} if event.get("body") is None else json.loads(event.get("body"))
         
         # Check if this is a document-based similarity search
