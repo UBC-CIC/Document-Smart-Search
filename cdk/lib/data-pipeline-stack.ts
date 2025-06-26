@@ -54,7 +54,7 @@ export class DataPipelineStack extends cdk.Stack {
     this.glueBucket = new s3.Bucket(this, `${id}-glue-bucket`, {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-      encryption: s3.BucketEncryption.S3_MANAGED,
+      encryption: s3.BucketEncryption.S3_MANAGED
     });
 
     // Upload existing Glue scripts to the scripts bucket

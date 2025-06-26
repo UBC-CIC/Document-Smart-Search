@@ -46,7 +46,7 @@ args = getResolvedOptions(sys.argv, [
     'pipeline_mode',
     'llm_model',
     'sm_method',
-    'topic_model_mode'
+    'topic_modelling_mode'
 ])
 
 REGION_NAME = args['region_name']
@@ -686,7 +686,7 @@ def main(dryrun=False, debug=False):
         # Load existing models from S3
         s3_client = session.client('s3')
         bucket = args['bucket_name']
-        s3_model_path = f"bertopic_model"
+        s3_model_path = f"bertopic_models"
         
         # Create temporary directory
         temp_dir = "temp_outputs/bertopic"
@@ -855,7 +855,7 @@ def main(dryrun=False, debug=False):
     # Save models and data to S3
     s3_client = session.client('s3')
     bucket = args['bucket_name']
-    s3_output_path = f"bertopic_model"
+    s3_output_path = f"bertopic_models"
     
     # Create temporary directory for model files
     os.makedirs(temp_dir, exist_ok=True)
