@@ -1,4 +1,4 @@
-import { Stack, StackProps, RemovalPolicy, SecretValue } from "aws-cdk-lib";
+import { Stack, StackProps, RemovalPolicy, SecretValue, CfnOutput } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import { Duration } from "aws-cdk-lib";
 
@@ -47,6 +47,7 @@ export class DatabaseStack extends Stack {
      */
     this.secretPathAdminName = `${id}-DFO/credentials/DbCredential`; // Name in the Secret Manager to store DB credentials
     const secretPathUserName = `${id}-DFO/userCredentials/DbCredential`;
+    // this is the secret for the user, which is used to read/write to the database, but not to create tables
     this.secretPathUser = new secretsmanager.Secret(this, secretPathUserName, {
       secretName: secretPathUserName,
       description: "Secrets for clients to connect to RDS",
@@ -57,6 +58,7 @@ export class DatabaseStack extends Stack {
       },
     });
 
+    // this is the secret for the table creator, which is used to create the tables in the database
     const secretPathTableCreator = `${id}-DFO/userCredentials/rdsTableCreator`;
     this.secretPathTableCreator = new secretsmanager.Secret(
       this,

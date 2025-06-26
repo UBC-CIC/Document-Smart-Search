@@ -69,6 +69,7 @@ def handler(event, context):
         # Create tables based on the schema
         sqlTableCreation = """
             CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
             CREATE TABLE IF NOT EXISTS "users" (
                 "user_id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
                 "user_email" varchar,
@@ -128,7 +129,8 @@ def handler(event, context):
 
             -- Documents Table
             CREATE TABLE IF NOT EXISTS "documents" (
-                "html_url" TEXT PRIMARY KEY,
+                "doc_id" TEXT PRIMARY KEY,
+                "html_url" TEXT UNIQUE NOT NULL,
                 "year" INT,
                 "title" TEXT,
                 "doc_type" TEXT,
@@ -174,17 +176,19 @@ def handler(event, context):
 
             -- Document-Derived_topics Many-to-One Table
             CREATE TABLE IF NOT EXISTS "documents_derived_topic" (
+                "doc_id" TEXT NOT NULL,
                 "html_url" TEXT NOT NULL,
                 "topic_name" TEXT NOT NULL,
                 "confidence_score" NUMERIC,
                 "last_updated" TIMESTAMP,
-                PRIMARY KEY("html_url", "topic_name"),
-                FOREIGN KEY ("html_url") REFERENCES "documents" ("html_url") ON DELETE CASCADE,
+                PRIMARY KEY("doc_id", "topic_name"),
+                FOREIGN KEY ("doc_id") REFERENCES "documents" ("doc_id") ON DELETE CASCADE,
                 FOREIGN KEY ("topic_name") REFERENCES "derived_topics" ("topic_name") ON DELETE CASCADE
             );
 
             -- Document-Mandates Many-to-Many Table
             CREATE TABLE IF NOT EXISTS "documents_mandates" (
+                "doc_id" TEXT NOT NULL,
                 "html_url" TEXT NOT NULL,
                 "mandate_name" TEXT NOT NULL,
                 "llm_belongs" TEXT,
@@ -192,13 +196,14 @@ def handler(event, context):
                 "llm_explanation" TEXT,
                 "semantic_score" NUMERIC,
                 "last_updated" TIMESTAMP,
-                PRIMARY KEY ("html_url", "mandate_name"),
-                FOREIGN KEY ("html_url") REFERENCES "documents" ("html_url") ON DELETE CASCADE,
+                PRIMARY KEY ("doc_id", "mandate_name"),
+                FOREIGN KEY ("doc_id") REFERENCES "documents" ("doc_id") ON DELETE CASCADE,
                 FOREIGN KEY ("mandate_name") REFERENCES "mandates" ("mandate_name") ON DELETE CASCADE
             );
 
             -- Document-Topics Many-to-Many Table
             CREATE TABLE IF NOT EXISTS "documents_topics" (
+                "doc_id" TEXT NOT NULL,
                 "html_url" TEXT NOT NULL,
                 "topic_name" TEXT NOT NULL,
                 "llm_belongs" TEXT,
@@ -207,8 +212,8 @@ def handler(event, context):
                 "semantic_score" NUMERIC,
                 "isPrimary" BOOLEAN NOT NULL,
                 "last_updated" TIMESTAMP,
-                PRIMARY KEY ("html_url", "topic_name"),
-                FOREIGN KEY ("html_url") REFERENCES "documents" ("html_url") ON DELETE CASCADE,
+                PRIMARY KEY ("doc_id", "topic_name"),
+                FOREIGN KEY ("doc_id") REFERENCES "documents" ("doc_id") ON DELETE CASCADE,
                 FOREIGN KEY ("topic_name") REFERENCES "topics" ("topic_name") ON DELETE CASCADE
             );
         """
@@ -273,8 +278,8 @@ def handler(event, context):
             GRANT CONNECT ON DATABASE postgres TO tablecreator;
 
             GRANT USAGE, CREATE ON SCHEMA public TO tablecreator;
-            GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO tablecreator;
-            ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO tablecreator;
+            GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE ON ALL TABLES IN SCHEMA public TO tablecreator;
+            ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE ON TABLES TO tablecreator;
             GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO tablecreator;
             ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE ON SEQUENCES TO tablecreator;
 

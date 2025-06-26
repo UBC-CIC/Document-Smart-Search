@@ -34,7 +34,9 @@ args = getResolvedOptions(sys.argv, [
     'dfo_topic_full_index_name',
     'dfo_mandate_full_index_name',
     'pipeline_mode',
-    'llm_model'
+    'llm_model',
+    'sm_method',
+    'topic_modelling_mode'
 ])
 
 
@@ -493,6 +495,7 @@ def trigger_next_job(job_name: str, job_args: dict) -> None:
     glue_client = session.client('glue')
     try:
         formatted_args = {f"--{k}": v for k, v in job_args.items()}
+        del formatted_args['--NEXT_JOB_NAME'] # this arg is handled via CDK, so we don't want to retrigger the same job
         response = glue_client.start_job_run(
             JobName=job_name,
             Arguments=formatted_args
@@ -507,7 +510,7 @@ def main(dryrun: bool = False, debug: bool = False):
     print(f"Dryrun: {dryrun}, Debug: {debug}")
     # Get AWS credentials and parameters
     opensearch_host = aws.get_parameter_ssm(parameter_name=args['opensearch_host'], region_name=args['region_name'])
-    rds_secret = aws.get_secret(args['rds_secret'])
+    rds_secret = aws.get_secret(args['rds_secret'], args['region_name'])
 
     # Initialize OpenSearch client with fallback authentication
     client, auth = init_opensearch_client(

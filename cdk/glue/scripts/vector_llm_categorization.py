@@ -7,7 +7,7 @@ import os
 import json
 import asyncio
 from collections import defaultdict
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Tuple, Any, Union
 from datetime import datetime
 import hashlib
 
@@ -47,7 +47,9 @@ args = getResolvedOptions(sys.argv, [
     'dfo_topic_full_index_name',
     'dfo_mandate_full_index_name',
     'pipeline_mode',
-    'llm_model'
+    'llm_model',
+    'sm_method',
+    'topic_modelling_mode'
 ])
 
 # Index Names
@@ -486,7 +488,7 @@ def numpy_semantic_similarity_categorization(
     return full_df, max_df
 
 
-def semantic_similarity(targets, target_embeddings, documents, document_embeddings, method="numpy", n=10, vector_store=None) -> pd.DataFrame | dict:
+def semantic_similarity(targets, target_embeddings, documents, document_embeddings, method="numpy", n=10, vector_store=None) -> Union[pd.DataFrame, dict]:
     """
     Perform semantic similarity using either numpy or OpenSearch.
     """
@@ -846,6 +848,7 @@ def trigger_next_job(job_name: str, job_args: dict) -> None:
     glue_client = session.client('glue')
     try:
         formatted_args = {f"--{k}": v for k, v in job_args.items()}
+        del formatted_args['--NEXT_JOB_NAME'] # this arg is handled via CDK, so we don't want to retrigger the same job
         response = glue_client.start_job_run(
             JobName=job_name,
             Arguments=formatted_args

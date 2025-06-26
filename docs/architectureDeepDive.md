@@ -163,7 +163,8 @@ Core table storing metadata about all documents in the system. This includes doc
 
 | Column Name | Data Type | Description | Constraints |
 |------------|-----------|-------------|-------------|
-| html_url | TEXT | URL of the HTML document | PK |
+| doc_id | TEXT | Unique identifier for the document | PK |
+| html_url | TEXT | URL of the HTML document | UNIQUE |
 | year | INT | Publication year | |
 | title | TEXT | Document title | |
 | doc_type | TEXT | Type of document | |
@@ -215,7 +216,7 @@ Maps documents to their automatically discovered topics. This table stores the r
 
 | Column Name | Data Type | Description | Constraints |
 |------------|-----------|-------------|-------------|
-| html_url | TEXT | Document URL | PK, FK (documents) |
+| doc_id | TEXT | Document ID | PK, FK (documents) |
 | topic_name | TEXT | Derived topic name | PK, FK (derived_topics) |
 | confidence_score | NUMERIC | Confidence score of the categorization | |
 | last_updated | TIMESTAMP | Last update timestamp | |
@@ -225,7 +226,7 @@ Links documents to their associated mandates. This table stores both LLM-based a
 
 | Column Name | Data Type | Description | Constraints |
 |------------|-----------|-------------|-------------|
-| html_url | TEXT | Document URL | PK, FK (documents) |
+| doc_id | TEXT | Document ID | PK, FK (documents) |
 | mandate_name | TEXT | Mandate name | PK, FK (mandates) |
 | llm_belongs | TEXT | LLM categorization result | |
 | llm_score | INT | LLM confidence score | |
@@ -238,7 +239,7 @@ Maps documents to their associated topics. This table maintains the relationship
 
 | Column Name | Data Type | Description | Constraints |
 |------------|-----------|-------------|-------------|
-| html_url | TEXT | Document URL | PK, FK (documents) |
+| doc_id | TEXT | Document ID | PK, FK (documents) |
 | topic_name | TEXT | Topic name | PK, FK (topics) |
 | llm_belongs | TEXT | LLM categorization result | |
 | llm_score | INT | LLM confidence score | |

@@ -44,7 +44,9 @@ args = getResolvedOptions(sys.argv, [
     'dfo_topic_full_index_name',
     'dfo_mandate_full_index_name',
     'pipeline_mode',
-    'llm_model'
+    'llm_model',
+    'sm_method',
+    'topic_modelling_mode'
 ])
 
 REGION_NAME = args['region_name']
@@ -248,9 +250,11 @@ def generate_topic_labels(
             continue
 
         top_words = [word for word, _ in topic_model.get_topic(topic_id)[:num_words]]
+        top_words = ", ".join(top_words)
         docs = topic_model.get_representative_docs(topic_id)[:num_docs]
-
-        prompt = f"""
+        docs = "\n\n".join(docs)
+        
+        prompt = """
         <|begin_of_text|><|start_header_id|>system<|end_header_id|>
         You are labeling research topics for Fisheries and Oceans Canada using BERTopic clusters.
 
@@ -273,13 +277,13 @@ def generate_topic_labels(
         - “Fisheries Bycatch in Atlantic Canada”
 
         Data for this topic:
-        - Top words: {', '.join(top_words)}
+        - Top words: {top_words}
         - Representative documents:
-        {"\n\n".join(docs)}
+        {docs}
 
         Respond with the **topic label only** — no explanations.
         <|eot_id|><|start_header_id|>assistant<|end_header_id|>
-        """
+        """.format(top_words=top_words, docs=docs)
 
         body = json.dumps({
             "prompt": prompt,
@@ -682,7 +686,7 @@ def main(dryrun=False, debug=False):
         # Load existing models from S3
         s3_client = session.client('s3')
         bucket = args['bucket_name']
-        s3_model_path = f"bertopic_model"
+        s3_model_path = f"bertopic_models"
         
         # Create temporary directory
         temp_dir = "temp_outputs/bertopic"
@@ -851,7 +855,7 @@ def main(dryrun=False, debug=False):
     # Save models and data to S3
     s3_client = session.client('s3')
     bucket = args['bucket_name']
-    s3_output_path = f"bertopic_model"
+    s3_output_path = f"bertopic_models"
     
     # Create temporary directory for model files
     os.makedirs(temp_dir, exist_ok=True)
