@@ -660,6 +660,7 @@ export class ApiGatewayStack extends cdk.Stack {
         stringValue: "meta.llama3-3-70b-instruct-v1:0",
       }
     );
+
     const embeddingModelParameter = new ssm.StringParameter(
       this,
       "EmbeddingModelParameter",
@@ -697,6 +698,16 @@ export class ApiGatewayStack extends cdk.Stack {
         parameterName: `/${id}/DFO/OpensearchSecretParamName`,
         description: "Opensearch secret parameter name",
         stringValue: osStack.adminSecret.secretArn,
+      }
+    );
+
+    const SummaryLLMParameter = new ssm.StringParameter(
+      this,
+      "SummaryModelParamName",
+      {
+        parameterName: `/${id}/DFO/SummaryModelParamName`,
+        description: "Summary LLM model parameter name",
+        stringValue: "meta.llama3-70b-instruct-v1:0",
       }
     );
 
@@ -1363,7 +1374,7 @@ export class ApiGatewayStack extends cdk.Stack {
           SM_DB_CREDENTIALS: db.secretPathUser.secretName,
           RDS_PROXY_ENDPOINT: db.rdsProxyEndpoint,
           REGION: this.region,
-          BEDROCK_LLM_PARAM: bedrockLLMParameter.parameterName,
+          SUMMARY_LLM_MODEL_ID: SummaryLLMParameter.parameterName,
           EMBEDDING_MODEL_PARAM: embeddingModelParameter.parameterName,
           TABLE_NAME_PARAM: tableNameParameter.parameterName,
           INDEX_NAME: indexNameParameter.parameterName,
@@ -1379,6 +1390,7 @@ export class ApiGatewayStack extends cdk.Stack {
     opensearchHostParameter.grantRead(llmAnalysisFunction);
     opensearchSecretParamName.grantRead(llmAnalysisFunction);
     indexNameParameter.grantRead(llmAnalysisFunction);
+    SummaryLLMParameter.grantRead(llmAnalysisFunction);
 
     const cfnLlmAnalysisFunc = llmAnalysisFunction.node
       .defaultChild as lambda.CfnFunction;

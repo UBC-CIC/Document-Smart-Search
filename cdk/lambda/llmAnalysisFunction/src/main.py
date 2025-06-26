@@ -10,13 +10,15 @@ from opensearchpy import OpenSearch
 # Set up basic logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
-OPENSEARCH_SEC = os.environ.get("OPENSEARCH_SEC")
-OPENSEARCH_HOST = os.environ.get("OPENSEARCH_HOST")
-REGION_NAME = os.environ.get("REGION")
-INDEX_NAME = os.environ.get("INDEX_NAME")
-EMBEDDING_MODEL_PARAM = os.environ.get("EMBEDDING_MODEL_PARAM")
-BEDROCK_MODEL_PARAM = os.environ.get("BEDROCK_MODEL_PARAM")
+OPENSEARCH_SEC = None
+OPENSEARCH_HOST = None
+REGION_NAME = None
+INDEX_NAME = None
+EMBEDDING_MODEL_PARAM = None
+SUMMARY_LLM_MODEL_ID = None
+
 
 # AWS Clients
 secrets_manager_client = boto3.client("secretsmanager", region_name=REGION_NAME)
@@ -41,6 +43,20 @@ def get_secret(secret_name: str) -> Dict:
     except Exception as e:
         logger.error(f"Error fetching secret {secret_name}: {e}")
         raise
+
+def init_constants():
+    """Initialize constants from environment variables."""
+    global OPENSEARCH_SEC, OPENSEARCH_HOST, REGION_NAME, INDEX_NAME, EMBEDDING_MODEL_PARAM, SUMMARY_LLM_MODEL_ID
+    try:
+        OPENSEARCH_SEC = get_parameter(os.environ["OPENSEARCH_SEC"])
+        logger.info(f"Using OpenSearch secret: {OPENSEARCH_SEC}")
+        OPENSEARCH_HOST = os.environ["OPENSEARCH_HOST"]
+        REGION_NAME = os.environ["REGION"]
+        INDEX_NAME = get_parameter(os.environ["INDEX_NAME"])
+        EMBEDDING_MODEL_PARAM = get_parameter(os.environ["EMBEDDING_MODEL_PARAM"])
+        SUMMARY_LLM_MODEL_ID = get_parameter(os.environ["SUMMARY_LLM_MODEL_ID"])
+    except KeyError as e:
+        logger.error(f"Missing environment variable: {e}")
 
 def extract_key_insights(analysis_text: str) -> List[str]:
     """Extract key insights from the LLM analysis text."""
@@ -109,6 +125,8 @@ def _get_document_by_id(
 
 def handler(event, context):
     try:
+        # Initialize constants from environment variables
+        init_constants()
         # Parse the input body
         body = {} if event.get("body") is None else json.loads(event.get("body"))
         
@@ -192,7 +210,7 @@ def handler(event, context):
         bedrock_client = boto3.client("bedrock-runtime", region_name=REGION_NAME)
         
         response = bedrock_client.invoke_model(
-            modelId=BEDROCK_MODEL_PARAM,
+            modelId=SUMMARY_LLM_MODEL_ID,
             contentType="application/json",
             accept="application/json",
             body=json.dumps({
