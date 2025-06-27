@@ -174,7 +174,7 @@ def handler(event, context):
             }
 
         cleaned_text = doc['text'].replace("\n", " ").strip()
-        llm_prompt = f"""
+        main_prompt = f"""
         You are an expert summarizer. Analyze the document in relation to the user's query, 
         and respond only in the following exact format in plain text, no other formatting or text:
 
@@ -185,6 +185,7 @@ def handler(event, context):
         A concise paragraph that (1) summarizes the document's main content, 
         (2) explains its relevance to the user's question, and (3) gives a rating of 1 to 10 
         on how well the document answers the user's question, with 10 being a perfect match.
+        Refer to the user in the second person as "you".
 
         Constraints:
         - Use exactly these two sections and no other headings.
@@ -206,9 +207,17 @@ def handler(event, context):
         {user_query}
         """
 
+        llm_prompt = (
+            "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n"
+            "You are an expert summarizer. Respond only with the sections: # Key Findings and # Summary.\n"
+            "<|eot_id|><|start_header_id|>user<|end_header_id|>\n"
+            f"{main_prompt}\n"
+            "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n"
+        )
+
         # Call Bedrock for LLM analysis
         bedrock_client = boto3.client("bedrock-runtime", region_name=REGION_NAME)
-        
+
         response = bedrock_client.invoke_model(
             modelId=SUMMARY_LLM_MODEL_ID,
             contentType="application/json",
@@ -216,10 +225,12 @@ def handler(event, context):
             body=json.dumps({
                 "prompt": llm_prompt,
                 "temperature": 0.1,
+                "max_gen_len": 1024
             })
         )
         
         response_body = json.loads(response.get("body").read())
+        logger.info(f"LLM response: {response_body}")
         analysis: str = response_body.get("generation", "").replace("`", "")
 
         # Extract summary - assume everything after the Summary header and before any other header
