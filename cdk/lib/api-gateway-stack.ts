@@ -872,59 +872,75 @@ export class ApiGatewayStack extends cdk.Stack {
     textGenFunc.addToRolePolicy(
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
-        actions: ["ssm:*"],
-        resources: ["arn:aws:ssm:*:*:parameter/*"],
-      })
-    );
-
-    // TODO: Restrict this later!
-    textGenFunc.addToRolePolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: ["bedrock:*"],
-        resources: ["*"],
-      })
-    );
-
-    // Grant access to Secret Manager
-    textGenFunc.addToRolePolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: [
-          //Secrets Manager
-          "secretsmanager:GetSecretValue",
-        ],
-        resources: [
-          `arn:aws:secretsmanager:${this.region}:${this.account}:secret:*`,
-        ],
-      })
-    );
-
-    // Grant access to DynamoDB actions
-    textGenFunc.addToRolePolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: [
-          "dynamodb:ListTables",
-          "dynamodb:CreateTable",
-          "dynamodb:DescribeTable",
-          "dynamodb:PutItem",
-          "dynamodb:GetItem",
-          "dynamodb:UpdateItem",
-        ],
-        resources: [`arn:aws:dynamodb:${this.region}:${this.account}:table/*`],
-      })
-    );
-    // Grant access to SSM Parameter Store for specific parameters
-    textGenFunc.addToRolePolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
         actions: ["ssm:GetParameter"],
         resources: [
           bedrockLLMParameter.parameterArn,
           embeddingModelParameter.parameterArn,
           tableNameParameter.parameterArn,
+          opensearchHostParameter.parameterArn,
+          opensearchSecretParamName.parameterArn,
+          indexNameParameter.parameterArn,
+          dfoHtmlFullIndexNameParameter.parameterArn,
+          dfoMandateFullIndexNameParameter.parameterArn,
+          bedrockInferenceProfileParameter.parameterArn,
+          dfoTopicFullIndexNameParameter.parameterArn,
         ],
+      })
+    );
+
+    textGenFunc.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          "bedrock:InvokeModel",
+          "bedrock:InvokeModelWithResponseStream",
+        ],
+        resources: [
+          `arn:aws:bedrock:${this.region}::foundation-model/meta.llama3-3-70b-instruct-v1:0`,
+          `arn:aws:bedrock:${this.region}::foundation-model/amazon.titan-embed-text-v2:0`,
+          `arn:aws:bedrock:${this.region}::foundation-model/meta.llama3-70b-instruct-v1:0`,
+        ],
+      })
+    );
+
+    // Restrict Secrets Manager access
+    textGenFunc.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ["secretsmanager:GetSecretValue"],
+        resources: [
+          `arn:aws:secretsmanager:${this.region}:${this.account}:secret:DFO-Database-DFO/credentials/DbCredential*`,
+          `${db.secretPathUser.secretArn}*`,
+          `${db.secretPathTableCreator.secretArn}*`,
+          `${osStack.adminSecret.secretArn}*`,
+        ],
+      })
+    );
+
+    // DynamoDB table-specific permissions
+    textGenFunc.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          "dynamodb:PutItem",
+          "dynamodb:GetItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:Query",
+          "dynamodb:CreateTable",
+          "dynamodb:DescribeTable",
+        ],
+        resources: [
+          `arn:aws:dynamodb:${this.region}:${this.account}:table/DynamoDB-Conversation-Table`,
+        ],
+      })
+    );
+
+    // DynamoDB ListTables requires wildcard resource
+    textGenFunc.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ["dynamodb:ListTables"],
+        resources: ["*"],
       })
     );
 
@@ -989,19 +1005,16 @@ export class ApiGatewayStack extends cdk.Stack {
       action: "lambda:InvokeFunction",
       sourceArn: `arn:aws:execute-api:${this.region}:${this.account}:${this.api.restApiId}/*/*/user*`,
     });
+    docDetailViewFunction.role?.addToPrincipalPolicy(bedrockPolicyStatement);
+    docDetailViewFunction.role?.addToPrincipalPolicy(openSearchPolicyStatement);
     docDetailViewFunction.role?.addToPrincipalPolicy(
       new iam.PolicyStatement({
-        actions: [
-          "bedrock:InvokeModel",
-          "bedrock:InvokeModelWithResponseStream",
-          "secretsmanager:GetSecretValue",
-          "ssm:GetParameter",
-          "es:ESHttpGet",
-          "es:ESHttpPost",
-          "es:ESHttpPut",
-          "es:ESHttpDelete",
+        actions: ["secretsmanager:GetSecretValue"],
+        resources: [
+          `arn:aws:secretsmanager:${this.region}:${this.account}:secret:DFO-Database-DFO/credentials/DbCredential*`,
+          `${db.secretPathUser.secretArn}*`,
+          `${osStack.adminSecret.secretArn}*`,
         ],
-        resources: ["*"],
       })
     );
 
@@ -1049,19 +1062,16 @@ export class ApiGatewayStack extends cdk.Stack {
       action: "lambda:InvokeFunction",
       sourceArn: `arn:aws:execute-api:${this.region}:${this.account}:${this.api.restApiId}/*/*/user*`,
     });
+    hybridSearchFunction.role?.addToPrincipalPolicy(bedrockPolicyStatement);
+    hybridSearchFunction.role?.addToPrincipalPolicy(openSearchPolicyStatement);
     hybridSearchFunction.role?.addToPrincipalPolicy(
       new iam.PolicyStatement({
-        actions: [
-          "bedrock:InvokeModel",
-          "bedrock:InvokeModelWithResponseStream",
-          "secretsmanager:GetSecretValue",
-          "ssm:GetParameter",
-          "es:ESHttpGet",
-          "es:ESHttpPost",
-          "es:ESHttpPut",
-          "es:ESHttpDelete",
+        actions: ["secretsmanager:GetSecretValue"],
+        resources: [
+          `arn:aws:secretsmanager:${this.region}:${this.account}:secret:DFO-Database-DFO/credentials/DbCredential*`,
+          `${db.secretPathUser.secretArn}*`,
+          `${osStack.adminSecret.secretArn}*`,
         ],
-        resources: ["*"],
       })
     );
 
