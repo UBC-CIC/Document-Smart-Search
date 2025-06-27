@@ -1188,19 +1188,16 @@ export class ApiGatewayStack extends cdk.Stack {
       action: "lambda:InvokeFunction",
       sourceArn: `arn:aws:execute-api:${this.region}:${this.account}:${this.api.restApiId}/*/*/user*`,
     });
+    similaritySearchFunction.role?.addToPrincipalPolicy(bedrockPolicyStatement);
+    similaritySearchFunction.role?.addToPrincipalPolicy(openSearchPolicyStatement);
     similaritySearchFunction.role?.addToPrincipalPolicy(
       new iam.PolicyStatement({
-        actions: [
-          "bedrock:InvokeModel",
-          "bedrock:InvokeModelWithResponseStream",
-          "secretsmanager:GetSecretValue",
-          "ssm:GetParameter",
-          "es:ESHttpGet",
-          "es:ESHttpPost",
-          "es:ESHttpPut",
-          "es:ESHttpDelete",
+        actions: ["secretsmanager:GetSecretValue"],
+        resources: [
+          `arn:aws:secretsmanager:${this.region}:${this.account}:secret:${db.secretPathAdminName}*`,
+          `${db.secretPathUser.secretArn}*`,
+          `${osStack.adminSecret.secretArn}*`,
         ],
-        resources: ["*"],
       })
     );
 
@@ -1238,19 +1235,14 @@ export class ApiGatewayStack extends cdk.Stack {
       action: "lambda:InvokeFunction",
       sourceArn: `arn:aws:execute-api:${this.region}:${this.account}:${this.api.restApiId}/*/*/user*`,
     });
+    chartAnalyticsFunction.role?.addToPrincipalPolicy(bedrockPolicyStatement);
     chartAnalyticsFunction.role?.addToPrincipalPolicy(
       new iam.PolicyStatement({
-        actions: [
-          "bedrock:InvokeModel",
-          "bedrock:InvokeModelWithResponseStream",
-          "secretsmanager:GetSecretValue",
-          "ssm:GetParameter",
-          "es:ESHttpGet",
-          "es:ESHttpPost",
-          "es:ESHttpPut",
-          "es:ESHttpDelete",
+        actions: ["secretsmanager:GetSecretValue"],
+        resources: [
+          `arn:aws:secretsmanager:${this.region}:${this.account}:secret:${db.secretPathAdminName}*`,
+          `${db.secretPathUser.secretArn}*`,
         ],
-        resources: ["*"],
       })
     );
 
@@ -1287,19 +1279,14 @@ export class ApiGatewayStack extends cdk.Stack {
       action: "lambda:InvokeFunction",
       sourceArn: `arn:aws:execute-api:${this.region}:${this.account}:${this.api.restApiId}/*/*/user*`,
     });
+    topicsFunction.role?.addToPrincipalPolicy(bedrockPolicyStatement);
     topicsFunction.role?.addToPrincipalPolicy(
       new iam.PolicyStatement({
-        actions: [
-          "bedrock:InvokeModel",
-          "bedrock:InvokeModelWithResponseStream",
-          "secretsmanager:GetSecretValue",
-          "ssm:GetParameter",
-          "es:ESHttpGet",
-          "es:ESHttpPost",
-          "es:ESHttpPut",
-          "es:ESHttpDelete",
+        actions: ["secretsmanager:GetSecretValue"],
+        resources: [
+          `arn:aws:secretsmanager:${this.region}:${this.account}:secret:${db.secretPathAdminName}*`,
+          `${db.secretPathUser.secretArn}*`,
         ],
-        resources: ["*"],
       })
     );
 
@@ -1346,19 +1333,16 @@ export class ApiGatewayStack extends cdk.Stack {
       action: "lambda:InvokeFunction",
       sourceArn: `arn:aws:execute-api:${this.region}:${this.account}:${this.api.restApiId}/*/*/user*`,
     });
+    userFiltersFunction.role?.addToPrincipalPolicy(bedrockPolicyStatement);
+    userFiltersFunction.role?.addToPrincipalPolicy(openSearchPolicyStatement);
     userFiltersFunction.role?.addToPrincipalPolicy(
       new iam.PolicyStatement({
-        actions: [
-          "bedrock:InvokeModel",
-          "bedrock:InvokeModelWithResponseStream",
-          "secretsmanager:GetSecretValue",
-          "ssm:GetParameter",
-          "es:ESHttpGet",
-          "es:ESHttpPost",
-          "es:ESHttpPut",
-          "es:ESHttpDelete",
+        actions: ["secretsmanager:GetSecretValue"],
+        resources: [
+          `arn:aws:secretsmanager:${this.region}:${this.account}:secret:${db.secretPathAdminName}*`,
+          `${db.secretPathUser.secretArn}*`,
+          `${osStack.adminSecret.secretArn}*`,
         ],
-        resources: ["*"],
       })
     );
 
@@ -1407,19 +1391,25 @@ export class ApiGatewayStack extends cdk.Stack {
       action: "lambda:InvokeFunction",
       sourceArn: `arn:aws:execute-api:${this.region}:${this.account}:${this.api.restApiId}/*/*/user*`,
     });
+    llmAnalysisFunction.role?.addToPrincipalPolicy(bedrockPolicyStatement);
     llmAnalysisFunction.role?.addToPrincipalPolicy(
       new iam.PolicyStatement({
-        actions: [
-          "bedrock:InvokeModel",
-          "bedrock:InvokeModelWithResponseStream",
-          "secretsmanager:GetSecretValue",
-          "ssm:GetParameter",
-          "es:ESHttpGet",
-          "es:ESHttpPost",
-          "es:ESHttpPut",
-          "es:ESHttpDelete",
+        effect: iam.Effect.ALLOW,
+        actions: ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
+        resources: [
+          `arn:aws:bedrock:${this.region}::foundation-model/meta.llama3-70b-instruct-v1:0`,
         ],
-        resources: ["*"],
+      })
+    );
+    llmAnalysisFunction.role?.addToPrincipalPolicy(openSearchPolicyStatement);
+    llmAnalysisFunction.role?.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        actions: ["secretsmanager:GetSecretValue"],
+        resources: [
+          `arn:aws:secretsmanager:${this.region}:${this.account}:secret:${db.secretPathAdminName}*`,
+          `${db.secretPathUser.secretArn}*`,
+          `${osStack.adminSecret.secretArn}*`,
+        ],
       })
     );
 
