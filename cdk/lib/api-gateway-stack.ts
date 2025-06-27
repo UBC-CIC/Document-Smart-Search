@@ -1075,75 +1075,6 @@ export class ApiGatewayStack extends cdk.Stack {
       })
     );
 
-    const openSearchQueryFunction = new lambda.DockerImageFunction(
-      this,
-      `${id}-OpenSearchQueryFunction`,
-      {
-        code: lambda.DockerImageCode.fromImageAsset(
-          "./lambda/openSearchQueryFunction",
-          {
-            platform: Platform.LINUX_AMD64,
-          }
-        ),
-        memorySize: 512,
-        timeout: cdk.Duration.seconds(300),
-        vpc: vpcStack.vpc,
-        functionName: `${id}-OpenSearchQueryFunction`,
-        logRetention: logs.RetentionDays.THREE_MONTHS,
-        environment: {
-          SM_DB_CREDENTIALS: db.secretPathUser.secretName,
-          RDS_PROXY_ENDPOINT: db.rdsProxyEndpoint,
-          REGION: this.region,
-          BEDROCK_LLM_PARAM: bedrockLLMParameter.parameterName,
-          EMBEDDING_MODEL_PARAM: embeddingModelParameter.parameterName,
-          TABLE_NAME_PARAM: tableNameParameter.parameterName,
-          OPENSEARCH_HOST: opensearchHostParameter.parameterName,
-          OPENSEARCH_SEC: opensearchSecretParamName.parameterName,
-          OPENSEARCH_INDEX_NAME: indexNameParameter.parameterName,
-          DFO_HTML_FULL_INDEX_NAME: dfoHtmlFullIndexNameParameter.parameterName,
-          DFO_MANDATE_FULL_INDEX_NAME:
-            dfoMandateFullIndexNameParameter.parameterName,
-          BEDROCK_INFERENCE_PROFILE:
-            bedrockInferenceProfileParameter.parameterName,
-          INDEX_NAME: indexNameParameter.parameterName,
-          DFO_TOPIC_FULL_INDEX_NAME:
-            dfoTopicFullIndexNameParameter.parameterName,
-        },
-      }
-    );
-
-    bedrockLLMParameter.grantRead(openSearchQueryFunction);
-    embeddingModelParameter.grantRead(openSearchQueryFunction);
-    tableNameParameter.grantRead(openSearchQueryFunction);
-    opensearchHostParameter.grantRead(openSearchQueryFunction);
-    opensearchSecretParamName.grantRead(openSearchQueryFunction);
-    indexNameParameter.grantRead(openSearchQueryFunction);
-    dfoHtmlFullIndexNameParameter.grantRead(openSearchQueryFunction);
-    dfoMandateFullIndexNameParameter.grantRead(openSearchQueryFunction);
-    bedrockInferenceProfileParameter.grantRead(openSearchQueryFunction);
-    dfoTopicFullIndexNameParameter.grantRead(openSearchQueryFunction);
-
-    const cfnOpenSearchQueryFunc = openSearchQueryFunction.node
-      .defaultChild as lambda.CfnFunction;
-    cfnOpenSearchQueryFunc.overrideLogicalId("OpenSearchLambdaDockerFunction");
-    openSearchQueryFunction.addPermission("AllowApiGatewayInvoke", {
-      principal: new iam.ServicePrincipal("apigateway.amazonaws.com"),
-      action: "lambda:InvokeFunction",
-      sourceArn: `arn:aws:execute-api:${this.region}:${this.account}:${this.api.restApiId}/*/*/user*`,
-    });
-    openSearchQueryFunction.role?.addToPrincipalPolicy(bedrockPolicyStatement);
-    openSearchQueryFunction.role?.addToPrincipalPolicy(openSearchPolicyStatement);
-    openSearchQueryFunction.role?.addToPrincipalPolicy(
-      new iam.PolicyStatement({
-        actions: ["secretsmanager:GetSecretValue"],
-        resources: [
-          `arn:aws:secretsmanager:${this.region}:${this.account}:secret:${db.secretPathAdminName}*`,
-          `${db.secretPathUser.secretArn}*`,
-          `${osStack.adminSecret.secretArn}*`,
-        ],
-      })
-    );
-
     const similaritySearchFunction = new lambda.DockerImageFunction(
       this,
       `${id}-SimilaritySearchFunction`,
@@ -1189,7 +1120,9 @@ export class ApiGatewayStack extends cdk.Stack {
       sourceArn: `arn:aws:execute-api:${this.region}:${this.account}:${this.api.restApiId}/*/*/user*`,
     });
     similaritySearchFunction.role?.addToPrincipalPolicy(bedrockPolicyStatement);
-    similaritySearchFunction.role?.addToPrincipalPolicy(openSearchPolicyStatement);
+    similaritySearchFunction.role?.addToPrincipalPolicy(
+      openSearchPolicyStatement
+    );
     similaritySearchFunction.role?.addToPrincipalPolicy(
       new iam.PolicyStatement({
         actions: ["secretsmanager:GetSecretValue"],
@@ -1395,7 +1328,10 @@ export class ApiGatewayStack extends cdk.Stack {
     llmAnalysisFunction.role?.addToPrincipalPolicy(
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
-        actions: ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
+        actions: [
+          "bedrock:InvokeModel",
+          "bedrock:InvokeModelWithResponseStream",
+        ],
         resources: [
           `arn:aws:bedrock:${this.region}::foundation-model/meta.llama3-70b-instruct-v1:0`,
         ],
