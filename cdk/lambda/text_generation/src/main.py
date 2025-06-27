@@ -397,7 +397,6 @@ def handler(event, context):
 
     try:
         # Initialize OpenSearch, DB, and get configuration values
-        # secrets = get_secret(OPENSEARCH_SEC)
         secrets = get_secret(OPENSEARCH_SEC)
         logger.info(f"OpenSearch Secrets: {secrets}")
         opensearch_host = OPENSEARCH_HOST

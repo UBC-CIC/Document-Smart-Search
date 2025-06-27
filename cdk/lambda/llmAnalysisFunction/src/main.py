@@ -183,15 +183,18 @@ def handler(event, context):
         
         # Summary
         A concise paragraph that (1) summarizes the document's main content, 
-        (2) explains its relevance to the user's question, and (3) gives a rating of 1 to 10 
-        on how well the document answers the user's question, with 10 being a perfect match.
-        Refer to the user in the second person as "you".
+        (2) explains its relevance to the user's question, and (3) assigns a
+        rating from 1 to 10 based on how well the document answers the user's
+        question using neutral, objective second-person language to the user
+        (e.g., 'It would be rated a [x] out of 10', not 'I would rate it...').
 
         Constraints:
         - Use exactly these two sections and no other headings.
         - Bullet lists must use a hyphen (`- `).
         - Do not ask any follow-up questions or add any commentary.
         - Do not include any additional text outside the specified sections.
+        - Refer to the user in the second person as "you".
+        - Do not speak in the first person, no "I" or "we".
         ---
 
         **Document Metadata:**  

@@ -146,6 +146,8 @@ def create_agent_prompt(user_prompt: Optional[str]) -> PromptTemplate:
         If you lack sufficient evidence, clearly state that you do not have the necessary data.
         When you provide an answer without support from verified documents, please indicate it.
         If you cannot fully answer a query, guide the user on how to obtain more information.
+        If the user's query is completely unrelated to DFO or something related to its services,
+        politely inform them that you cannot assist with that topic.
         """
 
     template = """
