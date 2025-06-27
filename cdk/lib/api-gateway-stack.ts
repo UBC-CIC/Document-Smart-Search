@@ -909,7 +909,7 @@ export class ApiGatewayStack extends cdk.Stack {
         effect: iam.Effect.ALLOW,
         actions: ["secretsmanager:GetSecretValue"],
         resources: [
-          `arn:aws:secretsmanager:${this.region}:${this.account}:secret:DFO-Database-DFO/credentials/DbCredential*`,
+          `arn:aws:secretsmanager:${this.region}:${this.account}:secret:${db.secretPathAdminName}*`,
           `${db.secretPathUser.secretArn}*`,
           `${db.secretPathTableCreator.secretArn}*`,
           `${osStack.adminSecret.secretArn}*`,
@@ -1011,7 +1011,7 @@ export class ApiGatewayStack extends cdk.Stack {
       new iam.PolicyStatement({
         actions: ["secretsmanager:GetSecretValue"],
         resources: [
-          `arn:aws:secretsmanager:${this.region}:${this.account}:secret:DFO-Database-DFO/credentials/DbCredential*`,
+          `arn:aws:secretsmanager:${this.region}:${this.account}:secret:${db.secretPathAdminName}*`,
           `${db.secretPathUser.secretArn}*`,
           `${osStack.adminSecret.secretArn}*`,
         ],
@@ -1068,7 +1068,7 @@ export class ApiGatewayStack extends cdk.Stack {
       new iam.PolicyStatement({
         actions: ["secretsmanager:GetSecretValue"],
         resources: [
-          `arn:aws:secretsmanager:${this.region}:${this.account}:secret:DFO-Database-DFO/credentials/DbCredential*`,
+          `arn:aws:secretsmanager:${this.region}:${this.account}:secret:${db.secretPathAdminName}*`,
           `${db.secretPathUser.secretArn}*`,
           `${osStack.adminSecret.secretArn}*`,
         ],
