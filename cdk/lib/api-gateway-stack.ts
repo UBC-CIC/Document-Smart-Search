@@ -1131,19 +1131,16 @@ export class ApiGatewayStack extends cdk.Stack {
       action: "lambda:InvokeFunction",
       sourceArn: `arn:aws:execute-api:${this.region}:${this.account}:${this.api.restApiId}/*/*/user*`,
     });
+    openSearchQueryFunction.role?.addToPrincipalPolicy(bedrockPolicyStatement);
+    openSearchQueryFunction.role?.addToPrincipalPolicy(openSearchPolicyStatement);
     openSearchQueryFunction.role?.addToPrincipalPolicy(
       new iam.PolicyStatement({
-        actions: [
-          "bedrock:InvokeModel",
-          "bedrock:InvokeModelWithResponseStream",
-          "secretsmanager:GetSecretValue",
-          "ssm:GetParameter",
-          "es:ESHttpGet",
-          "es:ESHttpPost",
-          "es:ESHttpPut",
-          "es:ESHttpDelete",
+        actions: ["secretsmanager:GetSecretValue"],
+        resources: [
+          `arn:aws:secretsmanager:${this.region}:${this.account}:secret:${db.secretPathAdminName}*`,
+          `${db.secretPathUser.secretArn}*`,
+          `${osStack.adminSecret.secretArn}*`,
         ],
-        resources: ["*"],
       })
     );
 
