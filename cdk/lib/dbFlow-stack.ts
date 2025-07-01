@@ -46,6 +46,20 @@ export class DBFlowStack extends Stack {
         resources: ["*"],
       })
     );
+
+    lambdaRole.addToPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          "es:ESHttpGet",
+          "es:ESHttpPut",
+          "es:ESHttpPost",
+          "es:ESHttpDelete",
+        ],
+        resources: [`${os.domain.domainArn}/*`],
+      })
+    );
+
     lambdaRole.addManagedPolicy(
       iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSSMReadOnlyAccess")
     );
