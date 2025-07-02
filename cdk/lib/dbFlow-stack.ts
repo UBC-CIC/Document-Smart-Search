@@ -105,7 +105,7 @@ export class DBFlowStack extends Stack {
           MANDATE_INDEX_NAME: "dfo-mandate-full-index",
           HTML_INDEX_NAME: "dfo-html-full-index",
           VECTOR_DIMENSION: "1024",
-          AWS_REGION: this.region,
+          AWS_PROFILE_REGION: this.region,
           OS_DOMAIN: os.domain.domainEndpoint,
           OS_SECRET_NAME: os.adminSecret.secretName,
         },

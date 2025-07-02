@@ -13,14 +13,14 @@ TOPIC_IDX = os.environ.get("TOPIC_INDEX_NAME", "dfo-topic-full-index")
 MANDATE_IDX = os.environ.get("MANDATE_INDEX_NAME", "dfo-mandate-full-index")
 HTML_IDX  = os.environ.get("HTML_INDEX_NAME", "dfo-html-full-index")
 VECTOR_DIMS = int(os.environ.get("VECTOR_DIMENSION", "1024"))
-AWS_REGION = os.environ.get("AWS_REGION", "us-west-2")
+AWS_PROFILE_REGION = os.environ.get("AWS_PROFILE_REGION", "us-west-2")
 OS_DOMAIN = os.environ.get("OS_DOMAIN", "https://dfo-os-domain.us-west-2.es.amazonaws.com")
 OS_SECRET_NAME = os.environ.get("OS_SECRET_NAME", "dfo-os-secret")
 
 # Build SigV4 auth
 session = boto3.Session()
 creds   = session.get_credentials().get_frozen_credentials()
-region  = session.region_name or AWS_REGION
+region  = session.region_name or AWS_PROFILE_REGION
 
 # awsauth = AWS4Auth(
 #     creds.access_key,
@@ -33,7 +33,7 @@ region  = session.region_name or AWS_REGION
 # Get the secret from AWS Secrets Manager
 sm_client = session.client(
     service_name='secretsmanager',
-    region_name=AWS_REGION
+    region_name=AWS_PROFILE_REGION
 )
 
 # Get the secret
