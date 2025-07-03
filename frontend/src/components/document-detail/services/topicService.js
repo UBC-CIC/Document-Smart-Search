@@ -6,6 +6,7 @@ import {
   defaultTopicMetadata,
 } from "../data/topicRelatedData";
 import { similarDocumentFilterOptions as defaultFilterOptions } from "../data/similarDocumentsData";
+import { getUserToken } from "@/lib/getUserToken";
 
 /**
  * Fetch available filter options for topic documents

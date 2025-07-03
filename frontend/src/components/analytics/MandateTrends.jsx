@@ -22,6 +22,7 @@ import {
   mockMandateOptions,
   mockDocumentTypes,
 } from "./mockdata/mockAnalyticsData";
+import { getUserToken } from "@/lib/getUserToken";
 
 // Set this to false to use real API data
 const USE_MOCK_DATA = false;
