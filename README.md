@@ -117,7 +117,7 @@ N/A
 
 ## Credits
 
-This application was architected and developed by [Daniel Long](https://www.linkedin.com/in/pin-hong-long/), [Tien Nguyen](https://www.linkedin.com/in/nhantien/), [Nikhil Sinclair](https://www.linkedin.com/in/nikhil-sinclair/), and [Zayan Sheikh](https://www.linkedin.com/in/zayans/), with project assistance by [Amy Cao](https://www.linkedin.com/in/amy-c-2313121b1/) and Harleen Chahal. Thanks to the UBC Cloud Innovation Centre Technical and Project Management teams for their guidance and support.
+This application was architected and developed by [Daniel Long](https://www.linkedin.com/in/pin-hong-long/), [Tien Nguyen](https://www.linkedin.com/in/nhantien/), [Nikhil Sinclair](https://www.linkedin.com/in/nikhil-sinclair/), and [Zayan Sheikh](https://www.linkedin.com/in/zayans/), with project assistance by [Amy Cao](https://www.linkedin.com/in/amy-c-2313121b1/) and [Harleen Chahal](https://www.linkedin.com/in/harleen-chahal-713569141/). Thanks to the UBC Cloud Innovation Centre Technical and Project Management teams for their guidance and support.
 
 ## License
 
