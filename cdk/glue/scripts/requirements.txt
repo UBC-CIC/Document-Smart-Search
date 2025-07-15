@@ -9,7 +9,7 @@ openpyxl
 pandas
 numpy==1.26.4
 scikit-learn
-aiohttp==3.11.10
+aiohttp==3.12.14
 beautifulsoup4==4.12.3
 bertopic==0.16.2
 langdetect==1.0.9
