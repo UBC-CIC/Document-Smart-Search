@@ -8,14 +8,17 @@ from requests_aws4auth import AWS4Auth
 import json
 
 # Environment
-ENDPOINT = os.environ["OPENSEARCH_ENDPOINT"]
 TOPIC_IDX = os.environ.get("TOPIC_INDEX_NAME", "dfo-topic-full-index")
 MANDATE_IDX = os.environ.get("MANDATE_INDEX_NAME", "dfo-mandate-full-index")
 HTML_IDX  = os.environ.get("HTML_INDEX_NAME", "dfo-html-full-index")
 VECTOR_DIMS = int(os.environ.get("VECTOR_DIMENSION", "1024"))
-AWS_PROFILE_REGION = os.environ.get("AWS_PROFILE_REGION", "us-west-2")
-OS_DOMAIN = os.environ.get("OS_DOMAIN", "https://dfo-os-domain.us-west-2.es.amazonaws.com")
-OS_SECRET_NAME = os.environ.get("OS_SECRET_NAME", "dfo-os-secret")
+
+# these are set in the CDK stack and must exist
+ENDPOINT = os.environ["OPENSEARCH_ENDPOINT"]
+AWS_PROFILE_REGION = os.environ["AWS_PROFILE_REGION"]
+OS_DOMAIN = os.environ["OS_DOMAIN"]
+OS_SECRET_NAME = os.environ["OS_SECRET_NAME"]
+
 
 # Build SigV4 auth
 session = boto3.Session()
