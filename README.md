@@ -1,4 +1,4 @@
-# Smart Document Categorization System
+# Document Smart Search
 
 This system leverages Large Language Models (LLMs) and vector embeddings to revolutionize document interaction and organization. It provides an intelligent and automated way to categorize and analyze extensive document collections, automatically identifying relevant topics and themes with explainable confidence scores. Users can interact with the documents through a versatile chatbot, receiving tailored responses that adapt to their background and level of detail, from general inquiries to highly specific research needs. Additionally, a dedicated search component enables precise retrieval of technical documents. This comprehensive approach enhances document management, enabling more efficient information discovery and deeper insights across vast repositories.
 
