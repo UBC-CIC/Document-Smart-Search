@@ -1,4 +1,5 @@
 **.cursorrules
+**.cursorignore
 **export
 **/glue/scripts/src*
 **/glue/scripts/configs.json

@@ -32,17 +32,17 @@ export const createLayers = (scope: Construct, id: string) => {
 
   /**
    *
-   * Create Lambda layer for Psycopg2
+   * Create Lambda layer for psycopg2-binary==2.9.10, compatible with Python 3.11
    */
   const psycopgLayer = new LayerVersion(scope, `${id}-psycopgLambdaLayer`, {
     code: Code.fromAsset("./layers/psycopg2.zip"),
-    compatibleRuntimes: [Runtime.PYTHON_3_9],
+    compatibleRuntimes: [Runtime.PYTHON_3_11],
     description: "Lambda layer containing the psycopg2 Python library",
   });
 
   /**
    *
-   * Create Lambda layer for OpenSearch
+   * Create Lambda layer for opensearch-py==2.8.0, compatible with Python 3.11
    */
   const opensearchLayer = new lambda.LayerVersion(
     scope,
