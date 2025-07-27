@@ -9,7 +9,6 @@ from opensearchpy import OpenSearch, RequestsHttpConnection
 import psycopg
 from langchain_aws import BedrockEmbeddings
 import time
-from aws_requests_auth.aws_auth import AWSRequestsAuth
 
 # Import helpers
 # from helpers.db import get_rds_connection
