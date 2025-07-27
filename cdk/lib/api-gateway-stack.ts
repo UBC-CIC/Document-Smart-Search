@@ -85,7 +85,7 @@ export class ApiGatewayStack extends cdk.Stack {
     const powertoolsLayer = lambda.LayerVersion.fromLayerVersionArn(
       this,
       `${id}-PowertoolsLayer`,
-      `arn:aws:lambda:${this.region}:017000801446:layer:AWSLambdaPowertoolsPythonV2:78`
+      `arn:aws:lambda:${this.region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python311-x86_64:17`
     );
 
     this.layerList["psycopg2"] = psycopgLayer;
@@ -1356,7 +1356,7 @@ export class ApiGatewayStack extends cdk.Stack {
       this,
       `${id}-GetMessagesFunction`,
       {
-        runtime: lambda.Runtime.PYTHON_3_9,
+        runtime: lambda.Runtime.PYTHON_3_11,
         code: lambda.Code.fromAsset("lambda/getMessages"), // Update the path to match your folder structure
         handler: "getMessagesFunction.lambda_handler",
         timeout: Duration.seconds(300),

@@ -1,6 +1,8 @@
-boto3
-botocore
-psycopg[binary,pool]
-psycopg2-binary
-python-dotenv
-opensearch-py
+boto3==1.39.14
+botocore==1.39.14
+opensearch-py==3.0.0
+psycopg==3.2.9
+psycopg-binary==3.2.9
+psycopg-pool==3.2.6
+psycopg2-binary==2.9.10
+python-dotenv==1.1.1
