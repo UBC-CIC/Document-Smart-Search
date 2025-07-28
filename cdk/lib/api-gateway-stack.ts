@@ -496,7 +496,7 @@ export class ApiGatewayStack extends cdk.Stack {
       {
         runtime: lambda.Runtime.NODEJS_20_X,
         code: lambda.Code.fromAsset("lambda/lib"),
-        handler: "addAdminOnSignUp.handler",
+        handler: "addAdminOnSignup.handler",
         timeout: Duration.seconds(300),
         environment: {
           SM_DB_CREDENTIALS: db.secretPathTableCreator.secretName,
