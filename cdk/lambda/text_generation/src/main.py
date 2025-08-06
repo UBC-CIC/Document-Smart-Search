@@ -404,15 +404,19 @@ def handler(event, context):
             http_compress=True,
             http_auth=(secrets['username'], secrets['password']),
             use_ssl=True,
-            verify_certs=True
+            verify_certs=True,
+            timeout=60
         )
         logger.info("OpenSearch client initialized successfully.")
-        create_hybrid_search_pipeline(
-            client=opensearch_client,
-            pipeline_name=SEARCH_PIPELINE_NAME,
-            keyword_weight=KEYWORD_RATIO_OS_P,
-            semantic_weight=SEMANTIC_RATIO_OS_P
-        )
+        try:
+            create_hybrid_search_pipeline(
+                client=opensearch_client,
+                pipeline_name=SEARCH_PIPELINE_NAME,
+                keyword_weight=KEYWORD_RATIO_OS_P,
+                semantic_weight=SEMANTIC_RATIO_OS_P
+            )
+        except Exception as e:
+            logger.error(f"Error creating hybrid search pipeline: {e}")
 
         # Set up RDS connection - This is hard coded to a test database for now
         tools_rds_secret = get_secret(RDS_SEC)
