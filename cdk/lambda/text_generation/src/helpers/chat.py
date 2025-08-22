@@ -1,4 +1,3 @@
-import json
 import boto3
 import re
 import logging
@@ -336,7 +335,7 @@ def get_prompt_for_role(conn, user_role: str) -> Optional[str]:
     
     Parameters:
     -----------
-    conn : psycopg2.extensions.connection
+    conn : psycopg connection object
         Database connection
     user_role : str
         User role (public, researcher)

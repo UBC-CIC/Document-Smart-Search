@@ -30,7 +30,7 @@ def initialize_tools(
     -----------
     opensearch_client : OpenSearch
         The OpenSearch client
-    conn : psycopg2.extensions.connection
+    conn : psycopg connection object
         An existing database connection to reuse
     embedder : BedrockEmbeddings
         The embeddings model for semantic search

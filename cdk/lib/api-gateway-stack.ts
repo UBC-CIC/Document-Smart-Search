@@ -776,6 +776,7 @@ export class ApiGatewayStack extends cdk.Stack {
         ),
         memorySize: 512,
         timeout: cdk.Duration.seconds(300),
+        // snapStart: lambda.SnapStartConf.ON_PUBLISHED_VERSIONS, // Not supported for Docker Image Function yet
         vpc: vpcStack.vpc, // Pass the VPC
         functionName: `${id}-TextGenFunction`,
         logRetention: logs.RetentionDays.THREE_MONTHS,

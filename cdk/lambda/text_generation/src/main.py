@@ -1,14 +1,19 @@
+import time
+
+start_time = time.time()
+
 import json
 import os
 from typing import Dict
 import boto3
 import logging
 import uuid
-import datetime
-from opensearchpy import OpenSearch, RequestsHttpConnection
+from datetime import datetime
+from opensearchpy import OpenSearch
 import psycopg
 from langchain_aws import BedrockEmbeddings
 import time
+
 
 # Import helpers
 # from helpers.db import get_rds_connection
@@ -244,7 +249,7 @@ def log_user_engagement(conn, session_id: str, message: str, user_role: str = No
     try:
         with conn.cursor() as cur:
             log_id = str(uuid.uuid4())
-            timestamp = datetime.datetime.now()
+            timestamp = datetime.now()
             
             query = """
             INSERT INTO user_engagement_log (
@@ -294,6 +299,11 @@ def map_role_to_display_name(role: str) -> str:
         "external_researcher": "External Researcher"
     }
     return role_mapping.get(role, "General Public")
+
+end_init_time = time.time()
+init_duration = end_init_time - start_time
+
+print(f"INIT phase took: {init_duration:.4f} seconds")
 
 def handler(event, context):
     """Lambda handler function"""
