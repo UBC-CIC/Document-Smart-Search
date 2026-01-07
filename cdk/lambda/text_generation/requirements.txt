@@ -20,11 +20,11 @@ attrs==25.3.0
     # via aiohttp
 boto3==1.39.14
     # via
-    #   -r ./text_generation/requirements.in
+    #   -r requirements.in
     #   langchain-aws
 botocore==1.39.14
     # via
-    #   -r ./text_generation/requirements.in
+    #   -r requirements.in
     #   boto3
     #   s3transfer
 certifi==2025.7.14
@@ -43,6 +43,8 @@ frozenlist==1.7.0
     # via
     #   aiohttp
     #   aiosignal
+greenlet==3.3.0
+    # via sqlalchemy
 h11==0.16.0
     # via httpcore
 httpcore==1.0.9
@@ -67,22 +69,22 @@ jsonpointer==3.0.0
     # via jsonpatch
 langchain==0.3.27
     # via
-    #   -r ./text_generation/requirements.in
+    #   -r requirements.in
     #   langchain-community
 langchain-aws==0.2.29
-    # via -r ./text_generation/requirements.in
+    # via -r requirements.in
 langchain-community==0.3.27
-    # via -r ./text_generation/requirements.in
-langchain-core==0.3.72
+    # via -r requirements.in
+langchain-core==0.3.81
     # via
-    #   -r ./text_generation/requirements.in
+    #   -r requirements.in
     #   langchain
     #   langchain-aws
     #   langchain-community
     #   langchain-postgres
     #   langchain-text-splitters
 langchain-postgres==0.0.15
-    # via -r ./text_generation/requirements.in
+    # via -r requirements.in
 langchain-text-splitters==0.3.9
     # via langchain
 langsmith==0.4.8
@@ -105,7 +107,7 @@ numpy==1.26.4
     #   langchain-postgres
     #   pgvector
 opensearch-py==3.0.0
-    # via -r ./text_generation/requirements.in
+    # via -r requirements.in
 orjson==3.11.1
     # via langsmith
 packaging==25.0
@@ -121,16 +123,16 @@ propcache==0.3.2
     #   yarl
 psycopg==3.2.9
     # via
-    #   -r ./text_generation/requirements.in
+    #   -r requirements.in
     #   langchain-postgres
 psycopg-binary==3.2.9
-    # via -r ./text_generation/requirements.in
+    # via -r requirements.in
 psycopg-pool==3.2.6
     # via
-    #   -r ./text_generation/requirements.in
+    #   -r requirements.in
     #   langchain-postgres
 psycopg2-binary==2.9.10
-    # via -r ./text_generation/requirements.in
+    # via -r requirements.in
 pydantic==2.11.7
     # via
     #   langchain
@@ -148,7 +150,7 @@ python-dateutil==2.9.0.post0
     #   opensearch-py
 python-dotenv==1.1.1
     # via
-    #   -r ./text_generation/requirements.in
+    #   -r requirements.in
     #   pydantic-settings
 pyyaml==6.0.2
     # via
